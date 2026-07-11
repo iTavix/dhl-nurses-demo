@@ -1,0 +1,105 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ===================================================================================
+   Custom app CSS (moved verbatim from the old single-file index.html <style> block),
+   plus the iOS safe-area rules at the bottom.
+   =================================================================================== */
+    body { font-family: 'Inter', sans-serif; }
+    ::-webkit-scrollbar { width: 10px; height: 10px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; background-clip: content-box; }
+    [data-tooltip] { position: relative; }
+    [data-tooltip]:hover::after {
+      content: attr(data-tooltip);
+      position: absolute; bottom: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+      background: #0f172a; color: #fff; padding: 6px 10px; border-radius: 8px;
+      font-size: 11px; font-weight: 500; z-index: 50; pointer-events: none;
+      box-shadow: 0 8px 24px rgba(15,23,42,.25);
+      width: max-content; max-width: min(72vw, 260px); white-space: normal; overflow-wrap: anywhere; text-align: center;
+    }
+    /* Drop the tooltip below the element (used in the top header so it isn't clipped by the browser bar) */
+    [data-tooltip][data-tip-pos="bottom"]:hover::after { top: calc(100% + 8px); bottom: auto; }
+    /* Below + right-aligned: for elements near the right edge (avatar) so it never overflows the viewport */
+    [data-tooltip][data-tip-pos="bottom-left"]:hover::after { top: calc(100% + 8px); bottom: auto; left: auto; right: 0; transform: none; text-align: left; }
+    /* Header utility controls: collapsed into a dropdown on mobile/tablet, inline on desktop (lg+) */
+    #hdr-tools { display: none; }
+    #hdr-tools.open {
+      display: flex; position: absolute; top: calc(100% + 8px); right: 0; z-index: 45;
+      flex-direction: column; align-items: stretch; gap: 8px; min-width: 210px;
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 10px;
+      box-shadow: 0 16px 40px rgba(15,23,42,.20);
+    }
+    #hdr-tools.open > button { justify-content: flex-start; }
+    @media (min-width: 1024px) {
+      #hdr-tools, #hdr-tools.open {
+        display: flex; position: static; flex-direction: row; align-items: center;
+        gap: 0.625rem; min-width: 0; background: none; border: 0; padding: 0; box-shadow: none;
+      }
+      #hdr-tools.open > button { justify-content: center; }
+      #hdr-tools-btn { display: none !important; }
+    }
+    .dark #hdr-tools.open { background: #1e293b; border-color: #334155; }
+    /* "Riepilogo Trasferimenti": softer, less flashy panel in dark mode (no indigo gradient) */
+    .dark .dhl-summary { background-image: none !important; background-color: #131c30 !important; border-color: #2b3a52 !important; }
+    /* Interactive guided tour */
+    #tour-layer { position: fixed; inset: 0; z-index: 60; pointer-events: none; }
+    #tour-hole {
+      position: fixed; border-radius: 14px; border: 2px solid #818cf8;
+      box-shadow: 0 0 0 9999px rgba(15, 23, 42, .62); transition: all .25s ease; pointer-events: none; opacity: 0;
+    }
+    #tour-card {
+      position: fixed; max-width: 340px; background: #fff; border-radius: 16px; padding: 18px;
+      box-shadow: 0 24px 60px rgba(15, 23, 42, .38); opacity: 0; pointer-events: auto; z-index: 61;
+      transition: opacity .2s ease, top .22s ease, left .22s ease;
+    }
+    /* In-app document overlays (operator manual + regulatory guide) */
+    #manual-overlay h2[id], #manual-overlay h3[id], #manual-overlay section[id],
+    #guide-overlay h2[id], #guide-overlay section[id], #guide-overlay li[id] { scroll-margin-top: 80px; }
+    #manual-overlay .toc-link.active, #guide-overlay .toc-link.active { color: #4f46e5; font-weight: 600; background: #eef2ff; }
+    @media print {
+      body > *:not(#manual-overlay):not(#guide-overlay):not(#privacy-overlay) { display: none !important; }
+      #manual-overlay, #guide-overlay, #privacy-overlay { position: static !important; overflow: visible !important; background: #fff !important; }
+      #manual-overlay .no-print, #guide-overlay .no-print, #privacy-overlay .no-print { display: none !important; }
+      #manual-overlay aside, #guide-overlay aside { display: none !important; }
+      /* The privacy form is signed on paper: always print it in light colors. */
+      #privacy-overlay, #privacy-overlay * { color: #0f172a !important; background: #fff !important; }
+    }
+
+    /* ===== Dark mode: remap the slate/white palette used across the app ===== */
+    html.dark body, html.dark { background-color: #0b1220; color: #cbd5e1; }
+    .dark .bg-slate-100 { background-color: #0b1220 !important; }
+    .dark .bg-white { background-color: #1e293b !important; }
+    .dark .bg-white\/85, .dark .bg-white\/90 { background-color: rgba(30,41,59,.88) !important; }
+    .dark .bg-slate-50, .dark .bg-slate-50\/60, .dark .bg-slate-50\/40 { background-color: #243044 !important; }
+    .dark .bg-slate-100.p-1, .dark nav.bg-slate-100, .dark .bg-slate-100.p-0\.5 { background-color: #243044 !important; }
+    .dark .border-slate-200, .dark .border-slate-100 { border-color: #334155 !important; }
+    .dark .divide-slate-100 > * + * { border-color: #334155 !important; }
+    .dark .text-slate-900 { color: #f1f5f9 !important; }
+    .dark .text-slate-800 { color: #e2e8f0 !important; }
+    .dark .text-slate-700 { color: #cbd5e1 !important; }
+    .dark .text-slate-600 { color: #b6c2d4 !important; }
+    .dark .text-slate-500 { color: #94a3b8 !important; }
+    .dark .text-slate-400 { color: #7c8aa0 !important; }
+    .dark .ring-slate-200 { --tw-ring-color: #334155 !important; }
+    .dark .shadow-sm, .dark .shadow-md, .dark .shadow-lg, .dark .shadow-2xl { --tw-shadow-color: rgba(0,0,0,.5); }
+    /* Light-tinted accent surfaces → translucent in dark */
+    .dark .bg-indigo-50, .dark .bg-indigo-50\/60, .dark .bg-indigo-50\/30 { background-color: rgba(99,102,241,.16) !important; }
+    .dark .bg-emerald-50, .dark .bg-emerald-50\/50, .dark .bg-emerald-50\/40, .dark .bg-emerald-50\/60 { background-color: rgba(16,185,129,.14) !important; }
+    .dark .bg-amber-50, .dark .bg-amber-50\/50, .dark .bg-amber-50\/40, .dark .bg-amber-50\/60 { background-color: rgba(245,158,11,.14) !important; }
+    .dark .bg-rose-50, .dark .bg-rose-50\/60 { background-color: rgba(244,63,94,.14) !important; }
+    .dark .from-indigo-50 { --tw-gradient-from: #243044 var(--tw-gradient-from-position) !important; }
+    .dark .to-slate-50 { --tw-gradient-to: #1e293b var(--tw-gradient-to-position) !important; }
+    .dark input, .dark textarea, .dark select { background-color: #0f172a !important; border-color: #334155 !important; color: #e2e8f0 !important; }
+    .dark input::placeholder, .dark textarea::placeholder { color: #64748b !important; }
+    .dark #manual-overlay, .dark #guide-overlay, .dark #privacy-overlay { background-color: #0b1220 !important; }
+    .dark #tour-card, .dark #modal-layer > div { background-color: #1e293b !important; color: #cbd5e1; }
+    .dark code { background-color: #334155 !important; }
+
+    /* ===== iOS standalone (PWA): keep UI clear of the notch / home indicator ===== */
+    /* Requires viewport-fit=cover in the <meta name="viewport"> tag. */
+    header.sticky { padding-top: env(safe-area-inset-top); }
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    #manual-overlay, #guide-overlay, #privacy-overlay, #modal-layer { padding-top: env(safe-area-inset-top); }

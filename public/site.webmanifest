@@ -1,0 +1,14 @@
+{
+  "name": "DHL Nurses",
+  "short_name": "DHL Nurses",
+  "description": "Gestionale trasferimento infermieri Repubblica Dominicana → Italia",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0b1220",
+  "theme_color": "#4f46e5",
+  "icons": [
+    { "src": "favicon.svg", "type": "image/svg+xml", "sizes": "any", "purpose": "any" },
+    { "src": "apple-touch-icon.svg", "type": "image/svg+xml", "sizes": "180x180", "purpose": "maskable" },
+    { "src": "apple-touch-icon.png", "type": "image/png", "sizes": "180x180", "purpose": "any" }
+  ]
+}

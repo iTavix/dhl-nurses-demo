@@ -1,0 +1,3358 @@
+// =====================================================================================
+//  Module imports — pinned npm packages (see package.json) instead of CDN <script> tags.
+//  The compat build of Firebase keeps the exact same `firebase.*` API the app was
+//  written against, so the application code below is unchanged.
+// =====================================================================================
+import firebase from 'firebase/compat/app';
+import 'firebase/compat/auth';
+import 'firebase/compat/firestore';
+import 'firebase/compat/storage';
+import { createIcons, icons as lucideIcons } from 'lucide';
+import { STEP_I18N, CHECKLIST_I18N, I18N } from './i18n-data.js';
+import { guideToc, guideBody } from './guide-content.js';
+
+// Shim with the same shape as the old lucide UMD global: lucide.createIcons().
+const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(opts || {}) }) };
+
+  // =====================================================================================
+  //  DHL Nurses — Gestionale Trasferimento Infermieri (Repubblica Dominicana → Italia)
+  //  Single-file reactive app · Vanilla ES6+ · Tailwind + Lucide
+  //  Persistence: Firebase Firestore (per-user cloud DB) + localStorage cache/fallback
+  //  Auth: Firebase Authentication (email/password + Google). Local demo mode if unset.
+  // =====================================================================================
+
+  // ---------- Firebase configuration ----------
+  // 1. Crea un progetto su https://console.firebase.google.com
+  // 2. Abilita Authentication → metodi "Email/Password" e "Google".
+  // 3. Crea un database Firestore (modalità produzione) e incolla le regole indicate nel README.
+  // 4. In "Impostazioni progetto" → "Le tue app" copia il config e incollalo qui sotto.
+  // Finché apiKey resta vuota, l'app gira in MODALITÀ DEMO LOCALE (solo localStorage, nessun login).
+  const FIREBASE_CONFIG = {
+    apiKey: "", // DEMO: vuota di proposito → modalità demo locale, nessun login
+    authDomain: "dominicahealthlink.firebaseapp.com",
+    projectId: "dominicahealthlink",
+    storageBucket: "dominicahealthlink.firebasestorage.app",
+    messagingSenderId: "88621070016",
+    appId: "1:88621070016:web:218cad6b8da9c7027e5f25",
+  };
+
+  // ---------- Workspace model ----------
+  // false → per-user private data (each operator has their own isolated workspace).
+  // true  → shared team workspace: all operators see the SAME candidates; admins manage
+  //         base records, operators work on cases. Enforced by Firestore rules + custom claims.
+  // Only enable AFTER deploying firestore.rules and bootstrapping an admin (see FIREBASE-SETUP.md §4).
+  const SHARED_WORKSPACE = true;
+  const ORG_ID = 'default';
+
+  // Firebase runtime handles (populated only when configured).
+  let fbEnabled = false, auth = null, db = null, storage = null, currentUser = null, userClaims = null;
+  let remoteSaveTimer = null, tourAutoChecked = false;
+  // True once onAuthStateChanged has fired at least once. Until then the boot splash stays on
+  // screen, so a returning signed-in user never sees the login screen flash by.
+  let authResolved = false;
+  // True while the initial Firestore read is in flight. Blocks the debounced cloud sync so a
+  // stale locally-cached state can never be pushed over fresher team data during startup.
+  let remoteLoading = false;
+
+  function firebaseConfigured() {
+    return typeof firebase !== 'undefined' && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.trim().length > 0;
+  }
+
+  // ---------- Internationalization (it / en / es) ----------
+  let LANG = 'it';
+  const SUPPORTED_LANGS = ['it', 'en', 'es'];
+  function loadLang() { try { const l = localStorage.getItem('dhl.lang'); if (l && SUPPORTED_LANGS.indexOf(l) >= 0) LANG = l; } catch (e) { /* ignore */ } }
+  function setLang(l) { if (SUPPORTED_LANGS.indexOf(l) < 0) return; LANG = l; try { localStorage.setItem('dhl.lang', l); } catch (e) { /* ignore */ } tourAutoChecked = true; render(); }
+  function localeTag() { return LANG === 'en' ? 'en-GB' : (LANG === 'es' ? 'es-ES' : 'it-IT'); }
+
+  // ---------- Theme (light / dark) ----------
+  let THEME = 'light';
+  function applyTheme() {
+    try { document.documentElement.classList.toggle('dark', THEME === 'dark'); } catch (e) { /* ignore */ }
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', THEME === 'dark' ? '#0b1220' : '#4f46e5');
+  }
+  function loadTheme() {
+    try {
+      const tm = localStorage.getItem('dhl.theme');
+      if (tm === 'dark' || tm === 'light') THEME = tm;
+      else if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) THEME = 'dark';
+    } catch (e) { /* ignore */ }
+    applyTheme();
+  }
+  function toggleTheme() {
+    THEME = THEME === 'dark' ? 'light' : 'dark';
+    try { localStorage.setItem('dhl.theme', THEME); } catch (e) { /* ignore */ }
+    applyTheme();
+    render();
+  }
+  function t(key, vars) {
+    const d = I18N[LANG] || I18N.it;
+    let s = d[key] != null ? d[key] : (I18N.it[key] != null ? I18N.it[key] : key);
+    if (vars) Object.keys(vars).forEach((p) => { s = s.split('{' + p + '}').join(vars[p]); });
+    return s;
+  }
+
+  // ---------- The 11 sequential workflow states (localized) ----------
+  const STEP_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  function stepName(id) { const L = STEP_I18N[LANG] || STEP_I18N.it; return L.names[id] || STEP_I18N.it.names[id] || '—'; }
+  function stepShort(id) { const L = STEP_I18N[LANG] || STEP_I18N.it; return L.short[id] || STEP_I18N.it.short[id] || ''; }
+  function steps() { return STEP_IDS.map((id) => ({ id: id, name: stepName(id), short: stepShort(id) })); }
+
+  // Realistic max days a case should sit in a given step before it becomes a risk.
+  const STEP_SLA_DAYS = { 1: 14, 2: 30, 3: 21, 4: 45, 5: 30, 6: 60, 7: 45, 8: 30, 9: 21, 10: 20, 11: 30 };
+
+  // Per-step mandatory checklist templates (same item count across languages).
+  function checklistLabels(step) { const L = CHECKLIST_I18N[LANG] || CHECKLIST_I18N.it; return L[step] || CHECKLIST_I18N.it[step] || []; }
+  function checklistLabel(step, idx) { const a = checklistLabels(step); return a[idx] != null ? a[idx] : ''; }
+
+  // Document gating rules per step.
+  const STEP_REQUIRES_NO_MISSING_DOCS = 2; // can't leave "Documents missing" while a doc is still missing
+  const STEP_REQUIRES_ALL_DOCS_APPROVED = 3; // can't leave "Documents verified" until every doc is approved
+
+  // Status badge metadata (colors fixed; labels localized via i18n).
+  const STATUS_CLS = {
+    'Missing Docs':         'bg-rose-100 text-rose-700 ring-rose-200',
+    'In Progress':          'bg-indigo-100 text-indigo-700 ring-indigo-200',
+    'Visa Obtained':        'bg-amber-100 text-amber-700 ring-amber-200',
+    'Onboarding Completed': 'bg-emerald-100 text-emerald-700 ring-emerald-200',
+  };
+  const STATUS_KEY = { 'Missing Docs': 'status_missing', 'In Progress': 'status_progress', 'Visa Obtained': 'status_visa', 'Onboarding Completed': 'status_onboarding' };
+  function statusLabel(k) { return t(STATUS_KEY[k] || 'status_progress'); }
+  function statusCls(k) { return STATUS_CLS[k] || STATUS_CLS['In Progress']; }
+
+  const DOC_STATUS_CLS = { approved: 'bg-emerald-100 text-emerald-700 ring-emerald-200', pending: 'bg-amber-100 text-amber-700 ring-amber-200', missing: 'bg-rose-100 text-rose-700 ring-rose-200' };
+  const DOC_STATUS_ICON = { approved: 'check-circle-2', pending: 'clock', missing: 'x-circle' };
+  function docStatusLabel(s) { return t('doc_' + s); }
+
+  // (Translation dictionary moved to src/i18n-data.js)
+
+  // ---------- Helpers ----------
+  const STORAGE_KEY = 'nurseflow.state.v1';
+  const uid = () => 'id_' + Math.random().toString(36).slice(2, 10);
+  const today = () => new Date();
+
+  function isoDaysAgo(days) {
+    const d = new Date();
+    d.setDate(d.getDate() - days);
+    return d.toISOString().slice(0, 10);
+  }
+  function isoMinutesAgo(mins) {
+    const d = new Date();
+    d.setMinutes(d.getMinutes() - mins);
+    return d.toISOString();
+  }
+  function formatDate(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return '—';
+    return d.toLocaleDateString(localeTag(), { day: '2-digit', month: 'short', year: 'numeric' });
+  }
+  function formatDateTime(iso) {
+    if (!iso) return '—';
+    const d = new Date(iso);
+    if (isNaN(d)) return '—';
+    return d.toLocaleString(localeTag(), { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  }
+  function daysBetween(iso) {
+    if (!iso) return 0;
+    const d = new Date(iso);
+    return Math.max(0, Math.floor((today() - d) / 86400000));
+  }
+  function escapeHtml(s) {
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+  }
+
+  // ---------- Initial / mock state ----------
+  function makeChecklist(stepDoneMap) {
+    // stepDoneMap: { stepId: [bool, bool, ...] } describing done flags for that step's items.
+    // Items store a {step, idx} reference so labels can be re-translated at render time.
+    const out = {};
+    STEP_IDS.forEach((id) => {
+      const count = (CHECKLIST_I18N.it[id] || []).length;
+      const flags = (stepDoneMap && stepDoneMap[id]) || [];
+      const arr = [];
+      for (let i = 0; i < count; i++) {
+        arr.push({ id: uid(), step: id, idx: i, done: flags[i] !== undefined ? flags[i] : (id < (stepDoneMap.__current || 1)) });
+      }
+      out[id] = arr;
+    });
+    return out;
+  }
+
+  function seedState() {
+    // -------- Candidate 1: Ana Valeria Rosario — Missing Docs (stuck at step 2) --------
+    const ana = {
+      id: 'nurse_ana',
+      name: 'Ana Valeria Rosario',
+      passport: 'RD-DX1184220',
+      birthPlace: 'Santo Domingo',
+      nationality: 'Dominicana',
+      cedula: '402-1938475-6', birthDate: '1996-03-14', maritalStatus: 'single',
+      phone: '+1 809 555 0134', email: 'ana.rosario@example.do',
+      address: 'Calle El Conde 45, Santo Domingo',
+      privacyConsent: false, privacyConsentDate: null,
+      partnerAgency: 'Caribe Health Recruiting SRL',
+      languageLevel: 'A2 — in formazione',
+      employer: 'Casa di Cura San Raffaele · Milano',
+      hrReferent: 'Dott.ssa Giulia Ferraro',
+      currentStep: 2,
+      status: 'Missing Docs',
+      lastUpdate: isoDaysAgo(74), // clearly over the 30g SLA → red risk
+      documents: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(90), validity: '2034-05-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(88), validity: '2030-01-01', status: 'approved' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: null,           validity: null,         status: 'missing' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: null,          validity: null,         status: 'missing' },
+      ],
+      checklist: makeChecklist({
+        __current: 2,
+        1: [true, true, true],
+        2: [true, true, false, false], // translation + legalization not uploaded
+      }),
+      relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Non avviato' },
+      logs: [
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 74), type: 'system', author: 'Sistema', text: 'Candidata acquisita e profilo creato.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 80), type: 'note', author: 'Dott.ssa Ferraro', text: 'Diploma e certificato professionale verificati con esito positivo.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 50), type: 'alert', author: 'Sistema', text: 'ALERTA / ALERT: Falta la traducción jurada legalizada del título. Manca la traduzione asseverata legalizzata del titolo.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 30), type: 'call', author: 'Caribe Health Recruiting', text: 'Llamada con la candidata: la apostilla está en trámite en la Procuraduría. Tempo stimato 3 settimane.' },
+      ],
+    };
+
+    // -------- Candidate 2: Carlos Manuel Tejeda — Visa Obtained (step 8) --------
+    const carlos = {
+      id: 'nurse_carlos',
+      name: 'Carlos Manuel Tejeda',
+      passport: 'RD-AK7740915',
+      birthPlace: 'Santiago de los Caballeros',
+      nationality: 'Dominicana',
+      cedula: '031-0847261-9', birthDate: '1991-08-22', maritalStatus: 'married',
+      phone: '+1 829 555 0177', email: 'carlos.tejeda@example.do',
+      address: 'Av. Estrella Sadhala 102, Santiago de los Caballeros',
+      privacyConsent: true, privacyConsentDate: isoDaysAgo(200),
+      partnerAgency: 'Antillas Nursing Partners',
+      languageLevel: 'B1 — certificato CELI',
+      employer: 'Azienda Ospedaliera di Padova',
+      hrReferent: 'Dott. Marco Bianchi',
+      currentStep: 8,
+      status: 'Visa Obtained',
+      lastUpdate: isoDaysAgo(6),
+      documents: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(210), validity: '2033-09-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(208), validity: '2031-01-01', status: 'approved' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(180), validity: '2033-09-01', status: 'approved' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(178), validity: '2033-09-01', status: 'approved' },
+        { id: uid(), name: 'Decreto di Riconoscimento del Titolo', language: 'IT', uploadDate: isoDaysAgo(40),  validity: '—',          status: 'approved' },
+        { id: uid(), name: 'Visto di Ingresso (Lavoro Subordinato)', language: 'IT', uploadDate: isoDaysAgo(6), validity: '2026-12-15', status: 'approved' },
+        { id: uid(), name: 'Copia Passaporto',                       language: 'ES', uploadDate: isoDaysAgo(210), validity: '2031-03-01', status: 'approved' },
+        { id: uid(), name: 'Cédula (Documento d’Identità RD)',   language: 'ES', uploadDate: isoDaysAgo(210), validity: '2029-05-01', status: 'approved' },
+        { id: uid(), name: 'Consenso Privacy Firmato',               language: 'IT', uploadDate: isoDaysAgo(200), validity: null,         status: 'approved' },
+        { id: uid(), name: 'Certificato di Lingua',                  language: 'IT', uploadDate: isoDaysAgo(190), validity: null,         status: 'approved' },
+      ],
+      checklist: makeChecklist({
+        __current: 8,
+        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
+        4: [true, true], 5: [true, true], 6: [true], 7: [true, true],
+        8: [true, true], // visa fully obtained → ready to advance to OPI
+      }),
+      relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Pre-contratto firmato' },
+      logs: [
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 40), type: 'system', author: 'Sistema', text: 'Decreto di riconoscimento del titolo ricevuto.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 20), type: 'note', author: 'Dott. Bianchi', text: 'Nulla osta al lavoro emesso dallo Sportello Unico Immigrazione.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 6),  type: 'alert', author: 'Sistema', text: 'Visto rilasciato dal consolato. Prossimo passo: iscrizione OPI e logistica viaggio.' },
+      ],
+    };
+
+    // -------- Candidate 3: Elena Maria Santos — Onboarding Completed (step 11) --------
+    const elena = {
+      id: 'nurse_elena',
+      name: 'Elena Maria Santos',
+      passport: 'RD-MP3320877',
+      birthPlace: 'La Romana',
+      nationality: 'Dominicana',
+      cedula: '026-5567340-1', birthDate: '1989-11-05', maritalStatus: 'married',
+      phone: '+39 349 555 0122', email: 'elena.santos@example.do',
+      address: 'Via Giustiniani 12, Padova',
+      privacyConsent: true, privacyConsentDate: isoDaysAgo(420),
+      partnerAgency: 'Caribe Health Recruiting SRL',
+      languageLevel: 'B2 — certificato CELI',
+      employer: 'Azienda Ospedaliera di Padova',
+      hrReferent: 'Dott. Marco Bianchi',
+      currentStep: 11,
+      status: 'Onboarding Completed',
+      lastUpdate: isoDaysAgo(12),
+      documents: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(420), validity: '2032-06-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(418), validity: '2030-01-01', status: 'approved' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(400), validity: '2032-06-01', status: 'approved' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(398), validity: '2032-06-01', status: 'approved' },
+        { id: uid(), name: 'Decreto di Riconoscimento del Titolo', language: 'IT', uploadDate: isoDaysAgo(150), validity: '—',          status: 'approved' },
+        { id: uid(), name: 'Iscrizione Albo OPI',                  language: 'IT', uploadDate: isoDaysAgo(80),  validity: '2027-01-01', status: 'approved' },
+        { id: uid(), name: 'Contratto di Lavoro Firmato',          language: 'IT', uploadDate: isoDaysAgo(30),  validity: '—',          status: 'approved' },
+        { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(420), validity: '2030-07-01', status: 'approved' },
+        { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(420), validity: '2028-11-01', status: 'approved' },
+        { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(420), validity: null,         status: 'approved' },
+        { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(400), validity: null,         status: 'approved' },
+      ],
+      checklist: makeChecklist({
+        __current: 12,
+        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
+        4: [true, true], 5: [true, true], 6: [true], 7: [true, true],
+        8: [true, true], 9: [true, true, true], 10: [true, true, true], 11: [true, true, true],
+      }),
+      relocation: {
+        flight: 'AZ 681 · SDQ → MXP · arrivo 18 mag 2026',
+        housing: 'Foresteria aziendale, Via Giustiniani 12, Padova',
+        tutor: 'Coord. Inf. Laura Marchetti',
+        contractStatus: 'Contratto a tempo indeterminato attivo',
+      },
+      logs: [
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 42), type: 'system', author: 'Sistema', text: 'Iscrizione OPI completata.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 30), type: 'note', author: 'Dott. Bianchi', text: 'Arrivo in Italia e permesso di soggiorno ritirato.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 12), type: 'system', author: 'Sistema', text: 'Onboarding completato: tutor assegnato, contratto attivo. Integrazione conclusa.' },
+      ],
+    };
+
+    // -------- Candidate 4: Marisol Pena Urena — Documents under verification (step 3) --------
+    const marisol = {
+      id: 'nurse_marisol',
+      name: 'Marisol Peña Ureña',
+      passport: 'RD-CG5521904',
+      birthPlace: 'San Pedro de Macorís',
+      nationality: 'Dominicana',
+      cedula: '023-7761204-3', birthDate: '1998-01-27', maritalStatus: 'single',
+      phone: '+1 809 555 0188', email: 'marisol.pena@example.do',
+      address: 'Av. Independencia 210, San Pedro de Macorís',
+      privacyConsent: true, privacyConsentDate: isoDaysAgo(35),
+      partnerAgency: 'Antillas Nursing Partners',
+      languageLevel: 'B1 — corso intensivo',
+      employer: 'Casa di Cura San Raffaele · Milano',
+      hrReferent: 'Dott.ssa Giulia Ferraro',
+      currentStep: 3,
+      status: 'In Progress',
+      lastUpdate: isoDaysAgo(4),
+      documents: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(30), validity: '2035-02-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(28), validity: '2031-06-01', status: 'approved' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(6),  validity: '2035-02-01', status: 'pending' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(5), validity: '2035-02-01', status: 'pending' },
+        { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(35), validity: '2032-01-01', status: 'approved' },
+        { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(35), validity: '2030-01-01', status: 'approved' },
+        { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(35), validity: null, status: 'approved' },
+        { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(10), validity: null, status: 'pending' },
+      ],
+      checklist: makeChecklist({
+        __current: 3,
+        1: [true, true, true], 2: [true, true, true, true], 3: [true, false],
+      }),
+      relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Non avviato' },
+      logs: [
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 30), type: 'system', author: 'Sistema', text: 'Profilo completato: documenti d’identità e consenso privacy acquisiti.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 6), type: 'note', author: 'Dott.ssa Ferraro', text: 'Traduzione asseverata e apostille ricevute: verifica di conformità in corso.' },
+      ],
+    };
+
+    // -------- Candidate 5: Jose Alberto Guzman — Integration requested (step 5) --------
+    const jose = {
+      id: 'nurse_jose',
+      name: 'José Alberto Guzmán',
+      passport: 'RD-BT8830476',
+      birthPlace: 'La Vega',
+      nationality: 'Dominicana',
+      cedula: '048-2210937-5', birthDate: '1993-06-09', maritalStatus: 'married',
+      phone: '+1 849 555 0163', email: 'jose.guzman@example.do',
+      address: 'Calle Duarte 88, La Vega',
+      privacyConsent: true, privacyConsentDate: isoDaysAgo(120),
+      partnerAgency: 'Caribe Health Recruiting SRL',
+      languageLevel: 'B1 — certificato CELI',
+      employer: 'Azienda Ospedaliera di Padova',
+      hrReferent: 'Dott. Marco Bianchi',
+      currentStep: 5,
+      status: 'In Progress',
+      lastUpdate: isoDaysAgo(9),
+      documents: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(115), validity: '2034-09-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(113), validity: '2030-12-01', status: 'approved' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(90),  validity: '2034-09-01', status: 'approved' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(88), validity: '2034-09-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Esperienza Professionale', language: 'ES', uploadDate: isoDaysAgo(9),  validity: '—', status: 'pending' },
+        { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(120), validity: '2033-04-01', status: 'approved' },
+        { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(120), validity: '2029-08-01', status: 'approved' },
+        { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(120), validity: null, status: 'approved' },
+        { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(100), validity: null, status: 'approved' },
+      ],
+      checklist: makeChecklist({
+        __current: 5,
+        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
+        4: [true, true], 5: [true, false],
+      }),
+      relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Non avviato' },
+      logs: [
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 20), type: 'alert', author: 'Sistema', text: 'Il Ministero della Salute ha richiesto un’integrazione documentale: certificato di esperienza professionale.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 9), type: 'note', author: 'Dott. Bianchi', text: 'Certificato di esperienza ricevuto dall’agenzia e inviato al Ministero. In attesa di riscontro.' },
+      ],
+    };
+
+    // -------- Candidate 6: Rosa Altagracia Feliz — OPI registration (step 9) --------
+    const rosa = {
+      id: 'nurse_rosa',
+      name: 'Rosa Altagracia Féliz',
+      passport: 'RD-HN2214880',
+      birthPlace: 'Barahona',
+      nationality: 'Dominicana',
+      cedula: '018-4452781-2', birthDate: '1994-12-02', maritalStatus: 'single',
+      phone: '+1 809 555 0126', email: 'rosa.feliz@example.do',
+      address: 'Calle Padre Billini 12, Barahona',
+      privacyConsent: true, privacyConsentDate: isoDaysAgo(260),
+      partnerAgency: 'Caribe Health Recruiting SRL',
+      languageLevel: 'B2 — certificato CILS',
+      employer: 'Casa di Cura San Raffaele · Milano',
+      hrReferent: 'Dott.ssa Giulia Ferraro',
+      currentStep: 9,
+      status: 'In Progress',
+      lastUpdate: isoDaysAgo(3),
+      documents: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(250), validity: '2033-01-01', status: 'approved' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(248), validity: '2030-06-01', status: 'approved' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(230), validity: '2033-01-01', status: 'approved' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(228), validity: '2033-01-01', status: 'approved' },
+        { id: uid(), name: 'Decreto di Riconoscimento del Titolo', language: 'IT', uploadDate: isoDaysAgo(60),  validity: '—', status: 'approved' },
+        { id: uid(), name: 'Visto di Ingresso (Lavoro Subordinato)', language: 'IT', uploadDate: isoDaysAgo(25), validity: '2027-01-31', status: 'approved' },
+        { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(260), validity: '2031-10-01', status: 'approved' },
+        { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(260), validity: '2028-02-01', status: 'approved' },
+        { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(260), validity: null, status: 'approved' },
+        { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(240), validity: null, status: 'approved' },
+      ],
+      checklist: makeChecklist({
+        __current: 9,
+        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
+        4: [true, true], 5: [true, true], 6: [true], 7: [true, true],
+        8: [true, true], 9: [true, true, false],
+      }),
+      relocation: { flight: 'IB 6501 · SDQ → MXP · partenza 02 ago 2026', housing: 'In ricerca — zona San Raffaele', tutor: null, contractStatus: 'Proposta contrattuale inviata' },
+      logs: [
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 25), type: 'system', author: 'Sistema', text: 'Visto rilasciato dal consolato italiano di Santo Domingo.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 3), type: 'note', author: 'Dott.ssa Ferraro', text: 'Domanda di iscrizione OPI presentata; quota versata. In attesa di delibera dell’Ordine.' },
+      ],
+    };
+
+    return {
+      version: 1,
+      view: 'dashboard',          // 'dashboard' | 'cases' | 'settings'
+      selectedNurseId: 'nurse_ana',
+      search: '',
+      statusFilter: 'all',        // 'all' | 'risk' | a status key
+      nurses: [ana, marisol, jose, carlos, rosa, elena],
+      settings: defaultSettings(),
+    };
+  }
+
+  // Base records (anagrafiche) managed from the Settings section.
+  function defaultSettings() {
+    return {
+      agencies: [
+        { id: uid(), name: 'Caribe Health Recruiting SRL', country: 'Repubblica Dominicana', contact: 'info@caribehealth.do' },
+        { id: uid(), name: 'Antillas Nursing Partners', country: 'Repubblica Dominicana', contact: 'rrhh@antillasnursing.do' },
+      ],
+      employers: [
+        { id: uid(), name: 'Casa di Cura San Raffaele', city: 'Milano' },
+        { id: uid(), name: 'Azienda Ospedaliera di Padova', city: 'Padova' },
+      ],
+      operators: [
+        { id: uid(), name: 'Dott.ssa Giulia Ferraro', role: 'HR Specialist', email: 'giulia.ferraro@dhl.it', accessRole: 'operator' },
+        { id: uid(), name: 'Dott. Marco Bianchi', role: 'HR Manager', email: 'marco.bianchi@dhl.it', accessRole: 'admin' },
+      ],
+      docTypes: [
+        { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES' },
+        { id: uid(), name: 'Certificato Professionale (Exatec)', language: 'ES' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo', language: 'IT' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT' },
+      ].concat(PERSONAL_DOC_TYPES.map((d) => ({ id: uid(), name: d.name, language: d.language, optional: !!d.optional }))),
+    };
+  }
+
+  // Personal-file slots every candidate gets. Required: identity documents, signed
+  // privacy consent and language certificate (needed for visa/OPI). Optional: photo,
+  // CV and criminal/health certificates (only if required by law / by the role) —
+  // optional docs never block the pipeline nor flag the case as "Missing Docs".
+  const PERSONAL_DOC_TYPES = [
+    { name: 'Copia Passaporto', language: 'ES' },
+    { name: 'Cédula (Documento d’Identità RD)', language: 'ES' },
+    { name: 'Fotografia (formato tessera)', language: 'ES', optional: true },
+    { name: 'Curriculum Vitae', language: 'ES', optional: true },
+    { name: 'Consenso Privacy Firmato', language: 'IT' },
+    { name: 'Certificato di Lingua', language: 'IT' },
+    { name: 'Certificato Penale', language: 'ES', optional: true },
+    { name: 'Certificato Sanitario', language: 'ES', optional: true },
+  ];
+
+  // ---------- Persistence ----------
+  let state;
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.nurses && parsed.nurses.length) return normalizeState(parsed);
+      }
+    } catch (e) { /* fall through to seed */ }
+    return normalizeState(seedState());
+  }
+  // Backfill fields added in later versions so older saved states keep working.
+  const PERSONAL_FIELDS = ['cedula', 'birthDate', 'birthPlace', 'nationality', 'maritalStatus', 'phone', 'email', 'address'];
+  function normalizeState(s) {
+    if (!s.settings) s.settings = defaultSettings();
+    ['agencies', 'employers', 'operators', 'docTypes'].forEach((k) => { if (!Array.isArray(s.settings[k])) s.settings[k] = []; });
+    // Backfill document types for states created before this feature existed.
+    if (!s.settings.docTypes.length) s.settings.docTypes = defaultSettings().docTypes;
+    // Merge in the personal-file doc types added later (matched by name, case-insensitive).
+    const typeNames = s.settings.docTypes.map((dt) => (dt.name || '').toLowerCase());
+    PERSONAL_DOC_TYPES.forEach((d) => {
+      if (typeNames.indexOf(d.name.toLowerCase()) < 0) s.settings.docTypes.push({ id: uid(), name: d.name, language: d.language, optional: !!d.optional });
+    });
+    // Keep the required/optional flag of the personal slots in sync with PERSONAL_DOC_TYPES,
+    // so flag changes in later versions propagate to already-saved states.
+    const flagByName = {};
+    PERSONAL_DOC_TYPES.forEach((d) => { flagByName[d.name.toLowerCase()] = !!d.optional; });
+    const syncFlag = (d) => { const f = flagByName[(d.name || '').toLowerCase()]; if (f !== undefined) d.optional = f; };
+    s.settings.docTypes.forEach(syncFlag);
+    (s.nurses || []).forEach((n) => { (n.documents || []).forEach(syncFlag); });
+    // Backfill the personal anagrafica fields and document slots on every saved nurse.
+    (s.nurses || []).forEach((n) => {
+      PERSONAL_FIELDS.forEach((k) => { if (n[k] === undefined) n[k] = ''; });
+      // The legacy "origin" field was superseded by birth place + nationality:
+      // migrate its value into the birth place (when empty) and drop it.
+      if (n.origin) { if (!n.birthPlace) n.birthPlace = n.origin; delete n.origin; }
+      if (n.privacyConsent === undefined) n.privacyConsent = false;
+      if (n.privacyConsentDate === undefined) n.privacyConsentDate = null;
+      if (!Array.isArray(n.documents)) n.documents = [];
+      const docNames = n.documents.map((d) => (d.name || '').toLowerCase());
+      PERSONAL_DOC_TYPES.forEach((d) => {
+        if (docNames.indexOf(d.name.toLowerCase()) < 0) n.documents.push({ id: uid(), name: d.name, language: d.language, uploadDate: null, validity: null, status: 'missing', optional: !!d.optional });
+      });
+    });
+    return s;
+  }
+  function serverTs() { return firebase.firestore.FieldValue.serverTimestamp(); }
+  function saveState() {
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* quota — ignore */ }
+    // Debounced cloud sync when authenticated (paused while the startup remote read runs).
+    if (fbEnabled && currentUser && db && !remoteLoading) {
+      clearTimeout(remoteSaveTimer);
+      remoteSaveTimer = setTimeout(remoteSync, 600);
+    }
+  }
+  function remoteSync() {
+    if (!(fbEnabled && currentUser && db)) return;
+    try {
+      if (SHARED_WORKSPACE) {
+        // Shared team workspace: cases and settings live in SEPARATE documents with
+        // different permissions (operators write cases; only admins write settings).
+        const data = db.collection('organizations').doc(ORG_ID).collection('data');
+        data.doc('cases').set({ nurses: state.nurses, updatedAt: serverTs() }, { merge: true })
+          .catch((err) => console.warn('Sync casi fallita:', err && err.message));
+        if (isAdmin()) {
+          data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true })
+            .catch((err) => console.warn('Sync impostazioni fallita:', err && err.message));
+        }
+      } else {
+        db.collection('nurseflow').doc(currentUser.uid)
+          .set({ state: state, updatedAt: serverTs() }, { merge: true })
+          .catch((err) => console.warn('Firestore sync fallita:', err && err.message));
+      }
+    } catch (e) { console.warn('Sync error:', e && e.message); }
+  }
+
+  // ---------- Derived / computed selectors ----------
+  function getNurse(id) { return state.nurses.find((n) => n.id === id); }
+
+  // ---------- Roles & permissions ----------
+  // Cloud users are matched to an operator record by email; unmatched users default to admin
+  // (avoids lock-out on first run). In demo mode the role is a switchable local setting.
+  function currentRole() {
+    if (fbEnabled && currentUser) {
+      // 1) Trusted source: Firebase custom claims (set server-side, enforced by Firestore rules).
+      if (userClaims && (userClaims.role === 'admin' || userClaims.role === 'operator')) return userClaims.role;
+      // 2) Convenience fallback (NOT a security boundary): match by email in the operators list.
+      //    Used only when no role claim is set yet (e.g. single-workspace per-user data).
+      const email = (currentUser.email || '').toLowerCase();
+      if (email) {
+        const op = (state.settings.operators || []).find((o) => (o.email || '').toLowerCase() === email);
+        if (op && op.accessRole) return op.accessRole;
+      }
+      // In a SHARED team workspace the safe default is least-privilege (operator): admins are
+      // granted explicitly via custom claims. In per-user mode each user owns their own data,
+      // so defaulting to admin-of-own-workspace is harmless.
+      return SHARED_WORKSPACE ? 'operator' : 'admin';
+    }
+    return state.demoRole || 'admin';
+  }
+  function isAdmin() { return currentRole() === 'admin'; }
+  function setDemoRole(role) {
+    if (role !== 'admin' && role !== 'operator') return;
+    state.demoRole = role;
+    if (!isAdmin() && state.view === 'settings') state.view = 'dashboard';
+    commit();
+  }
+
+  function deriveStatus(nurse) {
+    if (nurse.currentStep >= 11) return 'Onboarding Completed';
+    // Optional documents (language/criminal/health certificates) never flag the case.
+    if (nurse.documents.some((d) => d.status === 'missing' && !d.optional)) return 'Missing Docs';
+    if (nurse.currentStep === 8) return 'Visa Obtained';
+    return 'In Progress';
+  }
+
+  function blockers(nurse) {
+    // Returns array of human-readable reasons the case cannot advance. Empty => can advance.
+    const reasons = [];
+    if (nurse.currentStep >= 11) { reasons.push(t('bl_done')); return reasons; }
+    const items = nurse.checklist[nurse.currentStep] || [];
+    const pending = items.filter((i) => !i.done);
+    pending.forEach((i) => reasons.push(t('bl_checklist', { x: checklistLabel(i.step, i.idx) })));
+    if (nurse.currentStep === STEP_REQUIRES_NO_MISSING_DOCS) {
+      const miss = nurse.documents.filter((d) => d.status === 'missing' && !d.optional);
+      miss.forEach((d) => reasons.push(t('bl_doc_missing', { x: d.name })));
+    }
+    if (nurse.currentStep === STEP_REQUIRES_ALL_DOCS_APPROVED) {
+      const notOk = nurse.documents.filter((d) => d.status !== 'approved' && !d.optional);
+      notOk.forEach((d) => reasons.push(t('bl_doc_approve', { x: d.name })));
+    }
+    return reasons;
+  }
+  function canAdvance(nurse) { return blockers(nurse).length === 0; }
+
+  function isAtRisk(nurse) {
+    if (nurse.currentStep >= 11) return false;
+    const sla = STEP_SLA_DAYS[nurse.currentStep] || 30;
+    return daysBetween(nurse.lastUpdate) > sla;
+  }
+
+  // A candidate is considered "sent to Italy" once they arrive in Italy (step 10) or complete onboarding (step 11).
+  const SENT_TO_ITALY_STEP = 10;
+
+  function computeKpis() {
+    const active = state.nurses.filter((n) => n.currentStep < 11).length;
+    const missing = state.nurses.filter((n) => n.documents.some((d) => d.status === 'missing' && !d.optional)).length;
+    // Pending OPI: cases that obtained the visa or are at the OPI-registration step.
+    const opi = state.nurses.filter((n) => n.currentStep === 8 || n.currentStep === 9).length;
+    const completed = state.nurses.filter((n) => n.currentStep >= 11).length;
+    const expiring = computeExpiring().length;
+    // Transfer summary: total under management, sent to Italy, still to send.
+    const treating = state.nurses.length;
+    const sent = state.nurses.filter((n) => n.currentStep >= SENT_TO_ITALY_STEP).length;
+    const toSend = state.nurses.filter((n) => n.currentStep < SENT_TO_ITALY_STEP).length;
+    return { active, missing, opi, completed, expiring, treating, sent, toSend };
+  }
+
+  // Documents that are expired or expiring within 60 days, across all candidates.
+  function computeExpiring() {
+    const list = [];
+    state.nurses.forEach((n) => (n.documents || []).forEach((d) => {
+      const ex = docExpiry(d);
+      if (ex === 'expired' || ex === 'soon') list.push({ n: n, d: d, ex: ex });
+    }));
+    list.sort((a, b) => {
+      if (a.ex !== b.ex) return a.ex === 'expired' ? -1 : 1;
+      return String(a.d.validity).localeCompare(String(b.d.validity));
+    });
+    return list;
+  }
+
+  function employerBreakdown() {
+    const map = {};
+    state.nurses.forEach((n) => {
+      const key = n.employer || 'Non assegnato';
+      if (!map[key]) map[key] = { total: 0, completed: 0, active: 0 };
+      map[key].total++;
+      if (n.currentStep >= 11) map[key].completed++; else map[key].active++;
+    });
+    return Object.entries(map).map(([employer, v]) => ({ employer, ...v }))
+      .sort((a, b) => b.total - a.total);
+  }
+
+  // ---------- Actions (mutations) ----------
+  function commit() { state.nurses.forEach((n) => { n.status = deriveStatus(n); }); saveState(); render(); }
+
+  function setView(view) { state.view = view; commit(); }
+  function selectNurse(id) { state.selectedNurseId = id; state.view = 'cases'; commit(); }
+  function setSearch(v) { state.search = v; saveState(); renderCasesOnly(); }
+  function setFilter(v) { state.statusFilter = v; commit(); }
+
+  function approveDoc(nurseId, docId) {
+    const n = getNurse(nurseId); const d = n.documents.find((x) => x.id === docId); if (!d) return;
+    d.status = 'approved';
+    if (!d.uploadDate) d.uploadDate = new Date().toISOString().slice(0, 10);
+    pushLog(n, 'system', t('log_author_system'), t('log_doc_approved', { x: d.name }));
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    commit();
+  }
+  function rejectDoc(nurseId, docId) {
+    const n = getNurse(nurseId); const d = n.documents.find((x) => x.id === docId); if (!d) return;
+    d.status = 'missing'; d.uploadDate = null;
+    d.fileName = null; d.fileUrl = null; d.fileSize = null; d.fileStoragePath = null;
+    pushLog(n, 'alert', t('log_author_system'), t('log_doc_rejected', { x: d.name }));
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    commit();
+  }
+
+  // ---------- Real file upload for documents ----------
+  let pendingUpload = null;
+  function triggerUpload(nurseId, docId) {
+    pendingUpload = { nurseId: nurseId, docId: docId };
+    let input = document.getElementById('doc-file-input');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'file';
+      input.id = 'doc-file-input';
+      input.style.display = 'none';
+      input.accept = '.pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx';
+      input.addEventListener('change', onDocFileChosen);
+      document.body.appendChild(input);
+    }
+    input.value = '';
+    input.click();
+  }
+  function readAsDataURL(file) {
+    return new Promise((resolve, reject) => {
+      const r = new FileReader();
+      r.onload = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+      r.readAsDataURL(file);
+    });
+  }
+  async function onDocFileChosen(e) {
+    const file = e.target.files && e.target.files[0];
+    if (!file || !pendingUpload) return;
+    const ctx = pendingUpload; pendingUpload = null;
+    const n = getNurse(ctx.nurseId); if (!n) return;
+    const d = n.documents.find((x) => x.id === ctx.docId); if (!d) return;
+
+    d.fileName = file.name;
+    d.fileSize = file.size;
+    d.uploadDate = new Date().toISOString().slice(0, 10);
+    d.status = 'pending';
+    d.fileUrl = null; d.fileStoragePath = null;
+
+    try {
+      if (fbEnabled && storage && currentUser) {
+        // Upload the real bytes to Firebase Storage; keep only the download URL in the DB.
+        const base = SHARED_WORKSPACE ? ('documents/org/' + ORG_ID) : ('documents/users/' + currentUser.uid);
+        const path = base + '/' + ctx.docId + '/' + Date.now() + '_' + file.name;
+        const ref = storage.ref().child(path);
+        const snap = await ref.put(file);
+        d.fileUrl = await snap.ref.getDownloadURL();
+        d.fileStoragePath = path;
+      } else if (file.size <= 900 * 1024) {
+        // No cloud storage (demo/offline): embed small files as a data URL so they're viewable.
+        d.fileUrl = await readAsDataURL(file);
+      } else {
+        // Too large to embed without Storage — keep the metadata, flag it.
+        d.fileTooBig = true;
+      }
+    } catch (err) {
+      console.warn('Upload fallito:', err && err.message);
+    }
+    pushLog(n, 'note', t('log_author_system'), t('log_doc_uploaded', { x: d.name }));
+    // Uploading the signed privacy form marks the consent as acquired on the record.
+    if ((d.name || '').toLowerCase().indexOf('consenso privacy') >= 0 && !n.privacyConsent) {
+      n.privacyConsent = true;
+      n.privacyConsentDate = new Date().toISOString().slice(0, 10);
+      pushLog(n, 'system', t('log_author_system'), t('log_privacy_acquired'));
+    }
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    commit();
+  }
+
+  function toggleChecklist(nurseId, stepId, itemId) {
+    const n = getNurse(nurseId);
+    const item = (n.checklist[stepId] || []).find((i) => i.id === itemId);
+    if (!item) return;
+    item.done = !item.done;
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    commit();
+  }
+
+  function advanceStatus(nurseId) {
+    const n = getNurse(nurseId);
+    if (!canAdvance(n)) return;
+    if (n.currentStep >= 11) return;
+    const from = stepName(n.currentStep);
+    n.currentStep += 1;
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    pushLog(n, 'system', t('log_author_system'), t('log_advanced', { from: from, to: stepName(n.currentStep) }));
+    commit();
+  }
+
+  function pushLog(nurse, type, author, text) {
+    nurse.logs.unshift({ id: uid(), at: new Date().toISOString(), type, author, text });
+  }
+  function addLog(nurseId, type, text) {
+    const n = getNurse(nurseId);
+    const clean = (text || '').trim();
+    if (!clean) return;
+    pushLog(n, type, n.hrReferent || t('log_author_op'), clean);
+    commit();
+  }
+
+  function resetData() {
+    if (!isAdmin()) return;
+    if (!confirm(t('reset_confirm'))) return;
+    state = seedState();
+    saveState();
+    render();
+  }
+
+  // ---------- Create anagrafica & documents (modals) ----------
+  function defaultRequiredDocs() {
+    // Driven by the configurable document types managed in Settings.
+    const types = (state && state.settings && state.settings.docTypes) || [];
+    if (types.length) {
+      return types.map((dt) => ({ id: uid(), name: dt.name, language: dt.language || 'ES', uploadDate: null, validity: null, status: 'missing', optional: !!dt.optional }));
+    }
+    return [
+      { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: null, validity: null, status: 'missing' },
+      { id: uid(), name: 'Certificato Professionale (Exatec)', language: 'ES', uploadDate: null, validity: null, status: 'missing' },
+      { id: uid(), name: 'Traduzione Asseverata del Titolo', language: 'IT', uploadDate: null, validity: null, status: 'missing' },
+      { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: null, validity: null, status: 'missing' },
+    ].concat(PERSONAL_DOC_TYPES.map((d) => ({ id: uid(), name: d.name, language: d.language, uploadDate: null, validity: null, status: 'missing', optional: !!d.optional })));
+  }
+
+  function modalShell(inner, wide) {
+    closeModal();
+    const wrap = document.createElement('div');
+    wrap.id = 'modal-layer';
+    wrap.className = 'fixed inset-0 z-[70] flex items-center justify-center bg-slate-900/50 p-4';
+    wrap.style.backdropFilter = 'blur(2px)';
+    wrap.innerHTML = '<div class="max-h-[92vh] w-full ' + (wide ? 'max-w-3xl' : 'max-w-lg') + ' overflow-y-auto rounded-2xl bg-white shadow-2xl animate-fadeIn">' + inner + '</div>';
+    document.body.appendChild(wrap);
+    lucide.createIcons();
+    wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) closeModal(); });
+    return wrap;
+  }
+  function closeModal() { const m = document.getElementById('modal-layer'); if (m) m.remove(); }
+  function fieldVal(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; }
+  function inputField(id, label, ph, required, type) {
+    return '<div>' +
+      '<label class="mb-1 block text-xs font-semibold text-slate-500">' + label + (required ? ' <span class="text-rose-500">*</span>' : '') + '</label>' +
+      '<input id="' + id + '" type="' + (type || 'text') + '" placeholder="' + escapeHtml(ph) + '" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" />' +
+    '</div>';
+  }
+
+  let editNurseId = null;
+  function openNewNurseModal(editId) {
+    editNurseId = editId || null;
+    const e = editNurseId ? getNurse(editNurseId) : null;
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="' + (e ? 'user-cog' : 'user-plus') + '" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + (e ? t('edit_candidate') : t('nn_title')) + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div id="nn-error" class="mx-5 mt-4 hidden rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 ring-1 ring-inset ring-rose-200"></div>' +
+      '<div class="grid gap-3 p-5 sm:grid-cols-2">' +
+        inputField('nn-name', t('nn_name'), 'Ana Valeria Rosario', true) +
+        inputField('nn-passport', t('nn_passport'), 'RD-XX0000000', true) +
+        inputField('nn-cedula', t('nn_cedula'), '001-0000000-0') +
+        inputField('nn-birthdate', t('nn_birthdate'), '', false, 'date') +
+        inputField('nn-birthplace', t('nn_birthplace'), 'Santo Domingo') +
+        inputField('nn-nationality', t('nn_nationality'), t('nn_default_nationality')) +
+        selectField('nn-marital', t('nn_marital'), [
+          { value: 'single', labelKey: 'ms_single' }, { value: 'married', labelKey: 'ms_married' },
+          { value: 'divorced', labelKey: 'ms_divorced' }, { value: 'widowed', labelKey: 'ms_widowed' },
+          { value: 'other', labelKey: 'ms_other' },
+        ], e ? (e.maritalStatus || '') : '') +
+        inputField('nn-phone', t('nn_phone'), '+1 809 000 0000', false, 'tel') +
+        inputField('nn-email', t('nn_email'), 'nome@example.com', false, 'email') +
+        '<div class="sm:col-span-2">' + inputField('nn-address', t('nn_address'), 'Calle, numero, città, provincia') + '</div>' +
+        selectField('nn-agency', t('nn_agency'), agencyOptions(), e ? e.partnerAgency : '') +
+        inputField('nn-lang', t('nn_lang'), 'A2') +
+        selectField('nn-employer', t('nn_employer'), employerOptions(), e ? e.employer : '') +
+        selectField('nn-hr', t('nn_hr'), operatorOptions(), e ? e.hrReferent : '') +
+        '<label class="sm:col-span-2 flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">' +
+          '<input id="nn-privacy" type="checkbox"' + (e && e.privacyConsent ? ' checked' : '') + ' class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200" />' +
+          '<span class="text-xs leading-relaxed text-slate-600"><b>' + t('nn_privacy') + '</b><br>' + t('nn_privacy_hint') + '</span>' +
+        '</label>' +
+      '</div>' +
+      '<div class="flex items-center justify-between gap-2 border-t border-slate-100 p-5">' +
+        (e && isAdmin() ? '<button data-action="delete-nurse" data-id="' + e.id + '" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-sm font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50"><i data-lucide="trash-2" class="h-4 w-4"></i>' + t('del_candidate') + '</button>' : '<span></span>') +
+        '<div class="flex gap-2">' +
+          '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('cancel') + '</button>' +
+          '<button data-action="create-nurse" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + (e ? t('save') : t('nn_create')) + '</button>' +
+        '</div>' +
+      '</div>';
+    modalShell(inner);
+    if (e) {
+      const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+      set('nn-name', e.name); set('nn-passport', e.passport); set('nn-lang', e.languageLevel);
+      set('nn-cedula', e.cedula); set('nn-birthdate', e.birthDate); set('nn-birthplace', e.birthPlace);
+      set('nn-nationality', e.nationality); set('nn-phone', e.phone); set('nn-email', e.email); set('nn-address', e.address);
+    }
+    const el = document.getElementById('nn-name'); if (el) el.focus();
+  }
+
+  function createNurseFromForm() {
+    const name = fieldVal('nn-name'), passport = fieldVal('nn-passport');
+    if (!name || !passport) {
+      const err = document.getElementById('nn-error');
+      if (err) { err.textContent = t('nn_error'); err.classList.remove('hidden'); }
+      return;
+    }
+    const privacyEl = document.getElementById('nn-privacy');
+    const privacyChecked = !!(privacyEl && privacyEl.checked);
+    if (editNurseId) {
+      // Edit mode: update only the anagrafica fields, keep documents/checklist/state.
+      const e = getNurse(editNurseId);
+      if (e) {
+        e.name = name; e.passport = passport;
+        e.partnerAgency = fieldVal('nn-agency') || '—';
+        e.languageLevel = fieldVal('nn-lang') || e.languageLevel;
+        e.employer = fieldVal('nn-employer') || t('nn_default_employer');
+        e.hrReferent = fieldVal('nn-hr') || '—';
+        e.cedula = fieldVal('nn-cedula');
+        e.birthDate = fieldVal('nn-birthdate');
+        e.birthPlace = fieldVal('nn-birthplace');
+        e.nationality = fieldVal('nn-nationality');
+        e.maritalStatus = fieldVal('nn-marital');
+        e.phone = fieldVal('nn-phone');
+        e.email = fieldVal('nn-email');
+        e.address = fieldVal('nn-address');
+        // Privacy consent: stamp the date the first time it's granted, clear it if revoked.
+        if (privacyChecked && !e.privacyConsent) e.privacyConsentDate = new Date().toISOString().slice(0, 10);
+        if (!privacyChecked) e.privacyConsentDate = null;
+        e.privacyConsent = privacyChecked;
+        e.lastUpdate = new Date().toISOString().slice(0, 10);
+      }
+      editNurseId = null;
+      closeModal();
+      commit();
+      return;
+    }
+    const nurse = {
+      id: uid(), name: name, passport: passport,
+      partnerAgency: fieldVal('nn-agency') || '—',
+      languageLevel: fieldVal('nn-lang') || t('nn_default_lang'),
+      employer: fieldVal('nn-employer') || t('nn_default_employer'),
+      hrReferent: fieldVal('nn-hr') || '—',
+      cedula: fieldVal('nn-cedula'),
+      birthDate: fieldVal('nn-birthdate'),
+      birthPlace: fieldVal('nn-birthplace'),
+      nationality: fieldVal('nn-nationality') || t('nn_default_nationality'),
+      maritalStatus: fieldVal('nn-marital'),
+      phone: fieldVal('nn-phone'),
+      email: fieldVal('nn-email'),
+      address: fieldVal('nn-address'),
+      privacyConsent: privacyChecked,
+      privacyConsentDate: privacyChecked ? new Date().toISOString().slice(0, 10) : null,
+      currentStep: 1, status: 'In Progress',
+      lastUpdate: new Date().toISOString().slice(0, 10),
+      documents: defaultRequiredDocs(),
+      checklist: makeChecklist({ __current: 1 }),
+      relocation: { flight: null, housing: null, tutor: null, contractStatus: t('contract_none') },
+      logs: [{ id: uid(), at: new Date().toISOString(), type: 'system', author: t('log_author_system'), text: t('log_nurse_created') }],
+    };
+    state.nurses.unshift(nurse);
+    state.selectedNurseId = nurse.id;
+    state.view = 'cases';
+    closeModal();
+    commit();
+  }
+
+  // ---------- Relocation / HR onboarding editor ----------
+  let relocationNurseId = null;
+  function openRelocationModal(nurseId) {
+    relocationNurseId = nurseId;
+    const n = getNurse(nurseId); if (!n) return;
+    const r = n.relocation || {};
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="plane" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + t('reloc_title') + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div class="grid gap-3 p-5">' +
+        inputField('rl-flight', t('reloc_flight'), 'AZ 681 · SDQ → MXP') +
+        inputField('rl-housing', t('reloc_housing'), '') +
+        inputField('rl-tutor', t('reloc_tutor'), '') +
+        inputField('rl-contract', t('reloc_contract'), '') +
+      '</div>' +
+      '<div class="flex justify-end gap-2 border-t border-slate-100 p-5">' +
+        '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('cancel') + '</button>' +
+        '<button data-action="save-relocation" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + t('save') + '</button>' +
+      '</div>';
+    modalShell(inner);
+    const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
+    set('rl-flight', r.flight); set('rl-housing', r.housing); set('rl-tutor', r.tutor); set('rl-contract', r.contractStatus);
+    const el = document.getElementById('rl-flight'); if (el) el.focus();
+  }
+  function saveRelocation() {
+    const n = getNurse(relocationNurseId); if (!n) { closeModal(); return; }
+    n.relocation = {
+      flight: fieldVal('rl-flight') || null,
+      housing: fieldVal('rl-housing') || null,
+      tutor: fieldVal('rl-tutor') || null,
+      contractStatus: fieldVal('rl-contract') || t('contract_none'),
+    };
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    relocationNurseId = null;
+    closeModal();
+    commit();
+  }
+
+  // ---------- Delete candidate, export, document expiry ----------
+  function deleteNurse(id) {
+    if (!isAdmin()) return;
+    const n = getNurse(id); if (!n) return;
+    if (!confirm(t('confirm_delete_nurse', { x: n.name }))) return;
+    state.nurses = state.nurses.filter((x) => x.id !== id);
+    if (state.selectedNurseId === id) state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
+    editNurseId = null;
+    closeModal();
+    commit();
+  }
+
+  function docExpiry(d) {
+    if (!d || !d.validity || d.validity === '—') return 'none';
+    const dt = new Date(d.validity);
+    if (isNaN(dt)) return 'none';
+    const days = Math.floor((dt - today()) / 86400000);
+    if (days < 0) return 'expired';
+    if (days <= 60) return 'soon';
+    return 'ok';
+  }
+
+  function csvCell(v) {
+    const s = (v == null ? '' : String(v));
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  function exportCandidatesCsv() {
+    if (!isAdmin()) return;
+    const headers = ['Nome', 'Passaporto', 'Luogo di nascita', 'Nazionalità', 'Agenzia', 'Livello linguistico', 'Datore di lavoro', 'Referente HR', 'Step', 'Stato', 'Ultimo aggiornamento', 'Documenti approvati', 'Documenti totali'];
+    const lines = [headers.map(csvCell).join(',')];
+    state.nurses.forEach((n) => {
+      const appr = (n.documents || []).filter((d) => d.status === 'approved').length;
+      lines.push([n.name, n.passport, n.birthPlace, n.nationality, n.partnerAgency, n.languageLevel, n.employer, n.hrReferent,
+        n.currentStep + '/11', statusLabel(deriveStatus(n)), n.lastUpdate, appr, (n.documents || []).length].map(csvCell).join(','));
+    });
+    // BOM so Excel opens UTF-8 correctly.
+    downloadFile('candidati.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
+  }
+  function downloadFile(filename, content, mime) {
+    try {
+      const blob = new Blob([content], { type: mime || 'text/plain' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click();
+      setTimeout(() => { document.body.removeChild(a); URL.revokeObjectURL(url); }, 100);
+    } catch (e) { console.warn('Download fallito:', e && e.message); }
+  }
+
+  // ---------- Document archive & in-app preview ----------
+  function allDocs() {
+    const q = (state.docSearch || '').trim().toLowerCase();
+    const f = state.docFilter || 'all';
+    const rows = [];
+    state.nurses.forEach((n) => (n.documents || []).forEach((d) => {
+      if (f === 'withfile') { if (!d.fileName) return; }
+      else if (f === 'expiring') { const ex = docExpiry(d); if (ex !== 'expired' && ex !== 'soon') return; }
+      else if (f !== 'all' && d.status !== f) return;
+      if (q && !((n.name || '').toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q) || (d.fileName || '').toLowerCase().includes(q))) return;
+      rows.push({ n: n, d: d });
+    }));
+    return rows;
+  }
+  function fileKind(name, url) {
+    if (/\.(png|jpe?g|webp|gif|heic|heif|bmp)$/i.test(name || '') || /^data:image\//.test(url || '')) return 'image';
+    if (/\.pdf$/i.test(name || '') || /^data:application\/pdf/.test(url || '')) return 'pdf';
+    return 'other';
+  }
+  function openDocPreview(nurseId, docId) {
+    const n = getNurse(nurseId); const d = n && n.documents.find((x) => x.id === docId);
+    if (!d) return;
+    let inner;
+    if (!d.fileUrl) {
+      inner = '<div class="p-10 text-center text-sm text-slate-400"><i data-lucide="file-x" class="mx-auto mb-2 h-8 w-8 text-slate-300"></i>' + t('doc_no_file') + '</div>';
+    } else {
+      const kind = fileKind(d.fileName, d.fileUrl);
+      if (kind === 'image') inner = '<div class="flex justify-center bg-slate-100 p-4"><img src="' + escapeHtml(d.fileUrl) + '" alt="' + escapeHtml(d.fileName || '') + '" class="max-h-[70vh] rounded-lg object-contain" /></div>';
+      else if (kind === 'pdf') inner = '<iframe src="' + escapeHtml(d.fileUrl) + '" class="h-[72vh] w-full" title="' + escapeHtml(d.fileName || '') + '"></iframe>';
+      else inner = '<div class="p-10 text-center"><a href="' + escapeHtml(d.fileUrl) + '" target="_blank" rel="noopener" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-700"><i data-lucide="download" class="h-4 w-4"></i>' + t('doc_view') + '</a></div>';
+    }
+    const head =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-4">' +
+        '<div class="min-w-0"><p class="truncate text-sm font-bold text-slate-900">' + escapeHtml(d.name) + '</p>' +
+          '<p class="truncate text-xs text-slate-500">' + escapeHtml(n.name) + (d.fileName ? ' · ' + escapeHtml(d.fileName) : '') + '</p></div>' +
+        '<div class="flex items-center gap-2">' +
+          (d.fileUrl ? '<a href="' + escapeHtml(d.fileUrl) + '" target="_blank" rel="noopener" class="rounded-lg px-2 py-1 text-slate-400 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tooltip="' + escapeHtml(t('doc_view')) + '"><i data-lucide="external-link" class="h-4 w-4"></i></a>' : '') +
+          '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+        '</div>' +
+      '</div>';
+    modalShell(head + inner, true);
+  }
+
+  function archiveBody() {
+    const list = allDocs();
+    const chip = (val, label) =>
+      '<button data-action="doc-filter" data-filter="' + val + '" class="rounded-full px-3 py-1 text-xs font-semibold transition ' +
+      ((state.docFilter || 'all') === val ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200') + '">' + label + '</button>';
+    const rows = list.length === 0
+      ? '<div class="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-400">' + t('archive_empty') + '</div>'
+      : '<div class="overflow-x-auto rounded-2xl border border-slate-200 bg-white shadow-sm"><table class="w-full min-w-[720px] text-sm">' +
+          '<thead><tr class="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">' +
+            '<th class="px-4 py-2.5">' + t('col_candidate') + '</th><th class="px-2 py-2.5">' + t('th_document') + '</th><th class="px-2 py-2.5">' + t('th_lang') + '</th><th class="px-2 py-2.5">' + t('th_uploaded') + '</th><th class="px-2 py-2.5">' + t('th_status') + '</th><th class="px-4 py-2.5 text-right">' + t('th_actions') + '</th>' +
+          '</tr></thead><tbody>' +
+          list.map((it) => {
+            const d = it.d, n = it.n, m = DOC_STATUS_CLS[d.status], icon = DOC_STATUS_ICON[d.status];
+            const ex = docExpiry(d);
+            const exBadge = ex === 'expired'
+              ? ' <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200"><i data-lucide="calendar-x" class="h-2.5 w-2.5"></i>' + t('exp_expired') + '</span>'
+              : ex === 'soon'
+                ? ' <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"><i data-lucide="calendar-clock" class="h-2.5 w-2.5"></i>' + t('exp_soon') + '</span>'
+                : '';
+            const act = d.fileName
+              ? '<button data-action="view-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="eye" class="h-3 w-3"></i>' + t('doc_view') + '</button>'
+              : '<span class="text-xs text-slate-300">' + t('doc_no_file') + '</span>';
+            return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">' +
+              '<td class="px-4 py-3"><button data-action="open-nurse" data-id="' + n.id + '" class="font-semibold text-slate-800 hover:text-indigo-600">' + escapeHtml(n.name) + '</button></td>' +
+              '<td class="px-2 py-3 text-slate-700">' + escapeHtml(d.name) + (d.fileName ? '<span class="ml-1 text-slate-300">·</span> <span class="text-[11px] text-slate-400">' + escapeHtml(d.fileName) + '</span>' : '') + '</td>' +
+              '<td class="px-2 py-3"><span class="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">' + escapeHtml(d.language) + '</span></td>' +
+              '<td class="px-2 py-3 text-xs text-slate-500">' + formatDate(d.uploadDate) + '</td>' +
+              '<td class="px-2 py-3"><span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + m + '"><i data-lucide="' + icon + '" class="h-3 w-3"></i>' + docStatusLabel(d.status) + '</span>' + exBadge + '</td>' +
+              '<td class="px-4 py-3 text-right">' + act + '</td>' +
+            '</tr>';
+          }).join('') +
+          '</tbody></table></div>';
+    return '<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center">' +
+        '<div class="relative sm:max-w-xs sm:flex-1">' +
+          '<i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>' +
+          '<input id="doc-search-input" data-action="doc-search" type="text" value="' + escapeHtml(state.docSearch || '') + '" placeholder="' + escapeHtml(t('archive_search_ph')) + '" class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" />' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-1.5">' + chip('all', t('filter_all')) + chip('withfile', t('filter_withfile')) + chip('expiring', t('filter_expiring')) + chip('approved', docStatusLabel('approved')) + chip('pending', docStatusLabel('pending')) + chip('missing', docStatusLabel('missing')) + '</div>' +
+      '</div>' + rows;
+  }
+  function archiveView() {
+    return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
+      '<div class="mb-6"><h2 class="text-xl font-extrabold text-slate-900">' + t('archive_title') + '</h2>' +
+      '<p class="text-sm text-slate-500">' + t('archive_sub') + '</p></div>' +
+      '<div id="archive-host">' + archiveBody() + '</div>' +
+    '</main>';
+  }
+
+  let pendingDocNurse = null;
+  function openAddDocModal(nurseId) {
+    pendingDocNurse = nurseId;
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="file-plus" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + t('ad_title') + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div id="ad-error" class="mx-5 mt-4 hidden rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 ring-1 ring-inset ring-rose-200"></div>' +
+      '<div class="grid gap-3 p-5">' +
+        inputField('ad-name', t('ad_name'), '', true) +
+        '<div class="grid grid-cols-2 gap-3">' +
+          '<div><label class="mb-1 block text-xs font-semibold text-slate-500">' + t('ad_lang') + '</label>' +
+            '<select id="ad-lang" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-indigo-300"><option value="ES">ES</option><option value="IT">IT</option></select></div>' +
+          inputField('ad-validity', t('ad_validity'), '2030-01-01') +
+        '</div>' +
+      '</div>' +
+      '<div class="flex justify-end gap-2 border-t border-slate-100 p-5">' +
+        '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('cancel') + '</button>' +
+        '<button data-action="create-doc" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="plus" class="h-4 w-4"></i>' + t('add') + '</button>' +
+      '</div>';
+    modalShell(inner);
+    const el = document.getElementById('ad-name'); if (el) el.focus();
+  }
+
+  function createDocFromForm() {
+    const n = getNurse(pendingDocNurse);
+    if (!n) { closeModal(); return; }
+    const name = fieldVal('ad-name');
+    if (!name) {
+      const err = document.getElementById('ad-error');
+      if (err) { err.textContent = t('ad_error'); err.classList.remove('hidden'); }
+      return;
+    }
+    const lang = (document.getElementById('ad-lang') || {}).value || 'ES';
+    n.documents.push({ id: uid(), name: name, language: lang, uploadDate: null, validity: fieldVal('ad-validity') || null, status: 'missing' });
+    pushLog(n, 'system', t('log_author_system'), t('log_doc_added', { x: name }));
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    closeModal();
+    commit();
+  }
+
+  function optValue(o) { return (o && typeof o === 'object') ? o.value : o; }
+  function optLabel(o) { return (o && typeof o === 'object') ? (o.label != null ? o.label : t(o.labelKey)) : o; }
+  function selectField(id, label, options, current) {
+    const opts = ['<option value="">' + escapeHtml(t('select_none')) + '</option>']
+      .concat(options.map((o) => '<option value="' + escapeHtml(optValue(o)) + '"' + (optValue(o) === current ? ' selected' : '') + '>' + escapeHtml(optLabel(o)) + '</option>')).join('');
+    return '<div>' +
+      '<label class="mb-1 block text-xs font-semibold text-slate-500">' + label + '</label>' +
+      '<select id="' + id + '" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100">' + opts + '</select>' +
+    '</div>';
+  }
+  function agencyOptions() { return (state.settings.agencies || []).map((a) => a.name); }
+  function employerOptions() { return (state.settings.employers || []).map((e) => e.name + (e.city ? ' · ' + e.city : '')); }
+  function operatorOptions() { return (state.settings.operators || []).map((o) => o.name); }
+
+  // ---------- Settings: manage base records (agencies, employers, operators) ----------
+  const ENTITY_FIELDS = {
+    agencies: [{ key: 'name', label: 'f_name', req: true }, { key: 'country', label: 'f_country' }, { key: 'contact', label: 'f_contact' }],
+    employers: [{ key: 'name', label: 'f_name', req: true }, { key: 'city', label: 'f_city' }],
+    operators: [{ key: 'name', label: 'f_name', req: true }, { key: 'role', label: 'f_role' }, { key: 'email', label: 'f_email' }, { key: 'accessRole', label: 'access_role', type: 'select', options: [{ value: 'admin', labelKey: 'role_admin' }, { value: 'operator', labelKey: 'role_operator' }] }],
+    docTypes: [{ key: 'name', label: 'f_name', req: true }, { key: 'language', label: 'ad_lang', type: 'select', options: ['ES', 'IT'] }],
+  };
+  const ENTITY_META = {
+    agencies: { title: 'set_agencies', desc: 'set_agencies_desc', icon: 'handshake', add: 'new_agency' },
+    employers: { title: 'set_employers', desc: 'set_employers_desc', icon: 'hospital', add: 'new_employer' },
+    operators: { title: 'set_operators', desc: 'set_operators_desc', icon: 'user-cog', add: 'new_operator' },
+    docTypes: { title: 'set_doctypes', desc: 'set_doctypes_desc', icon: 'file-text', add: 'new_doctype' },
+  };
+  function fieldDisplay(f, value) {
+    if (f.type === 'select' && Array.isArray(f.options)) {
+      const o = f.options.find((x) => optValue(x) === value);
+      if (o) return optLabel(o);
+    }
+    return value;
+  }
+  function entitySecondary(type, item) {
+    return ENTITY_FIELDS[type].slice(1).map((f) => fieldDisplay(f, item[f.key])).filter(Boolean).join(' · ');
+  }
+  function settingsSection(type) {
+    const meta = ENTITY_META[type];
+    const items = state.settings[type] || [];
+    const rows = items.length === 0
+      ? '<div class="rounded-xl border border-dashed border-slate-200 p-5 text-center text-sm text-slate-400">' + t('entity_empty') + '</div>'
+      : items.map((it) =>
+          '<div class="flex items-center gap-3 rounded-xl border border-slate-200 bg-white p-3">' +
+            '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500"><i data-lucide="' + meta.icon + '" class="h-4 w-4"></i></span>' +
+            '<div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-800">' + escapeHtml(it.name || '—') + '</p>' +
+              (entitySecondary(type, it) ? '<p class="truncate text-xs text-slate-400">' + escapeHtml(entitySecondary(type, it)) + '</p>' : '') + '</div>' +
+            '<button data-action="open-entity" data-type="' + type + '" data-id="' + it.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + t('edit') + '</button>' +
+            '<button data-action="delete-entity" data-type="' + type + '" data-id="' + it.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50">' + t('del') + '</button>' +
+          '</div>'
+        ).join('');
+    return '<section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+      '<div class="mb-1 flex items-center gap-2"><i data-lucide="' + meta.icon + '" class="h-5 w-5 text-indigo-500"></i><h3 class="text-sm font-bold text-slate-900">' + t(meta.title) + '</h3>' +
+        '<button data-action="open-entity" data-type="' + type + '" class="ml-auto inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 text-xs font-semibold text-white transition hover:bg-indigo-700"><i data-lucide="plus" class="h-3 w-3"></i>' + t('add') + '</button></div>' +
+      '<p class="mb-3 text-xs text-slate-400">' + t(meta.desc) + '</p>' +
+      '<div class="space-y-2">' + rows + '</div>' +
+    '</section>';
+  }
+  function settingsView() {
+    return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
+      '<div class="mb-6"><h2 class="text-xl font-extrabold text-slate-900">' + t('settings_title') + '</h2>' +
+      '<p class="text-sm text-slate-500">' + t('settings_subtitle') + '</p></div>' +
+      '<div class="grid grid-cols-1 gap-5 lg:grid-cols-3">' +
+        settingsSection('agencies') + settingsSection('employers') + settingsSection('operators') +
+      '</div>' +
+      '<div class="mt-5">' + settingsSection('docTypes') + '</div>' +
+    '</main>';
+  }
+
+  let pendingEntity = { type: null, id: null };
+  function openEntityModal(type, id) {
+    pendingEntity = { type: type, id: id || null };
+    const meta = ENTITY_META[type];
+    const item = id ? (state.settings[type] || []).find((x) => x.id === id) : null;
+    const fields = ENTITY_FIELDS[type].map((f) => {
+      if (f.type === 'select') return selectField('ent-' + f.key, t(f.label), f.options, item ? (item[f.key] || '') : '');
+      return '<div>' + inputField('ent-' + f.key, t(f.label), '', f.req) + '</div>';
+    }).join('');
+    const title = id ? t('edit') : t(meta.add);
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="' + meta.icon + '" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + title + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div id="ent-error" class="mx-5 mt-4 hidden rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 ring-1 ring-inset ring-rose-200"></div>' +
+      '<div class="grid gap-3 p-5">' + fields + '</div>' +
+      '<div class="flex justify-end gap-2 border-t border-slate-100 p-5">' +
+        '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('cancel') + '</button>' +
+        '<button data-action="save-entity" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + t('save') + '</button>' +
+      '</div>';
+    modalShell(inner);
+    ENTITY_FIELDS[type].forEach((f) => { const e = document.getElementById('ent-' + f.key); if (e && item) e.value = item[f.key] || ''; });
+    const el = document.getElementById('ent-name'); if (el) el.focus();
+  }
+  function saveEntity() {
+    if (!isAdmin()) return;
+    const type = pendingEntity.type; if (!type) return;
+    const obj = {};
+    ENTITY_FIELDS[type].forEach((f) => { obj[f.key] = fieldVal('ent-' + f.key); });
+    if (!obj.name) { const err = document.getElementById('ent-error'); if (err) { err.textContent = t('name_required'); err.classList.remove('hidden'); } return; }
+    const list = state.settings[type];
+    if (pendingEntity.id) { const ex = list.find((x) => x.id === pendingEntity.id); if (ex) Object.assign(ex, obj); }
+    else { list.push(Object.assign({ id: uid() }, obj)); }
+    closeModal();
+    commit();
+  }
+  function deleteEntity(type, id) {
+    if (!isAdmin()) return;
+    const list = state.settings[type] || [];
+    const it = list.find((x) => x.id === id); if (!it) return;
+    if (!confirm(t('confirm_delete', { x: it.name || '' }))) return;
+    state.settings[type] = list.filter((x) => x.id !== id);
+    commit();
+  }
+
+  // ---------- Operator profile ----------
+  const LOCAL_OPERATOR_KEY = 'dhl.operator.name';
+  function localOperatorName() { try { return localStorage.getItem(LOCAL_OPERATOR_KEY) || ''; } catch (e) { return ''; } }
+  function providerLabel() {
+    if (!currentUser || !currentUser.providerData || !currentUser.providerData.length) return '—';
+    const id = currentUser.providerData[0].providerId;
+    return id === 'password' ? t('provider_password') : (id === 'google.com' ? 'Google' : id);
+  }
+  function isPasswordUser() {
+    return !!(currentUser && currentUser.providerData && currentUser.providerData.some((p) => p.providerId === 'password'));
+  }
+  function fmtMeta(ts) { if (!ts) return '—'; const d = new Date(ts); return isNaN(d) ? '—' : d.toLocaleString(localeTag(), { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }); }
+  function profileMsg(text, kind) {
+    const el = document.getElementById('pf-msg'); if (!el) return;
+    el.textContent = text;
+    el.className = 'rounded-xl px-3 py-2 text-xs font-medium ' + (kind === 'ok'
+      ? 'bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-200'
+      : 'bg-rose-50 text-rose-600 ring-1 ring-inset ring-rose-200');
+  }
+  function infoRow(label, value) {
+    return '<div class="rounded-xl border border-slate-100 bg-slate-50/60 p-3">' +
+      '<p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</p>' +
+      '<p class="mt-0.5 break-words text-sm font-medium text-slate-700">' + escapeHtml(value) + '</p></div>';
+  }
+
+  function openProfileModal() {
+    const cloud = fbEnabled && currentUser;
+    const label = cloud ? (currentUser.displayName || currentUser.email || t('user')) : (localOperatorName() || t('operator'));
+    const initial = (label[0] || '?').toUpperCase();
+    const head =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="user-cog" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + t('prof_title') + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>';
+    const avatar =
+      '<div class="flex items-center gap-3">' +
+        '<span class="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-600 text-lg font-bold text-white">' + escapeHtml(initial) + '</span>' +
+        '<div class="min-w-0"><p class="truncate text-sm font-bold text-slate-900">' + escapeHtml(label) + '</p>' +
+        '<p class="truncate text-xs text-slate-500">' + escapeHtml(cloud ? (currentUser.email || '—') : t('prof_no_account')) + '</p></div>' +
+      '</div>';
+
+    let body, footer;
+    if (cloud) {
+      body =
+        avatar +
+        '<div id="pf-msg" class="hidden"></div>' +
+        '<div>' + inputField('pf-name', t('prof_name'), 'Giulia Ferraro') + '</div>' +
+        '<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">' +
+          infoRow(t('prof_method'), providerLabel()) +
+          infoRow(t('prof_uid'), currentUser.uid ? currentUser.uid.slice(0, 10) + '…' : '—') +
+          infoRow(t('prof_created'), fmtMeta(currentUser.metadata && currentUser.metadata.creationTime)) +
+          infoRow(t('prof_last'), fmtMeta(currentUser.metadata && currentUser.metadata.lastSignInTime)) +
+          infoRow(t('prof_role'), t('role_' + currentRole())) +
+        '</div>' +
+        (isPasswordUser()
+          ? '<button data-action="reset-password" class="flex w-full items-center justify-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50"><i data-lucide="key-round" class="h-4 w-4"></i>' + t('prof_reset') + '</button>'
+          : '<p class="text-xs text-slate-400">' + t('prof_provider_note', { p: providerLabel() }) + '</p>');
+      footer =
+        '<button data-action="logout" class="inline-flex items-center gap-1.5 rounded-xl px-4 py-2.5 text-sm font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50"><i data-lucide="log-out" class="h-4 w-4"></i>' + t('logout') + '</button>' +
+        '<button data-action="save-profile" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + t('prof_save') + '</button>';
+    } else {
+      body =
+        avatar +
+        '<div class="rounded-xl border-l-4 border-amber-400 bg-amber-50 p-3 text-xs text-amber-800">' + t('prof_local_warn') + '</div>' +
+        '<div id="pf-msg" class="hidden"></div>' +
+        '<div><p class="mb-1 text-xs font-semibold text-slate-500">' + t('access_role') + '</p>' +
+          '<div class="flex gap-2">' +
+            ['admin', 'operator'].map((r) => '<button data-action="set-demo-role" data-role="' + r + '" class="flex-1 rounded-xl px-3 py-2 text-xs font-semibold ring-1 ring-inset transition ' + (currentRole() === r ? 'bg-indigo-600 text-white ring-indigo-600' : 'text-slate-600 ring-slate-200 hover:bg-slate-50') + '">' + t('role_' + r) + '</button>').join('') +
+          '</div>' +
+          '<p class="mt-1 text-[11px] text-slate-400">' + t('demo_role_hint') + '</p></div>' +
+        '<div>' + inputField('pf-name', t('prof_name_local'), 'Mario Rossi') + '</div>';
+      footer =
+        '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('close') + '</button>' +
+        '<button data-action="save-profile" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + t('prof_save') + '</button>';
+    }
+    modalShell(head + '<div class="space-y-4 p-5">' + body + '</div>' + '<div class="flex justify-between gap-2 border-t border-slate-100 p-5">' + footer + '</div>');
+    const el = document.getElementById('pf-name');
+    if (el) { el.value = cloud ? (currentUser.displayName || '') : localOperatorName(); el.focus(); }
+  }
+
+  function saveProfile() {
+    const name = fieldVal('pf-name');
+    if (fbEnabled && currentUser) {
+      currentUser.updateProfile({ displayName: name })
+        .then(() => { profileMsg(t('prof_saved_cloud'), 'ok'); render(); })
+        .catch((e) => profileMsg(translateAuthError(e), 'err'));
+    } else {
+      try { localStorage.setItem(LOCAL_OPERATOR_KEY, name); } catch (e) { /* ignore */ }
+      profileMsg(t('prof_saved_local'), 'ok');
+    }
+  }
+  function sendPasswordReset() {
+    if (!auth || !currentUser || !currentUser.email) return;
+    auth.sendPasswordResetEmail(currentUser.email)
+      .then(() => profileMsg(t('prof_reset_sent', { e: currentUser.email }), 'ok'))
+      .catch((e) => profileMsg(translateAuthError(e), 'err'));
+  }
+
+  // ---------- Fullscreen document overlays (operator manual + regulatory guide) ----------
+  // Scroll-spy shared by both overlays: highlight the current section in the TOC.
+  function attachTocSpy(o) {
+    const links = Array.prototype.slice.call(o.querySelectorAll('.toc-link'));
+    const map = {};
+    links.forEach((l) => { const id = l.getAttribute('href').slice(1); const el = o.querySelector('#' + id); if (el) map[id] = l; });
+    try {
+      const obs = new IntersectionObserver((entries) => {
+        entries.forEach((en) => {
+          if (en.isIntersecting) { links.forEach((l) => l.classList.remove('active')); if (map[en.target.id]) map[en.target.id].classList.add('active'); }
+        });
+      }, { root: o, rootMargin: '-72px 0px -70% 0px', threshold: 0 });
+      Object.keys(map).forEach((id) => obs.observe(o.querySelector('#' + id)));
+    } catch (e) { /* IntersectionObserver opzionale */ }
+  }
+  // Only one document overlay at a time (the print CSS relies on this).
+  function openDocOverlay(id, html) {
+    closeManual(); closeGuide(); closePrivacyForm();
+    const o = document.createElement('div');
+    o.id = id;
+    o.className = 'fixed inset-0 z-[80] overflow-y-auto bg-slate-100';
+    o.innerHTML = html;
+    document.body.appendChild(o);
+    document.documentElement.classList.add('overflow-hidden');
+    lucide.createIcons();
+    attachTocSpy(o);
+  }
+  function closeDocOverlay(id) {
+    const o = document.getElementById(id);
+    if (o) o.remove();
+    document.documentElement.classList.remove('overflow-hidden');
+  }
+
+  // ---------- In-app operator manual (self-contained, no external file) ----------
+  function openManual() { openDocOverlay('manual-overlay', manualHtml()); }
+  function closeManual() { closeDocOverlay('manual-overlay'); }
+
+  // ---------- Regulatory guide (content in src/guide-content.js) ----------
+  function openGuide() { openDocOverlay('guide-overlay', guideHtml()); }
+  function closeGuide() { closeDocOverlay('guide-overlay'); }
+
+  // ---------- Printable privacy-consent form (bilingual IT/ES, prefilled) ----------
+  function openPrivacyForm(nurseId) {
+    const n = getNurse(nurseId); if (!n) return;
+    openDocOverlay('privacy-overlay', privacyFormHtml(n));
+  }
+  function closePrivacyForm() { closeDocOverlay('privacy-overlay'); }
+
+  function privacyFormHtml(n) {
+    const dot = '<span class="text-slate-400">____________________________</span>';
+    const v = (x) => x ? escapeHtml(x) : dot;
+    const birth = [n.birthDate ? formatDate(n.birthDate) : '', n.birthPlace || ''].filter(Boolean).join(' · ');
+    // Each clause: Italian text + Spanish translation underneath (the form itself is not
+    // driven by the UI language: it is a legal document for an Italian data controller
+    // and a Spanish-speaking candidate).
+    const clause = (it, es) =>
+      '<div class="space-y-0.5"><p class="text-[13px] leading-relaxed text-slate-800">' + it + '</p>' +
+      '<p class="text-[12px] italic leading-relaxed text-slate-500">' + es + '</p></div>';
+    const box = '<span class="mr-1.5 inline-block h-3.5 w-3.5 translate-y-0.5 rounded-sm border-2 border-slate-500"></span>';
+    return '' +
+    '<div class="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">' +
+      '<div class="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:px-5">' +
+        '<div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow"><i data-lucide="shield-check" class="h-4 w-4"></i></div>' +
+        '<div><h1 class="text-sm font-extrabold leading-tight text-slate-900">' + t('privacy_form_title') + '</h1><p class="text-xs text-slate-500">' + escapeHtml(n.name) + '</p></div>' +
+        '<div class="ml-auto flex items-center gap-2">' +
+          '<button onclick="window.print()" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="printer" class="h-3.5 w-3.5"></i>' + t('manual_btn_print') + '</button>' +
+          '<button data-action="close-privacy" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="x" class="h-3.5 w-3.5"></i>' + t('manual_close') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="mx-auto max-w-3xl px-4 py-8 sm:px-5">' +
+      '<div class="space-y-5 rounded-2xl border border-slate-200 bg-white p-8 shadow-sm print:border-0 print:p-0 print:shadow-none">' +
+        '<div class="text-center">' +
+          '<h2 class="text-lg font-extrabold text-slate-900">Informativa e Consenso al Trattamento dei Dati Personali</h2>' +
+          '<p class="text-sm italic text-slate-500">Información y Consentimiento para el Tratamiento de Datos Personales</p>' +
+          '<p class="mt-1 text-xs text-slate-400">Artt. 13–14 Regolamento (UE) 2016/679 «GDPR»</p>' +
+        '</div>' +
+        '<div class="rounded-xl border border-slate-200 bg-slate-50 p-4 text-[13px] leading-relaxed text-slate-700 print:bg-white">' +
+          '<p><b>Candidato/a · Candidato/a:</b> ' + v(n.name) + '</p>' +
+          '<p><b>Nato/a il / a · Nacido/a el / en:</b> ' + (birth ? escapeHtml(birth) : dot) + '</p>' +
+          '<p><b>Cédula:</b> ' + v(n.cedula) + ' &nbsp;·&nbsp; <b>Passaporto · Pasaporte:</b> ' + v(n.passport) + '</p>' +
+          '<p><b>Indirizzo · Dirección:</b> ' + v(n.address) + '</p>' +
+        '</div>' +
+        clause('<b>1. Titolare del trattamento.</b> DHL Nurses — Gestionale Trasferimento Infermieri (integrare con ragione sociale, sede e contatti del Titolare).',
+               '<b>1. Responsable del tratamiento.</b> DHL Nurses — Gestión de Traslado de Enfermeros (completar con razón social, sede y contactos del Responsable).') +
+        clause('<b>2. Finalità.</b> I dati sono trattati per la gestione della candidatura e della pratica di trasferimento in Italia: riconoscimento del titolo professionale, nulla osta al lavoro, visto d’ingresso, permesso di soggiorno, iscrizione OPI e inserimento presso la struttura sanitaria di destinazione.',
+               '<b>2. Finalidad.</b> Los datos se tratan para la gestión de la candidatura y del expediente de traslado a Italia: reconocimiento del título profesional, autorización de trabajo, visado de entrada, permiso de residencia, inscripción OPI e incorporación a la estructura sanitaria de destino.') +
+        clause('<b>3. Categorie di dati.</b> Dati anagrafici e di contatto, documenti d’identità, titoli di studio e professionali, curriculum; ove richiesto dalla normativa: certificati penali e certificati sanitari (categorie particolari ex artt. 9–10 GDPR).',
+               '<b>3. Categorías de datos.</b> Datos personales y de contacto, documentos de identidad, títulos académicos y profesionales, currículum; cuando lo exija la normativa: certificados penales y sanitarios (categorías especiales según arts. 9–10 RGPD).') +
+        clause('<b>4. Base giuridica e conservazione.</b> Esecuzione di misure precontrattuali e contrattuali, obblighi di legge e consenso esplicito per le categorie particolari. I dati sono conservati per la durata della pratica e per i termini di legge successivi.',
+               '<b>4. Base jurídica y conservación.</b> Ejecución de medidas precontractuales y contractuales, obligaciones legales y consentimiento explícito para las categorías especiales. Los datos se conservan mientras dure el expediente y por los plazos legales posteriores.') +
+        clause('<b>5. Destinatari.</b> I dati possono essere comunicati, per le finalità indicate, a: Ministero della Salute, Sportello Unico per l’Immigrazione, rappresentanze consolari italiane, agenzia partner e struttura sanitaria di destinazione.',
+               '<b>5. Destinatarios.</b> Los datos podrán comunicarse, para las finalidades indicadas, a: Ministerio de Salud italiano, Ventanilla Única de Inmigración, representaciones consulares italianas, agencia asociada y estructura sanitaria de destino.') +
+        clause('<b>6. Diritti dell’interessato.</b> L’interessato può esercitare i diritti di cui agli artt. 15–22 GDPR (accesso, rettifica, cancellazione, limitazione, portabilità, opposizione) e revocare il consenso in qualsiasi momento, scrivendo al Titolare.',
+               '<b>6. Derechos del interesado.</b> El interesado puede ejercer los derechos de los arts. 15–22 RGPD (acceso, rectificación, supresión, limitación, portabilidad, oposición) y revocar el consentimiento en cualquier momento, escribiendo al Responsable.') +
+        '<div class="space-y-3 rounded-xl border border-indigo-200 bg-indigo-50/40 p-4 print:bg-white">' +
+          clause('<b>Consenso al trattamento dei dati personali</b> per le finalità di cui al punto 2:<br>' + box + 'Acconsento&nbsp;&nbsp;&nbsp;' + box + 'Non acconsento',
+                 '<b>Consentimiento al tratamiento de los datos personales</b> para las finalidades del punto 2:<br>' + box + 'Consiento&nbsp;&nbsp;&nbsp;' + box + 'No consiento') +
+          clause('<b>Consenso esplicito al trattamento delle categorie particolari di dati</b> (certificati sanitari e penali, solo ove richiesti):<br>' + box + 'Acconsento&nbsp;&nbsp;&nbsp;' + box + 'Non acconsento',
+                 '<b>Consentimiento explícito al tratamiento de las categorías especiales de datos</b> (certificados sanitarios y penales, solo cuando se requieran):<br>' + box + 'Consiento&nbsp;&nbsp;&nbsp;' + box + 'No consiento') +
+        '</div>' +
+        '<div class="grid grid-cols-2 gap-8 pt-6 text-[13px] text-slate-700">' +
+          '<div><p class="mb-8">Luogo e data · Lugar y fecha</p><p class="border-t border-slate-400 pt-1 text-center text-xs text-slate-400">&nbsp;</p></div>' +
+          '<div><p class="mb-8">Firma del candidato · Firma del candidato</p><p class="border-t border-slate-400 pt-1 text-center text-xs text-slate-400">&nbsp;</p></div>' +
+        '</div>' +
+        '<p class="no-print rounded-xl bg-amber-50 p-3 text-xs text-amber-700 ring-1 ring-inset ring-amber-200">' + t('privacy_form_hint') + '</p>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function guideHtml() {
+    const toc = guideToc(LANG).map((item) => '<a href="#' + item[0] + '" class="toc-link block rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-50">' + item[1] + '</a>').join('');
+    return '' +
+    '<div class="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">' +
+      '<div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-5">' +
+        '<div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow"><i data-lucide="scale" class="h-4 w-4"></i></div>' +
+        '<div><h1 class="text-sm font-extrabold leading-tight text-slate-900">' + t('norm_guide_title') + '</h1><p class="text-xs text-slate-500">DHL Nurses · Normativa</p></div>' +
+        '<div class="ml-auto flex items-center gap-2">' +
+          '<button onclick="window.print()" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="printer" class="h-3.5 w-3.5"></i><span class="hidden sm:inline">' + t('manual_btn_print') + '</span></button>' +
+          '<button data-action="close-guide" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="x" class="h-3.5 w-3.5"></i>' + t('manual_close') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="mx-auto flex max-w-6xl gap-8 px-4 py-8 sm:px-5">' +
+      '<aside class="no-print hidden w-60 shrink-0 lg:block"><nav class="sticky top-24 space-y-0.5 text-sm"><p class="mb-2 px-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">' + t('manual_index') + '</p>' + toc + '</nav></aside>' +
+      '<main class="min-w-0 flex-1 space-y-12">' + guideBody(LANG) + '</main>' +
+    '</div>';
+  }
+
+  function manualHtml() {
+    const TOC = {
+      it: [['intro','1. Introduzione'],['accesso','2. Accesso e profilo'],['interfaccia',"3. L'interfaccia"],['dashboard','4. Dashboard Analitica'],['pratiche','5. Gestione Pratiche'],['workflow','6. I 11 stati'],['procedure','7. Usare il gestionale'],['dati','8. Salvataggio dati'],['faq','9. Domande frequenti'],['glossario','10. Glossario']],
+      en: [['intro','1. Introduction'],['accesso','2. Access & profile'],['interfaccia','3. The interface'],['dashboard','4. Analytics Dashboard'],['pratiche','5. Case Management'],['workflow','6. The 11 states'],['procedure','7. Using the app'],['dati','8. Data storage'],['faq','9. FAQ'],['glossario','10. Glossary']],
+      es: [['intro','1. Introducción'],['accesso','2. Acceso y perfil'],['interfaccia','3. La interfaz'],['dashboard','4. Panel Analítico'],['pratiche','5. Gestión de Expedientes'],['workflow','6. Los 11 estados'],['procedure','7. Usar la app'],['dati','8. Almacenamiento'],['faq','9. Preguntas frecuentes'],['glossario','10. Glosario']],
+    };
+    const tocItems = TOC[LANG] || TOC.it;
+    const toc = tocItems.map((item) => '<a href="#' + item[0] + '" class="toc-link block rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-50">' + item[1] + '</a>').join('');
+    return '' +
+    '<div class="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">' +
+      '<div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-5">' +
+        '<div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow"><i data-lucide="book-open" class="h-4 w-4"></i></div>' +
+        '<div><h1 class="text-sm font-extrabold leading-tight text-slate-900">' + t('manual_title') + '</h1><p class="text-xs text-slate-500">DHL Nurses · v1.0</p></div>' +
+        '<div class="ml-auto flex items-center gap-2">' +
+          '<button onclick="window.print()" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="printer" class="h-3.5 w-3.5"></i><span class="hidden sm:inline">' + t('manual_btn_print') + '</span></button>' +
+          '<button data-action="close-manual" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="x" class="h-3.5 w-3.5"></i>' + t('manual_close') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="mx-auto flex max-w-6xl gap-8 px-4 py-8 sm:px-5">' +
+      '<aside class="no-print hidden w-60 shrink-0 lg:block"><nav class="sticky top-24 space-y-0.5 text-sm"><p class="mb-2 px-3 text-[11px] font-bold uppercase tracking-wide text-slate-400">' + t('manual_index') + '</p>' + toc + '</nav></aside>' +
+      '<main class="min-w-0 flex-1 space-y-12">' + manualBody() + '</main>' +
+    '</div>';
+  }
+
+  function manualBody() { return LANG === 'en' ? manualBodyEN() : (LANG === 'es' ? manualBodyES() : manualBodyIT()); }
+
+  function manualBodyIT() {
+    return `
+      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-indigo-900 p-7 text-white shadow-sm">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/20"><i data-lucide="book-open" class="h-3.5 w-3.5"></i>Manuale Operatore</span>
+        <h2 class="mt-3 text-2xl font-extrabold">Come usare DHL Nurses</h2>
+        <p class="mt-2 max-w-2xl text-sm text-slate-300">Guida pratica per il personale HR e gli operatori che seguono il trasferimento degli infermieri dalla Repubblica Dominicana alle strutture sanitarie italiane. Spiega ogni schermata, ogni pulsante e le procedure quotidiane.</p>
+      </div>
+
+      <section id="intro" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="info" class="h-5 w-5 text-indigo-500"></i>1. Introduzione</h2>
+        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses è il gestionale che segue ogni candidato infermiere lungo l'intero percorso burocratico: dall'acquisizione del profilo fino all'inserimento nella struttura sanitaria italiana. Ogni candidato è una <b>pratica</b> che attraversa <b>11 stati sequenziali</b>. Il sistema impedisce di saltare passaggi e segnala le pratiche in ritardo.</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Dashboard Analitica</p><p class="mt-1 text-xs text-slate-500">La visione d'insieme: numeri chiave e allarmi.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Gestione Pratiche</p><p class="mt-1 text-xs text-slate-500">Il lavoro sul singolo candidato.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="graduation-cap" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Guida interattiva</p><p class="mt-1 text-xs text-slate-500">Il tour a riflettore dentro l'app (pulsante "Guida").</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Suggerimento.</b> Al primo accesso parte automaticamente la <b>Guida</b> interattiva. Puoi rilanciarla in qualsiasi momento dal pulsante <span class="font-semibold">🎓 Guida</span> in alto a destra. Questo manuale la completa con le procedure dettagliate.</div>
+      </section>
+
+      <section id="accesso" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="log-in" class="h-5 w-5 text-indigo-500"></i>2. Accesso e profilo operatore</h2>
+        <p class="text-sm leading-relaxed text-slate-600">All'apertura del gestionale compare la schermata di accesso. Ogni operatore lavora con il proprio account: i dati sono <b>isolati e protetti</b>.</p>
+        <ol class="prose-list ml-5 list-decimal text-sm text-slate-600">
+          <li><b>Primo accesso:</b> inserisci la tua email aziendale e una password (minimo 6 caratteri), poi premi <b>Registrati</b>.</li>
+          <li><b>Accessi successivi:</b> inserisci email e password e premi <b>Accedi</b>.</li>
+          <li><b>Accesso con Google:</b> in alternativa premi <b>Continua con Google</b>.</li>
+          <li><b>Uscire:</b> in alto a destra, premi <b>Esci</b> al termine del lavoro.</li>
+        </ol>
+        <h3 id="profilo-operatore" class="pt-2 text-base font-bold text-slate-800">2.1 · Il tuo profilo operatore</h3>
+        <p class="text-sm leading-relaxed text-slate-600">In alto a destra, clicca il tuo <b>avatar</b> (il cerchio con l'iniziale) per aprire la scheda <b>Profilo Operatore</b>. Da qui puoi:</p>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Modificare il nome visualizzato</b>: scrivi il nome e premi <b>Salva nome</b>.</li>
+          <li><b>Consultare i dati dell'account</b>: email, metodo di accesso, data di creazione e ultimo accesso.</li>
+          <li><b>Reimpostare la password</b> (solo per accesso con email/password) tramite email.</li>
+          <li><b>Uscire</b> dalla sessione direttamente dalla scheda.</li>
+        </ul>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>In modalità demo locale</b> non esiste un account cloud: la scheda profilo permette solo di impostare il <b>nome operatore</b> salvato su questo computer.</div>
+      </section>
+
+      <section id="interfaccia" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="panels-top-left" class="h-5 w-5 text-indigo-500"></i>3. Conoscere l'interfaccia</h2>
+        <p class="text-sm leading-relaxed text-slate-600">La barra in alto è sempre presente. Da sinistra a destra trovi:</p>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-4 py-2">Elemento</th><th class="px-4 py-2">A cosa serve</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Gestione Pratiche / Documenti / Impostazioni</td><td class="px-4 py-2.5 text-slate-600">Le viste: visione d'insieme, lavoro sul candidato, archivio documenti e (solo admin) anagrafiche di base.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Badge "a rischio"</td><td class="px-4 py-2.5 text-slate-600">Conta le pratiche ferme oltre i tempi previsti. Verde = nessun rischio.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manuale</td><td class="px-4 py-2.5 text-slate-600">Apre questo documento.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Guida</td><td class="px-4 py-2.5 text-slate-600">Avvia il tour interattivo a riflettore.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Ripristina</td><td class="px-4 py-2.5 text-slate-600">Riporta ai 3 profili demo. <b>Attenzione:</b> annulla le modifiche locali.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Avatar / Esci</td><td class="px-4 py-2.5 text-slate-600">Profilo operatore e chiusura sessione.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="dashboard" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i>4. Dashboard Analitica</h2>
+        <p class="text-sm leading-relaxed text-slate-600">La prima schermata: per capire <b>in pochi secondi</b> lo stato generale del lavoro.</p>
+        <h3 id="riepilogo" class="pt-2 text-base font-bold text-slate-800">4.1 · Riepilogo Trasferimenti</h3>
+        <p class="text-sm leading-relaxed text-slate-600">In cima alla dashboard trovi il colpo d'occhio richiesto più spesso: <b>quanti infermieri stiamo trattando</b>, quanti sono stati <b>trasferiti in Italia</b> e quanti <b>devono ancora essere trasferiti</b>. Vale sempre la relazione: <b>In Gestione = Trasferiti + Da Trasferire</b>.</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">In Gestione</p><p class="mt-1 text-xs text-slate-500">Totale infermieri che stiamo seguendo (tutte le pratiche presenti).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Trasferiti</p><p class="mt-1 text-xs text-slate-500">Chi è già partito: <b>Arrivo in Italia</b> (stato 10) oppure <b>Onboarding completato</b> (stato 11).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Da Trasferire</p><p class="mt-1 text-xs text-slate-500">Ancora nel percorso, non ancora partiti (stati 1–9).</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Suggerimento.</b> Ogni riquadro è <b>cliccabile</b>: ti porta direttamente in <b>Gestione Pratiche</b> già filtrato (es. "Trasferiti" mostra solo chi è partito).</div>
+        <h3 id="kpi" class="pt-2 text-base font-bold text-slate-800">4.2 · Indicatori chiave (KPI)</h3>
+        <p class="text-sm leading-relaxed text-slate-600"><b>Tutti i KPI sono cliccabili</b> e aprono la sezione corrispondente già filtrata.</p>
+        <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Pratiche Attive</p><p class="mt-1 text-xs text-slate-500">Candidati in lavorazione (stati 1–10). → apre le pratiche attive.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Documenti Mancanti</p><p class="mt-1 text-xs text-slate-500">Con almeno un documento da caricare. → apre le pratiche con doc. mancanti.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">In attesa OPI</p><p class="mt-1 text-xs text-slate-500">Pronti o in iscrizione all'albo OPI. → apre le pratiche in attesa OPI.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Doc. in Scadenza</p><p class="mt-1 text-xs text-slate-500">Scaduti o entro 60 giorni. → apre l'Archivio Documenti filtrato.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Onboarding Completati</p><p class="mt-1 text-xs text-slate-500">Percorso concluso. → apre le pratiche completate.</p></div>
+        </div>
+        <h3 id="rischio" class="pt-2 text-base font-bold text-slate-800">4.3 · Semafori di Rischio e Scadenze</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Elenca le pratiche ferme <b>troppo a lungo</b> nello stato attuale, e un pannello con i <b>documenti in scadenza/scaduti</b>. <b>Azione:</b> clicca la riga per aprire la pratica; il KPI "Doc. in Scadenza" apre l'archivio filtrato.</p>
+        <h3 id="strutture" class="pt-2 text-base font-bold text-slate-800">4.4 · Candidati per Struttura</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Mostra quanti candidati sono assegnati a ciascun datore di lavoro e quanti hanno completato l'onboarding. In fondo, la distribuzione nei 11 stati.</p>
+      </section>
+
+      <section id="pratiche" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i>5. Gestione Pratiche</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Il lavoro quotidiano. A sinistra l'<b>elenco candidati</b>, a destra la <b>scheda completa</b>.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · Elenco e ricerca</h3>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Ricerca:</b> per nome, passaporto o struttura di destinazione.</li>
+          <li><b>Filtri di stato:</b> Tutti, <b>Trasferiti</b>, <b>Da Trasferire</b>, A rischio, Doc. Mancanti, In corso, Visto, Completati. Arrivando da un KPI (es. "In attesa OPI") compare un filtro temporaneo evidenziato, con la ✕ per rimuoverlo.</li>
+          <li><b>Scheda:</b> mostra badge di stato, livello linguistico e step. L'icona ⏰ segnala un rischio ritardo.</li>
+        </ul>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · Lo stepper (timeline 11 stati)</h3>
+        <p class="text-sm leading-relaxed text-slate-600">I colori: <span class="font-semibold text-emerald-600">verde</span> = completato, <span class="font-semibold text-indigo-600">indaco</span> = in corso, <span class="font-semibold text-amber-600">ambra</span> = bloccato, grigio = da fare.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · Il pulsante "Avanza Stato"</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Porta la pratica allo stato successivo. <b>Si sblocca solo</b> quando checklist e documenti del passo corrente sono soddisfatti; in caso contrario, sopra il pulsante compare l'elenco dei requisiti mancanti.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.4 · Documenti, checklist, logistica, log</h3>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Documenti:</b> stati Approvato / In Verifica / Mancante; azioni Carica, Approva, Respingi, Aggiungi.</li>
+          <li><b>Checklist:</b> attività obbligatorie del passo corrente, cambia a ogni avanzamento.</li>
+          <li><b>Logistica &amp; Onboarding HR:</b> volo, alloggio, tutor, contratto.</li>
+          <li><b>Log &amp; audit trail:</b> note, chiamate e avvisi con data e autore.</li>
+        </ul>
+      </section>
+
+      <section id="workflow" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. I 11 stati del workflow</h2>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Stato</th><th class="px-3 py-2">Cosa fare</th></tr></thead>
+          <tbody class="divide-y divide-slate-100 align-top">
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Candidato acquisito</td><td class="px-3 py-2.5 text-slate-600">Dati anagrafici, mandato agenzia, valutazione linguistica.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Documenti mancanti</td><td class="px-3 py-2.5 text-slate-600">Caricamento di diploma, certificato, traduzione, legalizzazione.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Documenti verificati</td><td class="px-3 py-2.5 text-slate-600">Verifica e approvazione di tutti i documenti.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Pratica inviata</td><td class="px-3 py-2.5 text-slate-600">Invio telematico al Ministero della Salute.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Integrazione richiesta</td><td class="px-3 py-2.5 text-slate-600">Invio documenti integrativi richiesti.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Titolo riconosciuto</td><td class="px-3 py-2.5 text-slate-600">Ricezione decreto di riconoscimento.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Nulla osta richiesto</td><td class="px-3 py-2.5 text-slate-600">Richiesta nulla osta allo SUI, conferma datore.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Visto ottenuto</td><td class="px-3 py-2.5 text-slate-600">Appuntamento consolato e rilascio visto.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Iscrizione OPI</td><td class="px-3 py-2.5 text-slate-600">Domanda, pagamento quota, iscrizione albo.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">10</td><td class="px-3 py-2.5 font-medium text-slate-700">Arrivo in Italia</td><td class="px-3 py-2.5 text-slate-600">Volo, alloggio, permesso di soggiorno.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">11</td><td class="px-3 py-2.5 font-medium text-slate-700">Onboarding completato</td><td class="px-3 py-2.5 text-slate-600">Contratto, tutor, inserimento in struttura.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="procedure" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>7. Usare il gestionale passo-passo</h2>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4">
+          <p class="text-sm font-bold text-indigo-800">Il flusso completo in 6 passi</p>
+          <ol class="prose-list mt-1 ml-5 list-decimal text-sm text-indigo-900/80">
+            <li><b>Accedi</b> con il tuo account.</li><li><b>Crea l'anagrafica</b> del candidato (procedura 1).</li>
+            <li><b>Inserisci e approva i documenti</b> (procedure 2 e 3).</li><li><b>Spunta la checklist</b> del passo corrente.</li>
+            <li><b>Avanza lo stato</b> quando il pulsante si sblocca (procedura 4).</li><li><b>Registra le comunicazioni</b> e controlla i semafori (5 e 6).</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">1</span>Creare una nuova anagrafica</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Vai sulla vista <b>Gestione Pratiche</b>.</li>
+            <li>In cima all'elenco, premi <b>Nuovo Candidato</b>.</li>
+            <li>Compila i campi. <b>Nome e Passaporto</b> sono obbligatori (*); gli altri facoltativi.</li>
+            <li>Premi <b>Crea candidato</b>: la pratica si apre allo stato <b>1 · Candidato acquisito</b> con i documenti standard già predisposti.</li>
+          </ol>
+          <p class="mt-2 text-xs text-slate-400">Per chiudere senza salvare: <b>Annulla</b>, tasto <b>Esc</b> o click fuori dal riquadro.</p>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">2</span>Inserire i documenti</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Apri la sezione <b>Ciclo di Vita dei Documenti</b>.</li>
+            <li>Premi <b>Aggiungi</b> in alto a destra della tabella.</li>
+            <li>Inserisci nome (obbligatorio), lingua (ES/IT) e validità se nota.</li>
+            <li>Premi <b>Aggiungi</b>: il documento compare come <span class="font-semibold text-rose-600">Mancante</span>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">3</span>Caricare e approvare un documento</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Individua le righe <span class="font-semibold text-rose-600">Mancante</span>.</li>
+            <li>Premi <b>Carica</b> → <span class="font-semibold text-amber-600">In Verifica</span>.</li>
+            <li>Premi <b>Approva</b> → <span class="font-semibold text-emerald-600">Approvato</span> (o <b>Respingi</b>).</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>Far avanzare una pratica</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Spunta la <b>Checklist</b> del passo corrente.</li><li>Verifica che i documenti siano <b>Approvati</b>.</li>
+            <li>Completa gli eventuali <b>requisiti mancanti</b> indicati.</li><li>Premi <b>Avanza Stato</b>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">5</span>Registrare una telefonata o nota</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Vai a "Log comunicazioni".</li><li>Scrivi il testo, scegli <b>Chiamata</b>/Nota/Avviso e premi <b>Registra</b>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-xs font-bold text-white">6</span>Gestire un semaforo rosso</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Dalla Dashboard, clicca la pratica nei "Semafori di Rischio".</li><li>Individua il blocco e contatta agenzia/candidato.</li>
+            <li><b>Registra la chiamata</b> e aggiorna documenti/checklist: il contatore si azzera.</li>
+          </ol>
+        </div>
+
+        <div class="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 p-4">
+          <p class="text-sm font-bold text-emerald-800">Altre funzioni utili</p>
+          <ul class="prose-list mt-1 ml-5 list-disc text-sm text-emerald-900/80">
+            <li><b>Caricare un file:</b> nella scheda documenti premi <b>Carica</b> → si apre il selettore file del computer (PDF, foto, scansione). Il file resta allegato e diventa <b>Sostituisci</b> per cambiarlo.</li>
+            <li><b>Archivio Documenti</b> (scheda <b>Documenti</b> in alto): ritrova <b>tutti</b> i documenti di tutti i candidati, con ricerca e filtri. Clicca <b>Visualizza</b> per l'<b>anteprima</b> di immagini e PDF dentro l'app.</li>
+            <li><b>Scadenze:</b> i documenti con data di validità vengono segnalati con <span class="font-semibold text-amber-600">In scadenza</span> (entro 60 giorni) o <span class="font-semibold text-rose-600">Scaduto</span>. Usa il filtro <b>In scadenza</b> nell'archivio.</li>
+            <li><b>Modifica anagrafica:</b> pulsante <b>Modifica anagrafica</b> nell'intestazione del candidato per correggere i dati.</li>
+            <li><b>Logistica &amp; Onboarding:</b> pulsante <b>Modifica</b> per inserire volo, alloggio, tutor e stato del contratto.</li>
+            <li><b>Elimina candidato</b> (solo admin): dentro <b>Modifica anagrafica</b>, in basso a sinistra. Operazione non reversibile.</li>
+            <li><b>Esporta CSV</b> (solo admin): pulsante in alto a destra nella Dashboard, scarica l'elenco candidati (utile per report e backup).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="dati" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="database" class="h-5 w-5 text-indigo-500"></i>8. Come vengono salvati i dati</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Ogni modifica viene salvata <b>automaticamente</b>: non esiste un pulsante "Salva".</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Modalità cloud (consigliata)</p><p class="mt-1 text-xs text-slate-600">Con il login attivo, i dati sono salvati su Firebase Firestore, isolati per operatore e accessibili da qualsiasi dispositivo.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="hard-drive" class="h-4 w-4 text-amber-500"></i>Modalità demo locale</p><p class="mt-1 text-xs text-slate-600">Senza configurazione cloud, i dati restano solo nel browser di quel computer. Utile per formazione e prove.</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Per l'amministratore.</b> La configurazione di database e autenticazione è descritta nel file <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code>.</div>
+      </section>
+
+      <section id="faq" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="help-circle" class="h-5 w-5 text-indigo-500"></i>9. Domande frequenti</h2>
+        <div class="space-y-2">
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché "Avanza Stato" è grigio?</summary><p class="mt-2 text-slate-600">Mancano requisiti nello stato corrente: spunta la checklist e approva i documenti elencati sopra il pulsante.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Ho approvato un documento per errore.</summary><p class="mt-2 text-slate-600">Premi <b>Respingi</b> sullo stesso documento: torna "Mancante" e l'azione resta nel log.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Posso tornare a uno stato precedente?</summary><p class="mt-2 text-slate-600">Il flusso è pensato per avanzare. Agisci su documenti/checklist e annota la motivazione nel log; per casi particolari contatta l'amministratore.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Cosa fa "Ripristina"?</summary><p class="mt-2 text-slate-600">Riporta ai 3 profili demo e cancella le modifiche locali. Usalo solo per dimostrazioni/formazione.</p></details>
+        </div>
+      </section>
+
+      <section id="glossario" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="book-marked" class="h-5 w-5 text-indigo-500"></i>10. Glossario</h2>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm"><tbody class="divide-y divide-slate-100 align-top">
+          <tr><td class="px-4 py-2.5 w-48 font-semibold text-slate-700">OPI</td><td class="px-4 py-2.5 text-slate-600">Ordine delle Professioni Infermieristiche: l'albo per esercitare in Italia.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Traduzione asseverata</td><td class="px-4 py-2.5 text-slate-600">Traduzione giurata con valore legale in Italia.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Legalizzazione / Apostille</td><td class="px-4 py-2.5 text-slate-600">Certificazione che rende valido in Italia un documento straniero.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Nulla osta</td><td class="px-4 py-2.5 text-slate-600">Autorizzazione al lavoro dello Sportello Unico Immigrazione (SUI).</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Decreto di riconoscimento</td><td class="px-4 py-2.5 text-slate-600">Provvedimento che riconosce il titolo estero di infermiere.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Tempo massimo previsto per uno stato; superarlo accende il semaforo.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Audit trail</td><td class="px-4 py-2.5 text-slate-600">Registro tracciabile di tutte le azioni e comunicazioni.</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Manuale Operatore v1.0 — Documento ad uso interno del personale HR.</footer>
+    `;
+  }
+
+  function manualBodyEN() {
+    return `
+      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-indigo-900 p-7 text-white shadow-sm">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/20"><i data-lucide="book-open" class="h-3.5 w-3.5"></i>Operator Manual</span>
+        <h2 class="mt-3 text-2xl font-extrabold">How to use DHL Nurses</h2>
+        <p class="mt-2 max-w-2xl text-sm text-slate-300">A practical guide for HR staff and operators following the transfer of nurses from the Dominican Republic to Italian healthcare facilities. It explains every screen, button and daily procedure.</p>
+      </div>
+
+      <section id="intro" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="info" class="h-5 w-5 text-indigo-500"></i>1. Introduction</h2>
+        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses tracks each nurse candidate along the entire bureaucratic path: from acquiring the profile to integration into an Italian facility. Each candidate is a <b>case</b> that goes through <b>11 sequential states</b>. The system prevents skipping steps and flags overdue cases.</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Analytics Dashboard</p><p class="mt-1 text-xs text-slate-500">The overview: key numbers and alerts.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Case Management</p><p class="mt-1 text-xs text-slate-500">Work on a single candidate.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="graduation-cap" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Interactive guide</p><p class="mt-1 text-xs text-slate-500">The spotlight tour inside the app ("Guide" button).</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Tip.</b> On first access the interactive <b>Guide</b> starts automatically. You can relaunch it any time from the <span class="font-semibold">🎓 Guide</span> button. This manual complements it with detailed procedures.</div>
+      </section>
+
+      <section id="accesso" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="log-in" class="h-5 w-5 text-indigo-500"></i>2. Access & operator profile</h2>
+        <p class="text-sm leading-relaxed text-slate-600">When the app opens, the sign-in screen appears. Each operator works with their own account: data is <b>isolated and protected</b>.</p>
+        <ol class="prose-list ml-5 list-decimal text-sm text-slate-600">
+          <li><b>First access:</b> enter your company email and a password (min 6 characters), then press <b>Sign up</b>.</li>
+          <li><b>Later access:</b> enter email and password and press <b>Sign in</b>.</li>
+          <li><b>Google sign-in:</b> alternatively press <b>Continue with Google</b>.</li>
+          <li><b>Sign out:</b> top right, press <b>Sign out</b> when you finish.</li>
+        </ol>
+        <h3 id="profilo-operatore" class="pt-2 text-base font-bold text-slate-800">2.1 · Your operator profile</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Top right, click your <b>avatar</b> (the circle with your initial) to open the <b>Operator Profile</b>. From here you can:</p>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Edit the display name</b>: type the name and press <b>Save name</b>.</li>
+          <li><b>View account data</b>: email, sign-in method, creation date and last access.</li>
+          <li><b>Reset the password</b> (email/password accounts only) via email.</li>
+          <li><b>Sign out</b> directly from the card.</li>
+        </ul>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>In local demo mode</b> there is no cloud account: the profile card only lets you set the <b>operator name</b> saved on this computer.</div>
+      </section>
+
+      <section id="interfaccia" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="panels-top-left" class="h-5 w-5 text-indigo-500"></i>3. The interface</h2>
+        <p class="text-sm leading-relaxed text-slate-600">The top bar is always present. From left to right:</p>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-4 py-2">Element</th><th class="px-4 py-2">Purpose</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Cases / Documents / Settings</td><td class="px-4 py-2.5 text-slate-600">The views: overview, single-candidate work, document archive, and (admin only) base records.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">"At risk" badge</td><td class="px-4 py-2.5 text-slate-600">Counts cases stuck beyond expected times. Click it to open the at-risk list. Green = no risk.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Theme toggle</td><td class="px-4 py-2.5 text-slate-600">Switch between light and dark mode.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">IT · EN · ES</td><td class="px-4 py-2.5 text-slate-600">Change the interface language.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manual / Guide</td><td class="px-4 py-2.5 text-slate-600">This document / the interactive spotlight tour.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Reset</td><td class="px-4 py-2.5 text-slate-600">Restores the 3 demo profiles. <b>Warning:</b> discards local changes.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Avatar / Sign out</td><td class="px-4 py-2.5 text-slate-600">Operator profile and session sign-out.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="dashboard" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i>4. Analytics Dashboard</h2>
+        <p class="text-sm leading-relaxed text-slate-600">The first screen: to understand the overall workload <b>in seconds</b>.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.1 · Transfer Summary</h3>
+        <p class="text-sm leading-relaxed text-slate-600">At the top you get the most-asked figures at a glance: <b>how many nurses we are handling</b>, how many have been <b>transferred to Italy</b>, and how many <b>still have to be transferred</b>. The relationship always holds: <b>Under Management = Transferred + To Transfer</b>.</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Under Management</p><p class="mt-1 text-xs text-slate-500">Total nurses we are handling (all existing cases).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Transferred</p><p class="mt-1 text-xs text-slate-500">Already departed: <b>Arrival in Italy</b> (state 10) or <b>Onboarding completed</b> (state 11).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">To Transfer</p><p class="mt-1 text-xs text-slate-500">Still in the pipeline, not yet departed (states 1–9).</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Tip.</b> Each tile is <b>clickable</b>: it opens <b>Case Management</b> already filtered (e.g. "Transferred" shows only those who departed).</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.2 · Key indicators (KPI)</h3>
+        <p class="text-sm leading-relaxed text-slate-600"><b>All KPIs are clickable</b> and open the matching section already filtered: Active Cases, Missing Documents, Awaiting OPI, Expiring Docs, Onboarding Completed.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.3 · Risk alerts &amp; expiries</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Lists cases stuck <b>too long</b> in their current state, plus a panel of <b>expiring/expired documents</b>. <b>Action:</b> click a row to open the case; the "Expiring Docs" KPI opens the filtered archive.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.4 · Candidates per facility</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Shows how many candidates are assigned to each employer and how many have completed onboarding, plus the distribution across the 11 states.</p>
+      </section>
+
+      <section id="pratiche" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i>5. Case Management</h2>
+        <p class="text-sm leading-relaxed text-slate-600">The daily work. On the left the <b>candidate list</b>, on the right the <b>full file</b>.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · List and search</h3>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Search:</b> by name, passport or destination facility.</li>
+          <li><b>Status filters:</b> All, <b>Transferred</b>, <b>To transfer</b>, At risk, Missing Docs, In progress, Visa, Completed. Coming from a KPI (e.g. "Awaiting OPI") a temporary highlighted filter appears, with an ✕ to clear it.</li>
+          <li><b>Card:</b> shows the status badge, language level and step. The ⏰ icon flags a delay risk.</li>
+        </ul>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · The stepper (11-state timeline)</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Colours: <span class="font-semibold text-emerald-600">green</span> = completed, <span class="font-semibold text-indigo-600">indigo</span> = current, <span class="font-semibold text-amber-600">amber</span> = blocked, grey = to do.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · The "Advance State" button</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Moves the case to the next state. It <b>unlocks only</b> when the current step's checklist and documents are satisfied; otherwise the missing requirements are listed above the button.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.4 · Documents, checklist, logistics, log</h3>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Documents:</b> statuses Approved / Under Review / Missing; actions Upload, Approve, Reject, Add.</li>
+          <li><b>Checklist:</b> mandatory tasks for the current step, changing on each advance.</li>
+          <li><b>Logistics &amp; HR Onboarding:</b> flight, housing, tutor, contract.</li>
+          <li><b>Log &amp; audit trail:</b> notes, calls and alerts with date and author.</li>
+        </ul>
+      </section>
+
+      <section id="workflow" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. The 11 workflow states</h2>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">State</th><th class="px-3 py-2">What to do</th></tr></thead>
+          <tbody class="divide-y divide-slate-100 align-top">
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Candidate acquired</td><td class="px-3 py-2.5 text-slate-600">Personal data, agency mandate, language assessment.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Documents missing</td><td class="px-3 py-2.5 text-slate-600">Upload degree, certificate, sworn translation, legalisation.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Documents verified</td><td class="px-3 py-2.5 text-slate-600">Verify and approve all documents.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Application submitted</td><td class="px-3 py-2.5 text-slate-600">Online submission to the Ministry of Health.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Integration requested</td><td class="px-3 py-2.5 text-slate-600">Send requested supplementary documents.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Qualification recognised</td><td class="px-3 py-2.5 text-slate-600">Receive the recognition decree.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Clearance requested</td><td class="px-3 py-2.5 text-slate-600">Request clearance from the Immigration desk, confirm employer.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Visa obtained</td><td class="px-3 py-2.5 text-slate-600">Consulate appointment and visa issue.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">OPI registration</td><td class="px-3 py-2.5 text-slate-600">Application, fee payment, register enrolment.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">10</td><td class="px-3 py-2.5 font-medium text-slate-700">Arrival in Italy</td><td class="px-3 py-2.5 text-slate-600">Flight, housing, residence permit.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">11</td><td class="px-3 py-2.5 font-medium text-slate-700">Onboarding completed</td><td class="px-3 py-2.5 text-slate-600">Contract, tutor, integration in the facility.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="procedure" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>7. Using the app step by step</h2>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4">
+          <p class="text-sm font-bold text-indigo-800">The full flow in 6 steps</p>
+          <ol class="prose-list mt-1 ml-5 list-decimal text-sm text-indigo-900/80">
+            <li><b>Sign in</b> with your account.</li><li><b>Create the candidate</b> record (procedure 1).</li>
+            <li><b>Add and approve documents</b> (procedures 2 and 3).</li><li><b>Tick the checklist</b> for the current step.</li>
+            <li><b>Advance the state</b> when the button unlocks (procedure 4).</li><li><b>Log communications</b> and watch the risk alerts (5 and 6).</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">1</span>Create a new candidate</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Go to the <b>Case Management</b> view.</li>
+            <li>At the top of the list, press <b>New Candidate</b>.</li>
+            <li>Fill in the fields. <b>Name and Passport</b> are required (*); the agency, employer and HR contact are chosen from the lists managed in <b>Settings</b>.</li>
+            <li>Press <b>Create candidate</b>: the case opens at state <b>1 · Candidate acquired</b> with the standard documents prepared.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">2</span>Add documents</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Open the <b>Document Lifecycle</b> section.</li>
+            <li>Press <b>Add</b> at the top right of the table.</li>
+            <li>Enter the name (required), language (ES/IT) and validity if known.</li>
+            <li>Press <b>Add</b>: the document appears as <span class="font-semibold text-rose-600">Missing</span>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">3</span>Upload and approve a document</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Find the <span class="font-semibold text-rose-600">Missing</span> rows.</li>
+            <li>Press <b>Upload</b> → <span class="font-semibold text-amber-600">Under Review</span>.</li>
+            <li>Press <b>Approve</b> → <span class="font-semibold text-emerald-600">Approved</span> (or <b>Reject</b>).</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>Advance a case</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Tick the <b>Checklist</b> for the current step.</li><li>Check the required documents are <b>Approved</b>.</li>
+            <li>Complete any <b>missing requirements</b> listed.</li><li>Press <b>Advance State</b>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">5</span>Log a call or note</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Go to "Communication Log".</li><li>Type the text, choose <b>Call</b>/Note/Alert and press <b>Log</b>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-xs font-bold text-white">6</span>Handle a red alert</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>From the Dashboard (or the "At risk" badge), open the flagged case.</li><li>Identify the block and contact the agency/candidate.</li>
+            <li><b>Log the call</b> and update documents/checklist: the day counter resets.</li>
+          </ol>
+        </div>
+
+        <div class="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 p-4">
+          <p class="text-sm font-bold text-emerald-800">Other useful features</p>
+          <ul class="prose-list mt-1 ml-5 list-disc text-sm text-emerald-900/80">
+            <li><b>Upload a file:</b> in the documents table press <b>Upload</b> → your computer's file picker opens (PDF, photo, scan). The file stays attached and the button becomes <b>Replace</b>.</li>
+            <li><b>Document Archive</b> (<b>Documents</b> tab): find <b>all</b> documents of all candidates, with search and filters. Click <b>View</b> for an in-app <b>preview</b> of images and PDFs.</li>
+            <li><b>Expiry:</b> documents with a validity date are flagged <span class="font-semibold text-amber-600">Expiring</span> (within 60 days) or <span class="font-semibold text-rose-600">Expired</span>. Use the <b>Expiring</b> filter in the archive.</li>
+            <li><b>Edit details:</b> the <b>Edit details</b> button on the candidate header to correct the data.</li>
+            <li><b>Logistics &amp; Onboarding:</b> the <b>Edit</b> button to enter flight, housing, tutor and contract status.</li>
+            <li><b>Delete candidate</b> (admin only): inside <b>Edit details</b>, bottom-left. This cannot be undone.</li>
+            <li><b>Export CSV</b> (admin only): button at the top-right of the Dashboard, downloads the candidate list (for reports and backup).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="dati" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="database" class="h-5 w-5 text-indigo-500"></i>8. How data is stored</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Every change is saved <b>automatically</b>: there is no "Save" button.</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Cloud mode (recommended)</p><p class="mt-1 text-xs text-slate-600">With login active, data is stored on Firebase Firestore, isolated per operator and accessible from any device.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="hard-drive" class="h-4 w-4 text-amber-500"></i>Local demo mode</p><p class="mt-1 text-xs text-slate-600">Without cloud setup, data stays only in that computer's browser. Useful for training and trials.</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>For the administrator.</b> Database and authentication setup is described in the <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code> file.</div>
+      </section>
+
+      <section id="faq" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="help-circle" class="h-5 w-5 text-indigo-500"></i>9. FAQ</h2>
+        <div class="space-y-2">
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why is "Advance State" greyed out?</summary><p class="mt-2 text-slate-600">Requirements are missing in the current state: tick the checklist and approve the documents listed above the button.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">I approved a document by mistake.</summary><p class="mt-2 text-slate-600">Press <b>Reject</b> on the same document: it returns to "Missing" and the action stays in the log.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Can I go back to a previous state?</summary><p class="mt-2 text-slate-600">The flow is designed to advance. Act on documents/checklist and note the reason in the log; for special cases contact the administrator.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">What does "Reset" do?</summary><p class="mt-2 text-slate-600">Restores the 3 demo profiles and discards local changes. Use it only for demos/training.</p></details>
+        </div>
+      </section>
+
+      <section id="glossario" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="book-marked" class="h-5 w-5 text-indigo-500"></i>10. Glossary</h2>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm"><tbody class="divide-y divide-slate-100 align-top">
+          <tr><td class="px-4 py-2.5 w-48 font-semibold text-slate-700">OPI</td><td class="px-4 py-2.5 text-slate-600">Order of Nursing Professions: the register a nurse must join to practise in Italy.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Sworn translation</td><td class="px-4 py-2.5 text-slate-600">An official certified translation with legal value in Italy.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Legalisation / Apostille</td><td class="px-4 py-2.5 text-slate-600">Certification that makes a foreign document valid in Italy.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Clearance (nulla osta)</td><td class="px-4 py-2.5 text-slate-600">Work authorisation issued by the Immigration One-Stop Desk.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Recognition decree</td><td class="px-4 py-2.5 text-slate-600">The act recognising the foreign nursing qualification.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Maximum expected time for a state; exceeding it triggers the risk alert.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Audit trail</td><td class="px-4 py-2.5 text-slate-600">Traceable chronological record of all actions and communications.</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Operator Manual v1.0 — Internal document for HR staff.</footer>
+    `;
+  }
+
+  function manualBodyES() {
+    return `
+      <div class="rounded-2xl border border-slate-200 bg-gradient-to-br from-slate-900 to-indigo-900 p-7 text-white shadow-sm">
+        <span class="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1 text-xs font-semibold ring-1 ring-inset ring-white/20"><i data-lucide="book-open" class="h-3.5 w-3.5"></i>Manual del Operador</span>
+        <h2 class="mt-3 text-2xl font-extrabold">Cómo usar DHL Nurses</h2>
+        <p class="mt-2 max-w-2xl text-sm text-slate-300">Guía práctica para el personal de RR.HH. y los operadores que siguen el traslado de enfermeros desde la República Dominicana a las estructuras sanitarias italianas. Explica cada pantalla, botón y procedimiento diario.</p>
+      </div>
+
+      <section id="intro" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="info" class="h-5 w-5 text-indigo-500"></i>1. Introducción</h2>
+        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses sigue a cada candidato enfermero a lo largo de todo el recorrido burocrático: desde la adquisición del perfil hasta la integración en una estructura italiana. Cada candidato es un <b>expediente</b> que atraviesa <b>11 estados secuenciales</b>. El sistema impide saltar pasos y señala los expedientes con retraso.</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Panel Analítico</p><p class="mt-1 text-xs text-slate-500">La visión global: cifras clave y alertas.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Gestión de Expedientes</p><p class="mt-1 text-xs text-slate-500">Trabajo sobre un candidato.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="graduation-cap" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Guía interactiva</p><p class="mt-1 text-xs text-slate-500">El tour con foco dentro de la app (botón "Guía").</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Sugerencia.</b> En el primer acceso la <b>Guía</b> interactiva se inicia automáticamente. Puedes relanzarla en cualquier momento desde el botón <span class="font-semibold">🎓 Guía</span>. Este manual la completa con procedimientos detallados.</div>
+      </section>
+
+      <section id="accesso" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="log-in" class="h-5 w-5 text-indigo-500"></i>2. Acceso y perfil del operador</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Al abrir la app aparece la pantalla de acceso. Cada operador trabaja con su propia cuenta: los datos están <b>aislados y protegidos</b>.</p>
+        <ol class="prose-list ml-5 list-decimal text-sm text-slate-600">
+          <li><b>Primer acceso:</b> introduce tu correo de empresa y una contraseña (mín. 6 caracteres), luego pulsa <b>Registrarse</b>.</li>
+          <li><b>Accesos posteriores:</b> introduce correo y contraseña y pulsa <b>Acceder</b>.</li>
+          <li><b>Acceso con Google:</b> como alternativa pulsa <b>Continuar con Google</b>.</li>
+          <li><b>Salir:</b> arriba a la derecha, pulsa <b>Salir</b> al terminar.</li>
+        </ol>
+        <h3 id="profilo-operatore" class="pt-2 text-base font-bold text-slate-800">2.1 · Tu perfil de operador</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Arriba a la derecha, haz clic en tu <b>avatar</b> (el círculo con la inicial) para abrir el <b>Perfil del Operador</b>. Desde aquí puedes:</p>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Modificar el nombre visible</b>: escribe el nombre y pulsa <b>Guardar nombre</b>.</li>
+          <li><b>Consultar los datos de la cuenta</b>: correo, método de acceso, fecha de creación y último acceso.</li>
+          <li><b>Restablecer la contraseña</b> (solo cuentas de correo/contraseña) por correo.</li>
+          <li><b>Salir</b> de la sesión directamente desde la ficha.</li>
+        </ul>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>En modo demo local</b> no existe una cuenta en la nube: la ficha de perfil solo permite establecer el <b>nombre del operador</b> guardado en este ordenador.</div>
+      </section>
+
+      <section id="interfaccia" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="panels-top-left" class="h-5 w-5 text-indigo-500"></i>3. La interfaz</h2>
+        <p class="text-sm leading-relaxed text-slate-600">La barra superior siempre está presente. De izquierda a derecha:</p>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-4 py-2">Elemento</th><th class="px-4 py-2">Función</th></tr></thead>
+          <tbody class="divide-y divide-slate-100">
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Panel / Expedientes / Documentos / Ajustes</td><td class="px-4 py-2.5 text-slate-600">Las vistas: visión global, trabajo por candidato, archivo de documentos y (solo admin) registros base.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Distintivo "en riesgo"</td><td class="px-4 py-2.5 text-slate-600">Cuenta los expedientes detenidos más de lo previsto. Haz clic para abrir la lista en riesgo. Verde = sin riesgo.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Cambio de tema</td><td class="px-4 py-2.5 text-slate-600">Alterna entre modo claro y oscuro.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">IT · EN · ES</td><td class="px-4 py-2.5 text-slate-600">Cambia el idioma de la interfaz.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manual / Guía</td><td class="px-4 py-2.5 text-slate-600">Este documento / el tour interactivo con foco.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Restablecer</td><td class="px-4 py-2.5 text-slate-600">Restaura los 3 perfiles demo. <b>Atención:</b> descarta los cambios locales.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Avatar / Salir</td><td class="px-4 py-2.5 text-slate-600">Perfil del operador y cierre de sesión.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="dashboard" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i>4. Panel Analítico</h2>
+        <p class="text-sm leading-relaxed text-slate-600">La primera pantalla: para entender la carga de trabajo general <b>en segundos</b>.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.1 · Resumen de Traslados</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Arriba tienes de un vistazo las cifras más consultadas: <b>cuántos enfermeros estamos gestionando</b>, cuántos han sido <b>trasladados a Italia</b> y cuántos <b>aún deben trasladarse</b>. Siempre se cumple: <b>En Gestión = Trasladados + Por Trasladar</b>.</p>
+        <div class="grid gap-3 sm:grid-cols-3">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">En Gestión</p><p class="mt-1 text-xs text-slate-500">Total de enfermeros que seguimos (todos los expedientes).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Trasladados</p><p class="mt-1 text-xs text-slate-500">Ya partieron: <b>Llegada a Italia</b> (estado 10) u <b>Onboarding completado</b> (estado 11).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Por Trasladar</p><p class="mt-1 text-xs text-slate-500">Todavía en el proceso, aún no partidos (estados 1–9).</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Consejo.</b> Cada recuadro es <b>clicable</b>: abre <b>Gestión de Expedientes</b> ya filtrado (p. ej. "Trasladados" muestra solo quienes partieron).</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.2 · Indicadores clave (KPI)</h3>
+        <p class="text-sm leading-relaxed text-slate-600"><b>Todos los KPI son clicables</b> y abren la sección correspondiente ya filtrada: Expedientes Activos, Documentos Faltantes, En espera OPI, Docs por Vencer, Onboarding Completado.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.3 · Semáforos de riesgo y vencimientos</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Lista los expedientes detenidos <b>demasiado tiempo</b> en su estado actual, y un panel de <b>documentos por vencer/vencidos</b>. <b>Acción:</b> haz clic en una fila para abrir el expediente; el KPI "Docs por Vencer" abre el archivo filtrado.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">4.4 · Candidatos por estructura</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Muestra cuántos candidatos están asignados a cada empleador y cuántos han completado el onboarding, además de la distribución en los 11 estados.</p>
+      </section>
+
+      <section id="pratiche" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i>5. Gestión de Expedientes</h2>
+        <p class="text-sm leading-relaxed text-slate-600">El trabajo diario. A la izquierda la <b>lista de candidatos</b>, a la derecha la <b>ficha completa</b>.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · Lista y búsqueda</h3>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Búsqueda:</b> por nombre, pasaporte o estructura de destino.</li>
+          <li><b>Filtros de estado:</b> Todos, <b>Trasladados</b>, <b>Por Trasladar</b>, En riesgo, Docs Faltantes, En curso, Visado, Completados. Al venir de un KPI (p. ej. "En espera OPI") aparece un filtro temporal resaltado, con la ✕ para quitarlo.</li>
+          <li><b>Ficha:</b> muestra el estado, el nivel lingüístico y el paso. El icono ⏰ señala riesgo de retraso.</li>
+        </ul>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · El stepper (línea de 11 estados)</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Colores: <span class="font-semibold text-emerald-600">verde</span> = completado, <span class="font-semibold text-indigo-600">índigo</span> = actual, <span class="font-semibold text-amber-600">ámbar</span> = bloqueado, gris = por hacer.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · El botón "Avanzar Estado"</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Lleva el expediente al estado siguiente. Se <b>desbloquea solo</b> cuando la checklist y los documentos del paso actual están cumplidos; de lo contrario, los requisitos faltantes se muestran sobre el botón.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.4 · Documentos, checklist, logística, registro</h3>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Documentos:</b> estados Aprobado / En Verificación / Faltante; acciones Subir, Aprobar, Rechazar, Añadir.</li>
+          <li><b>Checklist:</b> tareas obligatorias del paso actual, cambian en cada avance.</li>
+          <li><b>Logística &amp; Onboarding RR.HH.:</b> vuelo, alojamiento, tutor, contrato.</li>
+          <li><b>Registro y auditoría:</b> notas, llamadas y avisos con fecha y autor.</li>
+        </ul>
+      </section>
+
+      <section id="workflow" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. Los 11 estados del flujo</h2>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Estado</th><th class="px-3 py-2">Qué hacer</th></tr></thead>
+          <tbody class="divide-y divide-slate-100 align-top">
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Candidato adquirido</td><td class="px-3 py-2.5 text-slate-600">Datos personales, mandato de agencia, evaluación lingüística.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Documentos faltantes</td><td class="px-3 py-2.5 text-slate-600">Subir diploma, certificado, traducción jurada, legalización.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Documentos verificados</td><td class="px-3 py-2.5 text-slate-600">Verificar y aprobar todos los documentos.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Expediente enviado</td><td class="px-3 py-2.5 text-slate-600">Envío telemático al Ministerio de Sanidad.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Integración solicitada</td><td class="px-3 py-2.5 text-slate-600">Enviar documentos complementarios solicitados.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Título reconocido</td><td class="px-3 py-2.5 text-slate-600">Recepción del decreto de reconocimiento.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Autorización solicitada</td><td class="px-3 py-2.5 text-slate-600">Solicitar autorización a la Ventanilla de Inmigración, confirmar empleador.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Visado obtenido</td><td class="px-3 py-2.5 text-slate-600">Cita en el consulado y expedición del visado.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Inscripción OPI</td><td class="px-3 py-2.5 text-slate-600">Solicitud, pago de cuota, inscripción en el colegio.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">10</td><td class="px-3 py-2.5 font-medium text-slate-700">Llegada a Italia</td><td class="px-3 py-2.5 text-slate-600">Vuelo, alojamiento, permiso de residencia.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">11</td><td class="px-3 py-2.5 font-medium text-slate-700">Onboarding completado</td><td class="px-3 py-2.5 text-slate-600">Contrato, tutor, integración en la estructura.</td></tr>
+          </tbody>
+        </table></div>
+      </section>
+
+      <section id="procedure" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>7. Usar la app paso a paso</h2>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4">
+          <p class="text-sm font-bold text-indigo-800">El flujo completo en 6 pasos</p>
+          <ol class="prose-list mt-1 ml-5 list-decimal text-sm text-indigo-900/80">
+            <li><b>Accede</b> con tu cuenta.</li><li><b>Crea el registro</b> del candidato (procedimiento 1).</li>
+            <li><b>Añade y aprueba documentos</b> (procedimientos 2 y 3).</li><li><b>Marca la checklist</b> del paso actual.</li>
+            <li><b>Avanza el estado</b> cuando el botón se desbloquee (procedimiento 4).</li><li><b>Registra comunicaciones</b> y vigila los semáforos (5 y 6).</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">1</span>Crear un nuevo candidato</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Ve a la vista <b>Gestión de Expedientes</b>.</li>
+            <li>En la parte superior de la lista, pulsa <b>Nuevo Candidato</b>.</li>
+            <li>Rellena los campos. <b>Nombre y Pasaporte</b> son obligatorios (*); la agencia, el empleador y el referente de RR.HH. se eligen de las listas gestionadas en <b>Ajustes</b>.</li>
+            <li>Pulsa <b>Crear candidato</b>: el expediente se abre en el estado <b>1 · Candidato adquirido</b> con los documentos estándar preparados.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">2</span>Añadir documentos</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Abre la sección <b>Ciclo de Vida de los Documentos</b>.</li>
+            <li>Pulsa <b>Añadir</b> arriba a la derecha de la tabla.</li>
+            <li>Introduce el nombre (obligatorio), el idioma (ES/IT) y la validez si se conoce.</li>
+            <li>Pulsa <b>Añadir</b>: el documento aparece como <span class="font-semibold text-rose-600">Faltante</span>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">3</span>Subir y aprobar un documento</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Localiza las filas <span class="font-semibold text-rose-600">Faltante</span>.</li>
+            <li>Pulsa <b>Subir</b> → <span class="font-semibold text-amber-600">En Verificación</span>.</li>
+            <li>Pulsa <b>Aprobar</b> → <span class="font-semibold text-emerald-600">Aprobado</span> (o <b>Rechazar</b>).</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>Avanzar un expediente</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Marca la <b>Checklist</b> del paso actual.</li><li>Comprueba que los documentos requeridos estén <b>Aprobados</b>.</li>
+            <li>Completa los <b>requisitos faltantes</b> indicados.</li><li>Pulsa <b>Avanzar Estado</b>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">5</span>Registrar una llamada o nota</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Ve a "Registro de Comunicaciones".</li><li>Escribe el texto, elige <b>Llamada</b>/Nota/Aviso y pulsa <b>Registrar</b>.</li>
+          </ol>
+        </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-rose-600 text-xs font-bold text-white">6</span>Gestionar un semáforo rojo</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Desde el Panel (o el distintivo "En riesgo"), abre el expediente señalado.</li><li>Identifica el bloqueo y contacta con la agencia/candidato.</li>
+            <li><b>Registra la llamada</b> y actualiza documentos/checklist: el contador de días se reinicia.</li>
+          </ol>
+        </div>
+
+        <div class="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 p-4">
+          <p class="text-sm font-bold text-emerald-800">Otras funciones útiles</p>
+          <ul class="prose-list mt-1 ml-5 list-disc text-sm text-emerald-900/80">
+            <li><b>Subir un archivo:</b> en la tabla de documentos pulsa <b>Subir</b> → se abre el selector de archivos del ordenador (PDF, foto, escaneo). El archivo queda adjunto y el botón pasa a <b>Reemplazar</b>.</li>
+            <li><b>Archivo de Documentos</b> (pestaña <b>Documentos</b>): encuentra <b>todos</b> los documentos de todos los candidatos, con búsqueda y filtros. Pulsa <b>Ver</b> para la <b>vista previa</b> de imágenes y PDF dentro de la app.</li>
+            <li><b>Vencimientos:</b> los documentos con fecha de validez se marcan como <span class="font-semibold text-amber-600">Por vencer</span> (dentro de 60 días) o <span class="font-semibold text-rose-600">Vencido</span>. Usa el filtro <b>Por vencer</b> en el archivo.</li>
+            <li><b>Editar datos:</b> el botón <b>Editar datos</b> en la cabecera del candidato para corregir la información.</li>
+            <li><b>Logística &amp; Onboarding:</b> el botón <b>Editar</b> para introducir vuelo, alojamiento, tutor y estado del contrato.</li>
+            <li><b>Eliminar candidato</b> (solo admin): dentro de <b>Editar datos</b>, abajo a la izquierda. No se puede deshacer.</li>
+            <li><b>Exportar CSV</b> (solo admin): botón arriba a la derecha en el Panel, descarga la lista de candidatos (para informes y copias de seguridad).</li>
+          </ul>
+        </div>
+      </section>
+
+      <section id="dati" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="database" class="h-5 w-5 text-indigo-500"></i>8. Cómo se guardan los datos</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Cada cambio se guarda <b>automáticamente</b>: no hay botón "Guardar".</p>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Modo nube (recomendado)</p><p class="mt-1 text-xs text-slate-600">Con el acceso activo, los datos se guardan en Firebase Firestore, aislados por operador y accesibles desde cualquier dispositivo.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="hard-drive" class="h-4 w-4 text-amber-500"></i>Modo demo local</p><p class="mt-1 text-xs text-slate-600">Sin configuración en la nube, los datos quedan solo en el navegador de ese ordenador. Útil para formación y pruebas.</p></div>
+        </div>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Para el administrador.</b> La configuración de base de datos y autenticación se describe en el archivo <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code>.</div>
+      </section>
+
+      <section id="faq" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="help-circle" class="h-5 w-5 text-indigo-500"></i>9. Preguntas frecuentes</h2>
+        <div class="space-y-2">
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué "Avanzar Estado" está en gris?</summary><p class="mt-2 text-slate-600">Faltan requisitos en el estado actual: marca la checklist y aprueba los documentos indicados sobre el botón.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Aprobé un documento por error.</summary><p class="mt-2 text-slate-600">Pulsa <b>Rechazar</b> en el mismo documento: vuelve a "Faltante" y la acción queda en el registro.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Puedo volver a un estado anterior?</summary><p class="mt-2 text-slate-600">El flujo está pensado para avanzar. Actúa sobre documentos/checklist y anota el motivo en el registro; para casos especiales contacta con el administrador.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Qué hace "Restablecer"?</summary><p class="mt-2 text-slate-600">Restaura los 3 perfiles demo y descarta los cambios locales. Úsalo solo para demos/formación.</p></details>
+        </div>
+      </section>
+
+      <section id="glossario" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="book-marked" class="h-5 w-5 text-indigo-500"></i>10. Glosario</h2>
+        <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm"><tbody class="divide-y divide-slate-100 align-top">
+          <tr><td class="px-4 py-2.5 w-48 font-semibold text-slate-700">OPI</td><td class="px-4 py-2.5 text-slate-600">Colegio de Profesiones de Enfermería: el registro al que el enfermero debe inscribirse para ejercer en Italia.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Traducción jurada</td><td class="px-4 py-2.5 text-slate-600">Traducción oficial certificada con valor legal en Italia.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Legalización / Apostilla</td><td class="px-4 py-2.5 text-slate-600">Certificación que hace válido en Italia un documento extranjero.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Autorización (nulla osta)</td><td class="px-4 py-2.5 text-slate-600">Autorización de trabajo emitida por la Ventanilla Única de Inmigración.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Decreto de reconocimiento</td><td class="px-4 py-2.5 text-slate-600">El acto que reconoce el título extranjero de enfermería.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Tiempo máximo previsto para un estado; superarlo enciende el semáforo de riesgo.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Auditoría (audit trail)</td><td class="px-4 py-2.5 text-slate-600">Registro cronológico y trazable de todas las acciones y comunicaciones.</td></tr>
+        </tbody></table></div>
+      </section>
+
+      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Manual del Operador v1.0 — Documento de uso interno del personal de RR.HH.</footer>
+    `;
+  }
+
+  // =====================================================================================
+  //  RENDER LAYER
+  // =====================================================================================
+  function statusBadge(statusKey, extra) {
+    return '<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ' + statusCls(statusKey) + ' ' + (extra || '') + '">' + escapeHtml(statusLabel(statusKey)) + '</span>';
+  }
+
+  function render() {
+    const root = document.getElementById('app');
+    // Auth still resolving: keep the static boot splash (already in the DOM) — rendering the
+    // login screen here would make it flash for users who are in fact already signed in.
+    if (fbEnabled && !authResolved) return;
+    // Auth gate: when Firebase is configured but no user is signed in, show the login screen.
+    if (fbEnabled && !currentUser) {
+      root.innerHTML = loginScreen();
+      lucide.createIcons();
+      return;
+    }
+    // Settings is admin-only; non-admins are redirected to the dashboard.
+    if (state.view === 'settings' && !isAdmin()) state.view = 'dashboard';
+    const body = state.view === 'dashboard' ? dashboardView()
+      : state.view === 'settings' ? settingsView()
+      : state.view === 'documents' ? archiveView()
+      : casesView();
+    root.innerHTML = demoBanner() + header() + body + appFooter();
+    lucide.createIcons();
+    syncHistory();
+    maybeAutoStartTour();
+  }
+
+  // ---------- Browser history: back/forward navigates between the main sections ----------
+  const APP_VIEWS = ['dashboard', 'cases', 'documents', 'settings'];
+  let _lastHistoryView = null;
+  function syncHistory() {
+    const v = state.view;
+    if (v === _lastHistoryView) return;
+    const entry = { dhlView: v };
+    if (_lastHistoryView === null) history.replaceState(entry, '', '#' + v);
+    else history.pushState(entry, '', '#' + v);
+    _lastHistoryView = v;
+  }
+  window.addEventListener('popstate', (e) => {
+    let v = (e.state && e.state.dhlView) || (location.hash || '').replace('#', '') || 'dashboard';
+    if (APP_VIEWS.indexOf(v) < 0) v = 'dashboard';
+    if (v === state.view) return;
+    state.view = v;
+    _lastHistoryView = v; // the URL already reflects this entry — don't push a new one
+    saveState();
+    render();
+  });
+
+  // Lightweight re-render of just the cases body (used for search typing to keep focus elsewhere)
+  function renderCasesOnly() {
+    if (state.view !== 'cases') return;
+    const host = document.getElementById('cases-host');
+    if (!host) { render(); return; }
+    host.innerHTML = casesBody();
+    lucide.createIcons();
+  }
+
+  function header() {
+    const tab = (id, label, icon) =>
+      '<button data-action="set-view" data-view="' + id + '" class="group inline-flex shrink-0 items-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition ' +
+      (state.view === id ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-800') + '">' +
+      '<i data-lucide="' + icon + '" class="h-4 w-4"></i>' + label + '</button>';
+
+    const riskCount = state.nurses.filter(isAtRisk).length;
+
+    return '' +
+    '<header class="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">' +
+      '<div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-5">' +
+        '<div class="flex min-w-0 items-center gap-3">' +
+          '<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-200">' +
+            '<i data-lucide="heart-pulse" class="h-5 w-5"></i></div>' +
+          '<div class="min-w-0">' +
+            '<h1 class="truncate text-base font-extrabold leading-tight text-slate-900">DHL Nurses</h1>' +
+            '<p class="hidden truncate text-xs text-slate-500 sm:block">Trasferimento Infermieri · Rep. Dominicana → Italia</p>' +
+          '</div>' +
+        '</div>' +
+        '<div class="order-last w-full">' +
+          '<nav data-tour="views" class="flex w-full items-center gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 sm:w-max sm:max-w-full">' +
+            tab('dashboard', t('nav_dashboard'), 'layout-dashboard') +
+            tab('cases', t('nav_cases'), 'folder-kanban') +
+            tab('documents', t('nav_docs'), 'folder-archive') +
+            (isAdmin() ? tab('settings', t('settings'), 'settings') : '') +
+          '</nav>' +
+        '</div>' +
+        '<div class="relative ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-2.5">' +
+          (riskCount > 0
+            ? '<button data-action="show-risk" class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100"><i data-lucide="alarm-clock" class="h-3.5 w-3.5"></i>' + t('at_risk', { n: riskCount }) + '</button>'
+            : '<span class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-200"><i data-lucide="shield-check" class="h-3.5 w-3.5"></i>' + t('no_risk') + '</span>') +
+          '<button data-action="toggle-tools" id="hdr-tools-btn" class="inline-flex items-center justify-center rounded-xl px-2.5 py-2 text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50 lg:hidden" data-tip-pos="bottom-left" data-tooltip="' + escapeHtml(t('tools')) + '"><i data-lucide="settings-2" class="h-4 w-4"></i></button>' +
+          '<div id="hdr-tools">' +
+            '<button data-action="toggle-theme" class="inline-flex items-center gap-2 rounded-xl px-2.5 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tip-pos="bottom" data-tooltip="' + escapeHtml(t('theme_toggle')) + '"><i data-lucide="' + (THEME === 'dark' ? 'sun' : 'moon') + '" class="h-3.5 w-3.5"></i><span class="lg:hidden">' + t('theme_toggle') + '</span></button>' +
+            langSwitcher(false) +
+            '<button data-action="open-manual" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="book-open" class="h-3.5 w-3.5"></i><span>' + t('manual') + '</span></button>' +
+            '<button data-action="open-guide" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="scale" class="h-3.5 w-3.5"></i><span>' + t('norm_guide') + '</span></button>' +
+            '<button data-action="start-tour" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="graduation-cap" class="h-3.5 w-3.5"></i><span>' + t('guide') + '</span></button>' +
+            (isAdmin() ? '<button data-action="reset" class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tip-pos="bottom" data-tooltip="' + escapeHtml(t('reset_tooltip')) + '"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i><span class="lg:hidden">' + t('reset_tooltip') + '</span></button>' : '') +
+          '</div>' +
+          userCluster() +
+        '</div>' +
+      '</div>' +
+    '</header>';
+  }
+
+  function userCluster() {
+    if (fbEnabled && currentUser) {
+      const label = currentUser.displayName || currentUser.email || t('user');
+      const initial = (label[0] || '?').toUpperCase();
+      return '<div class="flex items-center gap-2 border-l border-slate-200 pl-2.5">' +
+        '<button data-action="open-profile" class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white transition hover:ring-2 hover:ring-indigo-200" data-tip-pos="bottom-left" data-tooltip="' + escapeHtml(label) + ' — ' + escapeHtml(t('profile_tooltip')) + '">' + escapeHtml(initial) + '</button>' +
+        '<button data-action="logout" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="log-out" class="h-3.5 w-3.5"></i><span class="hidden sm:inline">' + t('logout') + '</span></button>' +
+      '</div>';
+    }
+    return '<button data-action="open-profile" class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-500 transition hover:bg-slate-200" data-tip-pos="bottom-left" data-tooltip="' + escapeHtml(t('demo_local_tip')) + '"><i data-lucide="hard-drive" class="h-3.5 w-3.5"></i>' + t('demo_local') + '</button>';
+  }
+
+  function demoBanner() {
+    if (fbEnabled) return '';
+    return '<div class="border-b border-amber-200 bg-amber-50">' +
+      '<div class="mx-auto flex max-w-[1400px] items-center gap-2 px-4 py-2 text-xs text-amber-700 sm:px-5">' +
+        '<i data-lucide="info" class="h-4 w-4 shrink-0"></i>' +
+        '<span>' + t('demo_banner') + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function appFooter() {
+    return '<footer class="mx-auto mt-4 max-w-[1400px] px-4 pb-8 pt-2 sm:px-5">' +
+      '<div class="flex items-center justify-center gap-1.5 border-t border-slate-200 pt-5 text-xs text-slate-400">' +
+        '<span>Realizzato con cura da</span>' +
+        '<i data-lucide="heart" class="h-3.5 w-3.5 text-rose-400"></i>' +
+        '<span class="font-semibold text-slate-500">iTavix &amp; Claude</span>' +
+      '</div>' +
+    '</footer>';
+  }
+
+  // ------------------------------------------------------------------ DASHBOARD
+  function kpiCard(icon, label, value, tone, sub, action, filter) {
+    const tones = {
+      indigo: 'from-indigo-500 to-indigo-600 shadow-indigo-200',
+      rose: 'from-rose-500 to-rose-600 shadow-rose-200',
+      amber: 'from-amber-500 to-amber-600 shadow-amber-200',
+      emerald: 'from-emerald-500 to-emerald-600 shadow-emerald-200',
+    };
+    const tag = action ? 'button' : 'div';
+    const attrs = action ? ' data-action="' + action + '"' + (filter ? ' data-filter="' + escapeHtml(filter) + '"' : '') + ' class="w-full text-left ' : ' class="';
+    return '<' + tag + attrs + 'rounded-2xl border border-slate-200 bg-white p-5 shadow-sm transition hover:shadow-md' + (action ? ' hover:border-indigo-200' : '') + '">' +
+      '<div class="flex items-start justify-between">' +
+        '<div>' +
+          '<p class="text-xs font-semibold uppercase tracking-wide text-slate-400">' + label + '</p>' +
+          '<p class="mt-2 text-3xl font-extrabold text-slate-900">' + value + '</p>' +
+          '<p class="mt-1 text-xs text-slate-400">' + sub + '</p>' +
+        '</div>' +
+        '<div class="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br ' + tones[tone] + ' text-white shadow-lg"><i data-lucide="' + icon + '" class="h-5 w-5"></i></div>' +
+      '</div>' +
+    '</' + tag + '>';
+  }
+
+  // Big, at-a-glance transfer tiles (clickable → filtered Case Management).
+  function summaryTile(icon, tone, label, value, sub, filter) {
+    const tones = { indigo: 'bg-indigo-100 text-indigo-600', emerald: 'bg-emerald-100 text-emerald-600', amber: 'bg-amber-100 text-amber-600' };
+    return '<button data-action="goto-cases" data-filter="' + filter + '" class="flex items-center gap-4 rounded-xl border border-slate-200 bg-white p-4 text-left shadow-sm transition hover:border-indigo-300 hover:shadow-md active:scale-[.99]">' +
+      '<span class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ' + tones[tone] + '"><i data-lucide="' + icon + '" class="h-6 w-6"></i></span>' +
+      '<div class="min-w-0">' +
+        '<p class="text-3xl font-extrabold leading-none text-slate-900">' + value + '</p>' +
+        '<p class="mt-1 text-sm font-semibold text-slate-700">' + label + '</p>' +
+        '<p class="text-[11px] text-slate-400">' + sub + '</p>' +
+      '</div>' +
+    '</button>';
+  }
+
+  function dashboardView() {
+    const k = computeKpis();
+    const risks = state.nurses.filter(isAtRisk);
+    const breakdown = employerBreakdown();
+    const maxTotal = Math.max(1, ...breakdown.map((b) => b.total));
+    const expiring = computeExpiring();
+
+    const expiringPanel = expiring.length === 0
+      ? '<div class="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-200 sm:col-span-2"><i data-lucide="shield-check" class="h-5 w-5"></i>' + t('exp_panel_none') + '</div>'
+      : expiring.slice(0, 8).map((it) => {
+          const badge = it.ex === 'expired'
+            ? '<span class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200">' + t('exp_expired') + '</span>'
+            : '<span class="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200">' + t('exp_soon') + '</span>';
+          return '<button data-action="open-nurse" data-id="' + it.n.id + '" class="flex w-full items-center gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3 text-left transition hover:bg-slate-50">' +
+            '<span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ' + (it.ex === 'expired' ? 'bg-rose-100 text-rose-600' : 'bg-amber-100 text-amber-600') + '"><i data-lucide="calendar-clock" class="h-4 w-4"></i></span>' +
+            '<div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-800">' + escapeHtml(it.d.name) + '</p>' +
+              '<p class="truncate text-xs text-slate-500">' + escapeHtml(it.n.name) + ' • ' + t('valid_until', { d: formatDate(it.d.validity) }) + '</p></div>' +
+            badge +
+          '</button>';
+        }).join('') + (expiring.length > 8 ? '<button data-action="show-expiring" class="mt-1 w-full rounded-xl py-2 text-center text-xs font-semibold text-indigo-600 transition hover:bg-indigo-50">' + t('exp_see_all') + ' (' + expiring.length + ')</button>' : '');
+
+    const riskPanel = risks.length === 0
+      ? '<div class="flex items-center gap-3 rounded-xl bg-emerald-50 p-4 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-200"><i data-lucide="party-popper" class="h-5 w-5"></i>' + t('risk_none') + '</div>'
+      : risks.map((n) => {
+          const days = daysBetween(n.lastUpdate);
+          const sla = STEP_SLA_DAYS[n.currentStep] || 30;
+          return '<button data-action="open-nurse" data-id="' + n.id + '" class="flex w-full items-center gap-4 rounded-xl border border-rose-200 bg-rose-50/60 p-3.5 text-left transition hover:bg-rose-50">' +
+            '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600 animate-pulseSoft"><i data-lucide="alarm-clock" class="h-4 w-4"></i></span>' +
+            '<div class="min-w-0 flex-1">' +
+              '<p class="truncate text-sm font-semibold text-slate-900">' + escapeHtml(n.name) + '</p>' +
+              '<p class="truncate text-xs text-slate-500">' + t('risk_stuck_in', { state: escapeHtml(stepName(n.currentStep)) }) + ' • ' + escapeHtml(n.employer) + '</p>' +
+            '</div>' +
+            '<div class="text-right">' +
+              '<p class="text-sm font-bold text-rose-600">' + days + ' ' + t('days_short') + '</p>' +
+              '<p class="text-[11px] text-slate-400">' + t('sla_short', { n: sla }) + '</p>' +
+            '</div>' +
+            '<i data-lucide="chevron-right" class="h-4 w-4 text-rose-300"></i>' +
+          '</button>';
+        }).join('');
+
+    const breakdownRows = breakdown.map((b) => {
+      const pct = Math.round((b.total / maxTotal) * 100);
+      return '<div class="space-y-1.5">' +
+        '<div class="flex items-center justify-between text-sm">' +
+          '<span class="font-medium text-slate-700">' + escapeHtml(b.employer) + '</span>' +
+          '<span class="text-slate-400">' + b.total + ' ' + (b.total === 1 ? t('candidate_one') : t('candidate_many')) + ' • ' + b.completed + ' ' + t('onboard_abbr') + '</span>' +
+        '</div>' +
+        '<div class="h-2.5 overflow-hidden rounded-full bg-slate-100">' +
+          '<div class="h-full rounded-full bg-gradient-to-r from-indigo-500 to-indigo-400" style="width:' + pct + '%"></div>' +
+        '</div>' +
+      '</div>';
+    }).join('');
+
+    // Pipeline distribution mini-overview
+    const pipeline = steps().map((s) => {
+      const count = state.nurses.filter((n) => n.currentStep === s.id).length;
+      return '<div class="flex flex-col items-center gap-1">' +
+        '<div class="flex h-8 w-8 items-center justify-center rounded-lg text-xs font-bold ' + (count ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-400') + '">' + count + '</div>' +
+        '<span class="w-14 text-center text-[10px] leading-tight text-slate-400">' + escapeHtml(s.short) + '</span>' +
+      '</div>';
+    }).join('');
+
+    return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
+      '<div class="mb-6 flex items-end justify-between gap-3">' +
+        '<div><h2 class="text-xl font-extrabold text-slate-900">' + t('dash_title') + '</h2>' +
+        '<p class="text-sm text-slate-500">' + t('dash_subtitle') + '</p></div>' +
+        (isAdmin() ? '<button data-action="export-csv" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 shadow-sm transition hover:bg-slate-50"><i data-lucide="download" class="h-3.5 w-3.5"></i>' + t('export_csv') + '</button>' : '') +
+      '</div>' +
+
+      '<section data-tour="summary" class="dhl-summary mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">' +
+        '<div class="mb-4 flex items-center gap-2">' +
+          '<i data-lucide="plane-takeoff" class="h-5 w-5 text-indigo-500"></i>' +
+          '<h3 class="text-sm font-bold text-slate-900">' + t('summary_title') + '</h3>' +
+          '<span class="ml-auto hidden text-xs text-slate-400 sm:block">' + t('summary_hint') + '</span>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 gap-3 sm:grid-cols-3">' +
+          summaryTile('users', 'indigo', t('kpi_treating'), k.treating, t('kpi_treating_sub'), 'all') +
+          summaryTile('plane-landing', 'emerald', t('kpi_sent'), k.sent, t('kpi_sent_sub'), 'sent') +
+          summaryTile('hourglass', 'amber', t('kpi_tosend'), k.toSend, t('kpi_tosend_sub'), 'tosend') +
+        '</div>' +
+      '</section>' +
+
+      '<div data-tour="kpi" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">' +
+        kpiCard('users-round', t('kpi_active'), k.active, 'indigo', t('kpi_active_sub'), 'goto-cases', 'active') +
+        kpiCard('file-warning', t('kpi_missing'), k.missing, 'rose', t('kpi_missing_sub'), 'goto-cases', 'Missing Docs') +
+        kpiCard('clipboard-check', t('kpi_opi'), k.opi, 'amber', t('kpi_opi_sub'), 'goto-cases', 'opi') +
+        kpiCard('calendar-clock', t('kpi_expiring'), k.expiring, k.expiring ? 'rose' : 'emerald', t('kpi_expiring_sub'), 'show-expiring') +
+        kpiCard('badge-check', t('kpi_done'), k.completed, 'emerald', t('kpi_done_sub'), 'goto-cases', 'Onboarding Completed') +
+      '</div>' +
+
+      '<div class="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">' +
+        '<section data-tour="risk" class="lg:col-span-2 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+          '<div class="mb-4 flex items-center gap-2">' +
+            '<i data-lucide="traffic-cone" class="h-5 w-5 text-rose-500"></i>' +
+            '<h3 class="text-sm font-bold text-slate-900">' + t('risk_title') + '</h3>' +
+            '<span class="ml-auto text-xs text-slate-400">' + t('risk_hint') + '</span>' +
+          '</div>' +
+          '<div class="space-y-2.5">' + riskPanel + '</div>' +
+        '</section>' +
+
+        '<section class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+          '<div class="mb-4 flex items-center gap-2">' +
+            '<i data-lucide="building-2" class="h-5 w-5 text-indigo-500"></i>' +
+            '<h3 class="text-sm font-bold text-slate-900">' + t('struct_title') + '</h3>' +
+          '</div>' +
+          '<div class="space-y-4">' + breakdownRows + '</div>' +
+        '</section>' +
+      '</div>' +
+
+      '<section class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+        '<div class="mb-4 flex items-center gap-2">' +
+          '<i data-lucide="calendar-clock" class="h-5 w-5 text-amber-500"></i>' +
+          '<h3 class="text-sm font-bold text-slate-900">' + t('exp_panel_title') + '</h3>' +
+          (expiring.length ? '<span class="rounded-full bg-rose-100 px-2 py-0.5 text-[11px] font-bold text-rose-700">' + expiring.length + '</span>' : '') +
+          '<span class="ml-auto text-xs text-slate-400">' + t('kpi_expiring_sub') + '</span>' +
+        '</div>' +
+        '<div class="grid grid-cols-1 gap-2.5 sm:grid-cols-2">' + expiringPanel + '</div>' +
+      '</section>' +
+
+      '<section class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+        '<div class="mb-4 flex items-center gap-2">' +
+          '<i data-lucide="git-commit-horizontal" class="h-5 w-5 text-indigo-500"></i>' +
+          '<h3 class="text-sm font-bold text-slate-900">' + t('pipeline_title') + '</h3>' +
+        '</div>' +
+        '<div class="flex items-start justify-between gap-1 overflow-x-auto pb-1">' + pipeline + '</div>' +
+      '</section>' +
+    '</main>';
+  }
+
+  // ------------------------------------------------------------------ CASES (master-detail)
+  function casesView() {
+    return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
+      '<div id="cases-host">' + casesBody() + '</div>' +
+    '</main>';
+  }
+
+  function filteredNurses() {
+    const q = state.search.trim().toLowerCase();
+    return state.nurses.filter((n) => {
+      const f = state.statusFilter;
+      if (f === 'risk') { if (!isAtRisk(n)) return false; }
+      else if (f === 'sent') { if (!(n.currentStep >= SENT_TO_ITALY_STEP)) return false; }
+      else if (f === 'tosend') { if (!(n.currentStep < SENT_TO_ITALY_STEP)) return false; }
+      else if (f === 'active') { if (!(n.currentStep < 11)) return false; }
+      else if (f === 'opi') { if (!(n.currentStep === 8 || n.currentStep === 9)) return false; }
+      else if (f !== 'all' && deriveStatus(n) !== f) return false;
+      if (!q) return true;
+      return (
+        n.name.toLowerCase().includes(q) ||
+        n.passport.toLowerCase().includes(q) ||
+        (n.employer || '').toLowerCase().includes(q)
+      );
+    });
+  }
+
+  function casesBody() {
+    return '<div class="grid grid-cols-1 gap-5 lg:grid-cols-[340px_minmax(0,1fr)]">' +
+      masterList() +
+      detailPanel() +
+    '</div>';
+  }
+
+  // Filters reachable from the chip row directly. Others (set from dashboard KPIs, e.g. 'active'/'opi')
+  // are shown as a temporary, removable highlighted chip so the user always sees what is filtered.
+  const STANDARD_FILTERS = ['all', 'risk', 'sent', 'tosend', 'Missing Docs', 'In Progress', 'Visa Obtained', 'Onboarding Completed'];
+  function activeFilterLabel(f) {
+    const map = { active: t('kpi_active'), opi: t('kpi_opi') };
+    return map[f] || f;
+  }
+  function extraFilterChip() {
+    const f = state.statusFilter;
+    if (STANDARD_FILTERS.indexOf(f) >= 0) return '';
+    return '<button data-action="set-filter" data-filter="all" class="inline-flex items-center gap-1 rounded-full bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow-sm" data-tooltip="' + escapeHtml(t('clear_filter')) + '">' + escapeHtml(activeFilterLabel(f)) + '<i data-lucide="x" class="h-3 w-3"></i></button>';
+  }
+
+  function masterList() {
+    const list = filteredNurses();
+    const filterChip = (val, label) =>
+      '<button data-action="set-filter" data-filter="' + val + '" class="rounded-full px-3 py-1 text-xs font-semibold transition ' +
+      (state.statusFilter === val ? 'bg-indigo-600 text-white shadow-sm' : 'bg-slate-100 text-slate-500 hover:bg-slate-200') + '">' + label + '</button>';
+
+    const cards = list.length === 0
+      ? '<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">' + t('no_candidates') + '</div>'
+      : list.map((n) => {
+          const selected = n.id === state.selectedNurseId;
+          const risk = isAtRisk(n);
+          return '<button data-action="open-nurse" data-id="' + n.id + '" class="block w-full rounded-xl border p-3.5 text-left transition ' +
+            (selected ? 'border-indigo-300 bg-indigo-50/60 ring-1 ring-indigo-200' : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50') + '">' +
+            '<div class="flex items-start justify-between gap-2">' +
+              '<div class="min-w-0">' +
+                '<p class="truncate text-sm font-bold text-slate-900">' + escapeHtml(n.name) + '</p>' +
+                '<p class="mt-0.5 truncate text-xs text-slate-500">' + escapeHtml(n.passport) + ' • ' + escapeHtml(n.employer) + '</p>' +
+              '</div>' +
+              (risk ? '<span class="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-rose-600"><i data-lucide="alarm-clock" class="h-3 w-3"></i></span>' : '') +
+            '</div>' +
+            '<div class="mt-2.5 flex items-center justify-between gap-2">' +
+              statusBadge(deriveStatus(n)) +
+              '<span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400"><i data-lucide="languages" class="h-3 w-3"></i>' + escapeHtml(n.languageLevel.split(' ')[0]) + '</span>' +
+            '</div>' +
+            '<div class="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400"><i data-lucide="map-pin" class="h-3 w-3"></i>' + t('step_x', { n: n.currentStep }) + ' • ' + escapeHtml(stepName(n.currentStep)) + '</div>' +
+          '</button>';
+        }).join('');
+
+    return '<aside data-tour="master" class="lg:sticky lg:top-[76px] lg:self-start">' +
+      '<div class="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">' +
+        '<button data-action="open-new-nurse" class="mb-3 flex w-full items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700 active:scale-[.99]"><i data-lucide="user-plus" class="h-4 w-4"></i>' + t('new_candidate') + '</button>' +
+        '<div class="relative mb-3">' +
+          '<i data-lucide="search" class="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400"></i>' +
+          '<input id="search-input" data-action="search" type="text" value="' + escapeHtml(state.search) + '" placeholder="' + escapeHtml(t('search_ph')) + '" ' +
+            'class="w-full rounded-xl border border-slate-200 bg-slate-50 py-2.5 pl-9 pr-3 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" />' +
+        '</div>' +
+        '<div class="mb-3 flex flex-wrap gap-1.5">' +
+          extraFilterChip() +
+          filterChip('all', t('filter_all')) +
+          filterChip('sent', t('filter_sent')) +
+          filterChip('tosend', t('filter_tosend')) +
+          filterChip('risk', t('risk_filter')) +
+          filterChip('Missing Docs', t('filter_missing')) +
+          filterChip('In Progress', t('filter_progress')) +
+          filterChip('Visa Obtained', t('filter_visa')) +
+          filterChip('Onboarding Completed', t('filter_done')) +
+        '</div>' +
+        '<div class="space-y-2.5 pr-1 lg:max-h-[calc(100vh-220px)] lg:overflow-y-auto">' + cards + '</div>' +
+      '</div>' +
+    '</aside>';
+  }
+
+  function detailPanel() {
+    const n = getNurse(state.selectedNurseId) || filteredNurses()[0];
+    if (!n) return '<div class="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-slate-400">' + t('no_candidates') + '</div>';
+
+    return '<section class="space-y-5">' +
+      profileHeader(n) +
+      stepper(n) +
+      advanceBar(n) +
+      '<div class="grid grid-cols-1 gap-5 xl:grid-cols-2">' +
+        documentManager(n) +
+        checklistSection(n) +
+      '</div>' +
+      '<div class="grid grid-cols-1 gap-5 xl:grid-cols-2">' +
+        relocationCard(n) +
+        communicationLog(n) +
+      '</div>' +
+    '</section>';
+  }
+
+  function profileHeader(n) {
+    const initials = n.name.split(' ').map((w) => w[0]).slice(0, 2).join('');
+    const field = (icon, label, value) =>
+      '<div class="flex items-start gap-2">' +
+        '<i data-lucide="' + icon + '" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"></i>' +
+        '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</p>' +
+        '<p class="text-sm font-medium text-slate-700">' + escapeHtml(value) + '</p></div>' +
+      '</div>';
+
+    return '<div class="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">' +
+      '<div class="flex flex-col gap-4 border-b border-slate-100 bg-gradient-to-br from-indigo-50 to-slate-50 p-5 sm:flex-row sm:items-center">' +
+        '<div class="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-xl font-extrabold text-white shadow-md shadow-indigo-200">' + escapeHtml(initials) + '</div>' +
+        '<div class="min-w-0 flex-1">' +
+          '<h2 class="text-lg font-extrabold text-slate-900">' + escapeHtml(n.name) + '</h2>' +
+          '<p class="text-sm text-slate-500">' + escapeHtml([n.birthPlace, n.nationality].filter(Boolean).join(' · ') || '—') + '</p>' +
+        '</div>' +
+        '<div class="flex flex-col items-start gap-2 sm:items-end">' +
+          statusBadge(deriveStatus(n)) +
+          '<span class="text-xs text-slate-400">' + t('last_update', { d: formatDate(n.lastUpdate) }) + '</span>' +
+          '<button data-action="open-edit-nurse" data-id="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-white"><i data-lucide="pencil" class="h-3 w-3"></i>' + t('edit_candidate') + '</button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">' +
+        field('book-user', t('f_passport'), n.passport) +
+        field('credit-card', t('f_cedula'), n.cedula || '—') +
+        field('cake', t('f_birth'), [n.birthDate ? formatDate(n.birthDate) : '', n.birthPlace || ''].filter(Boolean).join(' · ') || '—') +
+        field('globe', t('f_nationality'), n.nationality || '—') +
+        field('heart', t('f_marital'), n.maritalStatus ? t('ms_' + n.maritalStatus) : '—') +
+        field('map-pin', t('f_address'), n.address || '—') +
+        field('phone', t('f_phone'), n.phone || '—') +
+        field('mail', t('f_email'), n.email || '—') +
+        field('handshake', t('f_agency'), n.partnerAgency) +
+        field('languages', t('f_lang'), n.languageLevel) +
+        field('hospital', t('f_employer'), n.employer) +
+        field('user-cog', t('f_hr'), n.hrReferent) +
+        field('flag', t('f_status'), t('step_state', { n: n.currentStep, name: stepName(n.currentStep) })) +
+        '<div class="flex items-start gap-2">' +
+          '<i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0 ' + (n.privacyConsent ? 'text-emerald-500' : 'text-rose-400') + '"></i>' +
+          '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + t('f_privacy') + '</p>' +
+          '<p class="text-sm font-medium ' + (n.privacyConsent ? 'text-emerald-600' : 'text-rose-500') + '">' +
+            (n.privacyConsent ? escapeHtml(t('privacy_given', { d: formatDate(n.privacyConsentDate) })) : escapeHtml(t('privacy_none'))) + '</p>' +
+          '<button data-action="print-privacy" data-id="' + n.id + '" class="mt-1.5 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50"><i data-lucide="printer" class="h-3 w-3"></i>' + t('privacy_print') + '</button></div>' +
+        '</div>' +
+      '</div>' +
+      personalDocsStrip(n) +
+    '</div>';
+  }
+
+  // Personal documents (passport copy, Cédula, photo, CV, certificates) uploadable
+  // straight from the anagrafica card — same actions as the documents table.
+  function personalDocsStrip(n) {
+    const personalNames = PERSONAL_DOC_TYPES.map((p) => p.name.toLowerCase());
+    const docs = (n.documents || []).filter((d) => personalNames.indexOf((d.name || '').toLowerCase()) >= 0);
+    if (!docs.length) return '';
+    const rows = docs.map((d) => {
+      const statusIcon = d.status === 'approved' ? '<i data-lucide="check-circle-2" class="h-4 w-4 shrink-0 text-emerald-500"></i>'
+        : d.status === 'pending' ? '<i data-lucide="clock" class="h-4 w-4 shrink-0 text-amber-500"></i>'
+        : '<i data-lucide="' + (d.optional ? 'circle-dashed' : 'x-circle') + '" class="h-4 w-4 shrink-0 ' + (d.optional ? 'text-slate-300' : 'text-rose-400') + '"></i>';
+      const viewBtn = (d.fileName && d.fileUrl)
+        ? '<button data-action="view-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tooltip="' + escapeHtml(t('doc_view')) + '"><i data-lucide="eye" class="h-3.5 w-3.5"></i></button>'
+        : '';
+      const uploadBtn = '<button data-action="upload-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + (d.fileName ? t('act_replace') : t('act_upload')) + '</button>';
+      return '<div class="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">' +
+        statusIcon +
+        '<div class="min-w-0 flex-1">' +
+          '<p class="truncate text-xs font-semibold text-slate-700">' + escapeHtml(d.name) +
+            (d.optional ? ' <span class="font-medium text-slate-400">(' + escapeHtml(t('doc_optional')) + ')</span>' : '') + '</p>' +
+          (d.fileName ? '<p class="truncate text-[11px] text-slate-400">' + escapeHtml(d.fileName) + '</p>' : '') +
+        '</div>' +
+        viewBtn + uploadBtn +
+      '</div>';
+    }).join('');
+    return '<div class="border-t border-slate-100 p-5 pt-4">' +
+      '<p class="mb-2.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400"><i data-lucide="paperclip" class="h-3.5 w-3.5"></i>' + t('personal_docs') + '</p>' +
+      '<div class="grid grid-cols-1 gap-2 md:grid-cols-2">' + rows + '</div>' +
+    '</div>';
+  }
+
+  function stepper(n) {
+    const nodes = steps().map((s) => {
+      let circle, line, labelCls;
+      const blocked = s.id === n.currentStep && !canAdvance(n);
+      if (s.id < n.currentStep) {
+        circle = 'bg-emerald-500 text-white'; labelCls = 'text-emerald-600';
+      } else if (s.id === n.currentStep) {
+        circle = blocked ? 'bg-amber-500 text-white ring-4 ring-amber-100' : 'bg-indigo-600 text-white ring-4 ring-indigo-100';
+        labelCls = blocked ? 'text-amber-600 font-bold' : 'text-indigo-600 font-bold';
+      } else {
+        circle = 'bg-slate-100 text-slate-400'; labelCls = 'text-slate-400';
+      }
+      const inner = s.id < n.currentStep
+        ? '<i data-lucide="check" class="h-4 w-4"></i>'
+        : (blocked ? '<i data-lucide="lock" class="h-3.5 w-3.5"></i>' : String(s.id));
+      return '<div class="flex min-w-[78px] flex-1 flex-col items-center">' +
+        '<div class="flex h-9 w-9 items-center justify-center rounded-full text-xs font-bold transition ' + circle + '">' + inner + '</div>' +
+        '<span class="mt-2 text-center text-[10px] leading-tight ' + labelCls + '">' + escapeHtml(s.short) + '</span>' +
+      '</div>';
+    });
+    // connectors between nodes
+    const withConnectors = [];
+    nodes.forEach((nd, i) => {
+      withConnectors.push(nd);
+      if (i < nodes.length - 1) {
+        const done = (i + 1) < n.currentStep;
+        withConnectors.push('<div class="mt-4 h-0.5 flex-1 min-w-[8px] ' + (done ? 'bg-emerald-400' : 'bg-slate-200') + '"></div>');
+      }
+    });
+
+    return '<div data-tour="stepper" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+      '<div class="mb-4 flex items-center gap-2">' +
+        '<i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>' +
+        '<h3 class="text-sm font-bold text-slate-900">' + t('stepper_title') + '</h3>' +
+      '</div>' +
+      '<div class="flex items-start overflow-x-auto pb-1">' + withConnectors.join('') + '</div>' +
+    '</div>';
+  }
+
+  function advanceBar(n) {
+    const reasons = blockers(n);
+    const ok = reasons.length === 0;
+    const done = n.currentStep >= 11;
+
+    const btn = done
+      ? '<button disabled class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white opacity-90"><i data-lucide="badge-check" class="h-4 w-4"></i>' + t('case_completed_btn') + '</button>'
+      : ok
+        ? '<button data-action="advance" data-id="' + n.id + '" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 active:scale-[.98]"><i data-lucide="arrow-right-circle" class="h-4 w-4"></i>' + t('advance_btn') + '</button>'
+        : '<button disabled data-tooltip="' + escapeHtml(t('adv_blocked_tip')) + '" class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-400"><i data-lucide="lock" class="h-4 w-4"></i>' + t('advance_btn') + '</button>';
+
+    const banner = done
+      ? '<div class="flex items-center gap-2 text-sm text-emerald-600"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('adv_done_banner') + '</div>'
+      : ok
+        ? '<div class="flex items-center gap-2 text-sm text-emerald-600"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('adv_ok_banner', { state: escapeHtml(stepName(n.currentStep)) }) + '</div>'
+        : '<div class="space-y-1.5">' +
+            '<div class="flex items-center gap-2 text-sm font-semibold text-amber-600"><i data-lucide="alert-triangle" class="h-4 w-4"></i>' + t('adv_blocked_title') + '</div>' +
+            '<ul class="ml-6 list-disc space-y-0.5 text-xs text-slate-500">' + reasons.slice(0, 6).map((r) => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>' +
+          '</div>';
+
+    return '<div data-tour="advance" class="flex flex-col items-start justify-between gap-4 rounded-2xl border p-5 shadow-sm sm:flex-row sm:items-center ' +
+      (done ? 'border-emerald-200 bg-emerald-50/40' : ok ? 'border-indigo-200 bg-indigo-50/30' : 'border-amber-200 bg-amber-50/40') + '">' +
+      '<div class="min-w-0 flex-1">' + banner + '</div>' + btn +
+    '</div>';
+  }
+
+  function documentManager(n) {
+    const rows = n.documents.map((d) => {
+      const cls = DOC_STATUS_CLS[d.status], icon = DOC_STATUS_ICON[d.status];
+      const uploadBtn = '<button data-action="upload-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + (d.fileName ? t('act_replace') : t('act_upload')) + '</button>';
+      const actions = d.status === 'approved'
+        ? '<div class="flex flex-wrap justify-end gap-1.5">' + uploadBtn +
+            '<button data-action="reject-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50">' + t('act_reject') + '</button></div>'
+        : d.status === 'missing'
+          ? uploadBtn
+          : '<div class="flex flex-wrap justify-end gap-1.5">' + uploadBtn +
+              '<button data-action="approve-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-50">' + t('act_approve') + '</button>' +
+              '<button data-action="reject-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50">' + t('act_reject') + '</button>' +
+            '</div>';
+      const fileLine = d.fileName
+        ? '<p class="mt-0.5 flex items-center gap-1 text-[11px] text-slate-400"><i data-lucide="paperclip" class="h-3 w-3"></i>' +
+            (d.fileUrl ? '<button data-action="view-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="font-medium text-indigo-500 underline-offset-2 hover:underline">' + escapeHtml(d.fileName) + '</button>' : escapeHtml(d.fileName)) +
+            (d.fileTooBig ? ' <span class="text-amber-500">(' + escapeHtml(t('file_too_big')) + ')</span>' : '') + '</p>'
+        : '';
+      return '<tr class="border-b border-slate-100 last:border-0">' +
+        '<td class="py-3 pr-2"><p class="text-sm font-medium text-slate-800">' + escapeHtml(d.name) +
+          ' <span class="ml-0.5 inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 align-middle text-[10px] font-semibold text-slate-400">' + escapeHtml(d.language) + '</span>' +
+          (d.optional ? ' <span class="ml-1 inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-semibold text-slate-400">' + escapeHtml(t('doc_optional')) + '</span>' : '') + '</p>' +
+          '<p class="text-[11px] text-slate-400">' + t('validity', { v: (d.validity ? escapeHtml(d.validity) : '—') }) +
+            (d.uploadDate ? ' · ' + t('th_uploaded') + ': ' + formatDate(d.uploadDate) : '') + '</p>' + fileLine + '</td>' +
+        '<td class="px-2 py-3"><span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + cls + '"><i data-lucide="' + icon + '" class="h-3 w-3"></i>' + docStatusLabel(d.status) + '</span></td>' +
+        '<td class="py-3 pl-2 text-right">' + actions + '</td>' +
+      '</tr>';
+    }).join('');
+
+    const approved = n.documents.filter((d) => d.status === 'approved').length;
+
+    return '<div data-tour="docs" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+      '<div class="mb-3 flex items-center gap-2">' +
+        '<i data-lucide="files" class="h-5 w-5 text-indigo-500"></i>' +
+        '<h3 class="text-sm font-bold text-slate-900">' + t('docs_title') + '</h3>' +
+        '<span class="ml-auto text-xs text-slate-400">' + t('docs_count', { a: approved, b: n.documents.length }) + '</span>' +
+        '<button data-action="open-add-doc" data-nurse="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="plus" class="h-3 w-3"></i>' + t('add') + '</button>' +
+      '</div>' +
+      '<div class="-mx-5 overflow-x-auto px-5">' +
+        '<table class="w-full min-w-[340px]">' +
+          '<thead><tr class="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">' +
+            '<th class="pb-2 pr-2">' + t('th_document') + '</th><th class="px-2 pb-2">' + t('th_status') + '</th><th class="pb-2 pl-2 text-right">' + t('th_actions') + '</th>' +
+          '</tr></thead>' +
+          '<tbody>' + rows + '</tbody>' +
+        '</table>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function checklistSection(n) {
+    const items = n.checklist[n.currentStep] || [];
+    const done = items.filter((i) => i.done).length;
+    const list = n.currentStep >= 11
+      ? '<div class="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-200"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('checklist_all_done') + '</div>'
+      : items.map((i) =>
+          '<label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ' + (i.done ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white hover:bg-slate-50') + '">' +
+            '<input type="checkbox" ' + (i.done ? 'checked' : '') + ' data-action="toggle-check" data-nurse="' + n.id + '" data-step="' + n.currentStep + '" data-item="' + i.id + '" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />' +
+            '<span class="text-sm ' + (i.done ? 'text-slate-400 line-through' : 'text-slate-700') + '">' + escapeHtml(checklistLabel(i.step, i.idx)) + '</span>' +
+          '</label>'
+        ).join('');
+
+    return '<div data-tour="checklist" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+      '<div class="mb-3 flex items-center gap-2">' +
+        '<i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>' +
+        '<h3 class="text-sm font-bold text-slate-900">' + t('checklist_title') + '</h3>' +
+        (n.currentStep < 11 ? '<span class="ml-auto text-xs text-slate-400">' + t('checklist_count', { a: done, b: items.length, s: n.currentStep }) + '</span>' : '') +
+      '</div>' +
+      '<p class="mb-3 text-xs text-slate-400">' + t('checklist_sub', { state: escapeHtml(stepName(n.currentStep)) }) + '</p>' +
+      '<div class="space-y-2">' + list + '</div>' +
+    '</div>';
+  }
+
+  function relocationCard(n) {
+    const r = n.relocation || {};
+    const row = (icon, label, value) =>
+      '<div class="flex items-start gap-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3">' +
+        '<i data-lucide="' + icon + '" class="mt-0.5 h-4 w-4 shrink-0 text-indigo-400"></i>' +
+        '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</p>' +
+        '<p class="text-sm font-medium text-slate-700">' + (value ? escapeHtml(value) : '<span class="text-slate-300">' + t('to_define') + '</span>') + '</p></div>' +
+      '</div>';
+    return '<div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+      '<div class="mb-3 flex items-center gap-2">' +
+        '<i data-lucide="plane" class="h-5 w-5 text-indigo-500"></i>' +
+        '<h3 class="text-sm font-bold text-slate-900">' + t('reloc_title') + '</h3>' +
+        '<button data-action="open-relocation" data-id="' + n.id + '" class="ml-auto inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="pencil" class="h-3 w-3"></i>' + t('edit') + '</button>' +
+      '</div>' +
+      '<div class="space-y-2.5">' +
+        row('ticket', t('reloc_flight'), r.flight) +
+        row('home', t('reloc_housing'), r.housing) +
+        row('user-check', t('reloc_tutor'), r.tutor) +
+        row('file-signature', t('reloc_contract'), r.contractStatus) +
+      '</div>' +
+    '</div>';
+  }
+
+  function communicationLog(n) {
+    const ICONS = { note: 'message-square', call: 'phone', alert: 'bell-ring', system: 'cpu' };
+    const TONES = {
+      note: 'bg-indigo-100 text-indigo-600',
+      call: 'bg-emerald-100 text-emerald-600',
+      alert: 'bg-rose-100 text-rose-600',
+      system: 'bg-slate-200 text-slate-500',
+    };
+    const entries = n.logs.map((l) =>
+      '<li class="relative flex gap-3 pb-4 last:pb-0">' +
+        '<span class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full ' + (TONES[l.type] || TONES.system) + '"><i data-lucide="' + (ICONS[l.type] || 'cpu') + '" class="h-3.5 w-3.5"></i></span>' +
+        '<div class="min-w-0 flex-1">' +
+          '<div class="flex items-center justify-between gap-2">' +
+            '<p class="text-xs font-semibold text-slate-700">' + escapeHtml(l.author) + '</p>' +
+            '<p class="text-[11px] text-slate-400">' + formatDateTime(l.at) + '</p>' +
+          '</div>' +
+          '<p class="mt-0.5 text-sm text-slate-600">' + escapeHtml(l.text) + '</p>' +
+        '</div>' +
+      '</li>'
+    ).join('');
+
+    return '<div data-tour="log" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+      '<div class="mb-3 flex items-center gap-2">' +
+        '<i data-lucide="history" class="h-5 w-5 text-indigo-500"></i>' +
+        '<h3 class="text-sm font-bold text-slate-900">' + t('log_title') + '</h3>' +
+      '</div>' +
+      '<form data-action="add-log-form" data-nurse="' + n.id + '" class="mb-4 space-y-2">' +
+        '<textarea id="log-text-' + n.id + '" rows="2" placeholder="' + escapeHtml(t('log_ph')) + '" ' +
+          'class="w-full resize-none rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100"></textarea>' +
+        '<div class="flex items-center gap-2">' +
+          '<select id="log-type-' + n.id + '" class="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 outline-none focus:border-indigo-300">' +
+            '<option value="note">' + t('log_note') + '</option><option value="call">' + t('log_call') + '</option><option value="alert">' + t('log_alert') + '</option>' +
+          '</select>' +
+          '<button type="submit" class="ml-auto inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white transition hover:bg-indigo-700"><i data-lucide="send" class="h-3.5 w-3.5"></i>' + t('log_register') + '</button>' +
+        '</div>' +
+      '</form>' +
+      '<ul class="relative max-h-80 overflow-y-auto pr-1">' + entries + '</ul>' +
+    '</div>';
+  }
+
+  // =====================================================================================
+  //  LOGIN SCREEN (rendered only when Firebase is configured)
+  // =====================================================================================
+  function langSwitcher(dark) {
+    const base = dark
+      ? { on: 'bg-white/20 text-white', off: 'text-slate-300 hover:text-white' }
+      : { on: 'bg-white text-indigo-700 shadow-sm', off: 'text-slate-500 hover:text-slate-800' };
+    const btn = (code) => '<button data-action="set-lang" data-lang="' + code + '" class="rounded-lg px-2 py-1 text-[11px] font-bold uppercase transition ' + (LANG === code ? base.on : base.off) + '">' + code + '</button>';
+    return '<div class="flex items-center gap-0.5 rounded-xl ' + (dark ? 'bg-white/10' : 'bg-slate-100') + ' p-0.5">' + btn('it') + btn('en') + btn('es') + '</div>';
+  }
+
+  function loginScreen() {
+    return '<div class="flex min-h-screen items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 px-4 py-10">' +
+      '<div class="w-full max-w-md animate-fadeIn">' +
+        '<div class="mb-4 flex justify-center">' + langSwitcher(true) + '</div>' +
+        '<div class="mb-6 flex flex-col items-center text-center">' +
+          '<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-xl shadow-indigo-900/40"><i data-lucide="heart-pulse" class="h-7 w-7"></i></div>' +
+          '<h1 class="text-2xl font-extrabold text-white">DHL Nurses</h1>' +
+          '<p class="mt-1 text-sm text-slate-300">' + t('login_subtitle') + '</p>' +
+        '</div>' +
+        '<div class="rounded-2xl border border-white/10 bg-white p-6 shadow-2xl">' +
+          '<div id="auth-error" class="mb-3 hidden rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 ring-1 ring-inset ring-rose-200"></div>' +
+          '<form data-action="login-form" class="space-y-3">' +
+            '<div>' +
+              '<label class="mb-1 block text-xs font-semibold text-slate-500">' + t('login_email') + '</label>' +
+              '<input id="auth-email" type="email" autocomplete="username" placeholder="' + escapeHtml(t('email_ph')) + '" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" />' +
+            '</div>' +
+            '<div>' +
+              '<label class="mb-1 block text-xs font-semibold text-slate-500">' + t('login_password') + '</label>' +
+              '<input id="auth-pass" type="password" autocomplete="current-password" placeholder="••••••••" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" />' +
+            '</div>' +
+            '<div class="flex gap-2 pt-1">' +
+              '<button type="submit" data-intent="login" class="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700">' + t('login_signin') + '</button>' +
+              '<button type="submit" data-intent="signup" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + t('login_signup') + '</button>' +
+            '</div>' +
+          '</form>' +
+          '<div class="my-4 flex items-center gap-3"><div class="h-px flex-1 bg-slate-100"></div><span class="text-[11px] font-medium text-slate-400">' + t('login_or') + '</span><div class="h-px flex-1 bg-slate-100"></div></div>' +
+          '<button data-action="login-google" class="flex w-full items-center justify-center gap-2 rounded-xl border border-slate-200 px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">' +
+            '<svg class="h-4 w-4" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.76h3.56c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.56-2.76c-.98.66-2.23 1.06-3.72 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84A11 11 0 0 0 12 23z"/><path fill="#FBBC05" d="M5.84 14.11a6.6 6.6 0 0 1 0-4.22V7.05H2.18a11 11 0 0 0 0 9.9l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1A11 11 0 0 0 2.18 7.05l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z"/></svg>' +
+            t('login_google') + '</button>' +
+          '<p class="mt-4 text-center text-[11px] text-slate-400">' + t('login_isolated') + '</p>' +
+        '</div>' +
+        '<p class="mt-4 text-center text-xs text-slate-400">' + t('login_protected') + '</p>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function showAuthError(msg) {
+    const el = document.getElementById('auth-error');
+    if (!el) return;
+    el.textContent = msg;
+    el.classList.remove('hidden');
+  }
+  function translateAuthError(e) {
+    const code = (e && e.code) || '';
+    const map = {
+      'auth/invalid-email': 'auth_invalid_email',
+      'auth/user-not-found': 'auth_user_not_found',
+      'auth/wrong-password': 'auth_wrong_password',
+      'auth/invalid-credential': 'auth_invalid_credential',
+      'auth/email-already-in-use': 'auth_email_in_use',
+      'auth/weak-password': 'auth_weak_password',
+      'auth/popup-closed-by-user': 'auth_popup_closed',
+      'auth/operation-not-allowed': 'auth_not_allowed',
+    };
+    return map[code] ? t(map[code]) : t('auth_generic', { m: (e && e.message ? e.message : code) });
+  }
+
+  async function emailAuth(isSignup) {
+    if (!auth) return;
+    const email = (document.getElementById('auth-email') || {}).value || '';
+    const pass = (document.getElementById('auth-pass') || {}).value || '';
+    if (!email.trim() || !pass) { showAuthError(t('auth_need_credentials')); return; }
+    try {
+      if (isSignup) await auth.createUserWithEmailAndPassword(email.trim(), pass);
+      else await auth.signInWithEmailAndPassword(email.trim(), pass);
+    } catch (e) { showAuthError(translateAuthError(e)); }
+  }
+  async function googleAuth() {
+    if (!auth) return;
+    try { await auth.signInWithPopup(new firebase.auth.GoogleAuthProvider()); }
+    catch (e) { showAuthError(translateAuthError(e)); }
+  }
+  async function doLogout() { closeModal(); if (auth) { try { await auth.signOut(); } catch (e) { /* ignore */ } } }
+
+  // =====================================================================================
+  //  FIREBASE INIT + REMOTE STATE
+  // =====================================================================================
+  function initFirebase() {
+    if (!firebaseConfigured()) return false;
+    try {
+      firebase.initializeApp(FIREBASE_CONFIG);
+      auth = firebase.auth();
+      db = firebase.firestore();
+      try { storage = firebase.storage(); } catch (e) { storage = null; }
+      fbEnabled = true;
+      auth.onAuthStateChanged(async (user) => {
+        authResolved = true;
+        currentUser = user;
+        tourAutoChecked = false; // re-evaluate tour for the new session
+        userClaims = null;
+        if (user) {
+          // Read the role from Firebase custom claims — the trusted, server-set source.
+          try { const res = await user.getIdTokenResult(); userClaims = res.claims || null; } catch (e) { userClaims = null; }
+          // Instant start: when a previous session left a local cache, render it right away
+          // and refresh from Firestore in the background (a second render follows on arrival).
+          let hasCache = false;
+          try { hasCache = !!localStorage.getItem(STORAGE_KEY); } catch (e) { hasCache = false; }
+          if (hasCache) {
+            render();
+            loadRemoteState().then(() => render());
+          } else {
+            await loadRemoteState();
+            render();
+          }
+        } else { render(); }
+      });
+      return true;
+    } catch (e) {
+      console.warn('Init Firebase fallito, passo a modalità locale:', e && e.message);
+      fbEnabled = false; auth = null; db = null;
+      return false;
+    }
+  }
+
+  async function loadRemoteState() {
+    remoteLoading = true;
+    try {
+      if (SHARED_WORKSPACE) {
+        await loadSharedState();
+      } else {
+        const ref = db.collection('nurseflow').doc(currentUser.uid);
+        const snap = await ref.get();
+        if (snap.exists && snap.data() && snap.data().state) {
+          state = normalizeState(snap.data().state);
+        } else {
+          state = seedState();
+          await ref.set({ state: state, updatedAt: serverTs() });
+        }
+      }
+    } catch (e) {
+      console.warn('Lettura Firestore fallita, uso cache locale:', e && e.message);
+      state = loadState();
+    }
+    remoteLoading = false;
+    state.nurses.forEach((n) => { n.status = deriveStatus(n); });
+  }
+
+  // Shared team workspace: cases and settings come from two separate documents.
+  // UI preferences (view, selection, language, theme) stay local — they're not shared.
+  async function loadSharedState() {
+    const data = db.collection('organizations').doc(ORG_ID).collection('data');
+    const seed = seedState();
+    const [casesSnap, settingsSnap] = await Promise.all([data.doc('cases').get(), data.doc('settings').get()]);
+    state = seed;
+    if (casesSnap.exists && Array.isArray(casesSnap.data().nurses)) state.nurses = casesSnap.data().nurses;
+    if (settingsSnap.exists && settingsSnap.data().settings) state.settings = settingsSnap.data().settings;
+    normalizeState(state);
+    state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
+    // First-run initialization: seed the shared docs (writes succeed only for an admin).
+    if (!casesSnap.exists) data.doc('cases').set({ nurses: state.nurses, updatedAt: serverTs() }, { merge: true }).catch(() => {});
+    if (!settingsSnap.exists && isAdmin()) data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true }).catch(() => {});
+  }
+
+  // =====================================================================================
+  //  INTERACTIVE GUIDED TOUR
+  // =====================================================================================
+  const TOUR_SEEN_KEY = 'nurseflow.tourSeen.v1';
+  let tour = { active: false, i: 0 };
+  const TOUR_STEPS = [
+    { view: 'dashboard', sel: '[data-tour="views"]', key: 'tour1' },
+    { view: 'dashboard', sel: '[data-tour="kpi"]', key: 'tour2' },
+    { view: 'dashboard', sel: '[data-tour="risk"]', key: 'tour3' },
+    { view: 'cases', sel: '[data-tour="master"]', key: 'tour4' },
+    { view: 'cases', sel: '[data-tour="stepper"]', key: 'tour5' },
+    { view: 'cases', sel: '[data-tour="advance"]', key: 'tour6' },
+    { view: 'cases', sel: '[data-tour="docs"]', key: 'tour7' },
+    { view: 'cases', sel: '[data-tour="checklist"]', key: 'tour8' },
+    { view: 'cases', sel: '[data-tour="log"]', key: 'tour9' },
+  ];
+
+  function ensureTourDom() {
+    if (document.getElementById('tour-layer')) return;
+    const layer = document.createElement('div');
+    layer.id = 'tour-layer';
+    layer.innerHTML = '<div id="tour-hole"></div><div id="tour-card"></div>';
+    document.body.appendChild(layer);
+  }
+  function removeTourDom() { const l = document.getElementById('tour-layer'); if (l) l.remove(); }
+
+  function maybeAutoStartTour() {
+    if (tourAutoChecked) return;
+    tourAutoChecked = true;
+    if (tour.active) return;
+    let seen = false;
+    try { seen = localStorage.getItem(TOUR_SEEN_KEY) === '1'; } catch (e) { /* ignore */ }
+    if (!seen) setTimeout(startTour, 450);
+  }
+  function startTour() { ensureTourDom(); tour.active = true; tour.i = 0; renderTourStep(); }
+  function tourNext() { if (tour.i < TOUR_STEPS.length - 1) { tour.i++; renderTourStep(); } else endTour(true); }
+  function tourPrev() { if (tour.i > 0) { tour.i--; renderTourStep(); } }
+  function endTour(remember) {
+    tour.active = false; removeTourDom();
+    if (remember) { try { localStorage.setItem(TOUR_SEEN_KEY, '1'); } catch (e) { /* ignore */ } }
+  }
+
+  function tourCardHtml(step) {
+    const dots = TOUR_STEPS.map((_, i) =>
+      '<span class="h-1.5 rounded-full transition-all ' + (i === tour.i ? 'w-5 bg-indigo-600' : 'w-1.5 bg-slate-300') + '"></span>').join('');
+    const isLast = tour.i === TOUR_STEPS.length - 1;
+    return '<div class="flex items-center justify-between">' +
+        '<span class="text-[11px] font-semibold uppercase tracking-wide text-indigo-500">' + t('guide') + ' ' + (tour.i + 1) + '/' + TOUR_STEPS.length + '</span>' +
+        '<button data-action="tour-skip" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-4 w-4"></i></button>' +
+      '</div>' +
+      '<h4 class="mt-1.5 text-base font-extrabold text-slate-900">' + t(step.key + '_title') + '</h4>' +
+      '<p class="mt-1.5 text-sm leading-relaxed text-slate-600">' + t(step.key + '_text') + '</p>' +
+      '<div class="mt-4 flex items-center justify-between">' +
+        '<div class="flex items-center gap-1">' + dots + '</div>' +
+        '<div class="flex items-center gap-2">' +
+          (tour.i > 0 ? '<button data-action="tour-prev" class="rounded-lg px-3 py-1.5 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('tour_back') + '</button>' : '') +
+          '<button data-action="tour-next" class="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700">' + (isLast ? t('tour_finish') : t('tour_next')) + '<i data-lucide="' + (isLast ? 'check' : 'arrow-right') + '" class="h-3.5 w-3.5"></i></button>' +
+        '</div>' +
+      '</div>';
+  }
+
+  function renderTourStep() {
+    const step = TOUR_STEPS[tour.i];
+    let needRender = false;
+    if (step.view && state.view !== step.view) { state.view = step.view; saveState(); needRender = true; }
+    if (step.view === 'cases' && !getNurse(state.selectedNurseId) && state.nurses.length) {
+      state.selectedNurseId = state.nurses[0].id; needRender = true;
+    }
+    if (needRender) render();
+    requestAnimationFrame(() => requestAnimationFrame(() => positionTour(step)));
+  }
+
+  function positionTour(step) {
+    if (!tour.active) return;
+    ensureTourDom();
+    const el = document.querySelector(step.sel);
+    const hole = document.getElementById('tour-hole');
+    const card = document.getElementById('tour-card');
+    card.innerHTML = tourCardHtml(step);
+    lucide.createIcons();
+
+    if (!el) { // target missing: center the card, hide the spotlight
+      hole.style.opacity = '0';
+      card.style.top = '50%'; card.style.left = '50%';
+      card.style.transform = 'translate(-50%, -50%)'; card.style.opacity = '1';
+      return;
+    }
+    card.style.transform = 'none';
+    try { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); } catch (e) { el.scrollIntoView(); }
+    requestAnimationFrame(() => {
+      const r = el.getBoundingClientRect();
+      const pad = 8;
+      hole.style.opacity = '1';
+      hole.style.top = (r.top - pad) + 'px';
+      hole.style.left = (r.left - pad) + 'px';
+      hole.style.width = (r.width + pad * 2) + 'px';
+      hole.style.height = (r.height + pad * 2) + 'px';
+      const cr = card.getBoundingClientRect();
+      let top = r.bottom + 14;
+      if (top + cr.height > window.innerHeight - 12) top = r.top - cr.height - 14;
+      if (top < 12) top = 12;
+      let left = r.left + r.width / 2 - cr.width / 2;
+      left = Math.max(12, Math.min(left, window.innerWidth - cr.width - 12));
+      card.style.top = top + 'px';
+      card.style.left = left + 'px';
+      card.style.opacity = '1';
+    });
+  }
+
+  // Keep the spotlight aligned on resize/scroll while the tour is active.
+  window.addEventListener('resize', () => { if (tour.active) positionTour(TOUR_STEPS[tour.i]); });
+  window.addEventListener('scroll', () => { if (tour.active) positionTour(TOUR_STEPS[tour.i]); }, true);
+
+  // =====================================================================================
+  //  EVENT DELEGATION
+  // =====================================================================================
+  document.addEventListener('click', (e) => {
+    // Close the mobile "tools" dropdown when clicking outside it (or its toggle button).
+    const _menu = document.getElementById('hdr-tools');
+    if (_menu && _menu.classList.contains('open') && !e.target.closest('#hdr-tools') && !e.target.closest('#hdr-tools-btn')) {
+      _menu.classList.remove('open');
+    }
+    const t = e.target.closest('[data-action]');
+    if (!t) return;
+    const a = t.getAttribute('data-action');
+    if (a === 'toggle-tools') { if (_menu) _menu.classList.toggle('open'); return; }
+    switch (a) {
+      case 'set-view': setView(t.getAttribute('data-view')); break;
+      case 'open-nurse': selectNurse(t.getAttribute('data-id')); break;
+      case 'set-filter': setFilter(t.getAttribute('data-filter')); break;
+      case 'advance': advanceStatus(t.getAttribute('data-id')); break;
+      case 'approve-doc': approveDoc(t.getAttribute('data-nurse'), t.getAttribute('data-doc')); break;
+      case 'reject-doc': rejectDoc(t.getAttribute('data-nurse'), t.getAttribute('data-doc')); break;
+      case 'upload-doc': triggerUpload(t.getAttribute('data-nurse'), t.getAttribute('data-doc')); break;
+      case 'open-edit-nurse': openNewNurseModal(t.getAttribute('data-id')); break;
+      case 'open-relocation': openRelocationModal(t.getAttribute('data-id')); break;
+      case 'save-relocation': saveRelocation(); break;
+      case 'view-doc': openDocPreview(t.getAttribute('data-nurse'), t.getAttribute('data-doc')); break;
+      case 'doc-filter': state.docFilter = t.getAttribute('data-filter'); saveState(); render(); break;
+      case 'delete-nurse': deleteNurse(t.getAttribute('data-id')); break;
+      case 'export-csv': exportCandidatesCsv(); break;
+      case 'show-expiring': state.view = 'documents'; state.docFilter = 'expiring'; commit(); break;
+      case 'goto-cases': state.statusFilter = t.getAttribute('data-filter') || 'all'; state.selectedNurseId = null; state.view = 'cases'; commit(); break;
+      case 'reset': resetData(); break;
+      case 'start-tour': startTour(); break;
+      case 'tour-next': tourNext(); break;
+      case 'tour-prev': tourPrev(); break;
+      case 'tour-skip': endTour(true); break;
+      case 'login-google': googleAuth(); break;
+      case 'logout': doLogout(); break;
+      case 'open-new-nurse': openNewNurseModal(); break;
+      case 'create-nurse': createNurseFromForm(); break;
+      case 'open-add-doc': openAddDocModal(t.getAttribute('data-nurse')); break;
+      case 'create-doc': createDocFromForm(); break;
+      case 'close-modal': closeModal(); break;
+      case 'open-profile': openProfileModal(); break;
+      case 'save-profile': saveProfile(); break;
+      case 'reset-password': sendPasswordReset(); break;
+      case 'open-manual': openManual(); break;
+      case 'close-manual': closeManual(); break;
+      case 'open-guide': openGuide(); break;
+      case 'close-guide': closeGuide(); break;
+      case 'print-privacy': openPrivacyForm(t.getAttribute('data-id')); break;
+      case 'close-privacy': closePrivacyForm(); break;
+      case 'set-lang': setLang(t.getAttribute('data-lang')); break;
+      case 'toggle-theme': toggleTheme(); break;
+      case 'show-risk': state.statusFilter = 'risk'; state.view = 'cases'; commit(); break;
+      case 'open-entity': openEntityModal(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
+      case 'save-entity': saveEntity(); break;
+      case 'delete-entity': deleteEntity(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
+      case 'set-demo-role': setDemoRole(t.getAttribute('data-role')); break;
+    }
+    // Any action selected from the mobile tools dropdown should close it.
+    const _m2 = document.getElementById('hdr-tools');
+    if (_m2) _m2.classList.remove('open');
+  });
+
+  // Close any open modal / tour with the Escape key.
+  document.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape') return;
+    if (document.getElementById('modal-layer')) closeModal();
+    else if (document.getElementById('privacy-overlay')) closePrivacyForm();
+    else if (document.getElementById('guide-overlay')) closeGuide();
+    else if (document.getElementById('manual-overlay')) closeManual();
+    else if (tour.active) endTour(true);
+  });
+
+  document.addEventListener('change', (e) => {
+    const t = e.target.closest('[data-action="toggle-check"]');
+    if (t) {
+      toggleChecklist(t.getAttribute('data-nurse'), parseInt(t.getAttribute('data-step'), 10), t.getAttribute('data-item'));
+    }
+  });
+
+  document.addEventListener('input', (e) => {
+    const t = e.target.closest('[data-action="search"]');
+    if (t) { state.search = t.value; saveState();
+      // Re-render the master list only, preserving input focus & caret.
+      const host = document.getElementById('cases-host');
+      if (host) {
+        const caret = t.selectionStart;
+        host.innerHTML = casesBody();
+        lucide.createIcons();
+        const fresh = document.getElementById('search-input');
+        if (fresh) { fresh.focus(); try { fresh.setSelectionRange(caret, caret); } catch (_) {} }
+      }
+      return;
+    }
+    const ds = e.target.closest('[data-action="doc-search"]');
+    if (ds) { state.docSearch = ds.value; saveState();
+      const host = document.getElementById('archive-host');
+      if (host) {
+        const caret = ds.selectionStart;
+        host.innerHTML = archiveBody();
+        lucide.createIcons();
+        const fresh = document.getElementById('doc-search-input');
+        if (fresh) { fresh.focus(); try { fresh.setSelectionRange(caret, caret); } catch (_) {} }
+      }
+    }
+  });
+
+  document.addEventListener('submit', (e) => {
+    const logForm = e.target.closest('[data-action="add-log-form"]');
+    if (logForm) {
+      e.preventDefault();
+      const nurseId = logForm.getAttribute('data-nurse');
+      const ta = document.getElementById('log-text-' + nurseId);
+      const sel = document.getElementById('log-type-' + nurseId);
+      addLog(nurseId, sel ? sel.value : 'note', ta ? ta.value : '');
+      return;
+    }
+    const authForm = e.target.closest('[data-action="login-form"]');
+    if (authForm) {
+      e.preventDefault();
+      const intent = e.submitter && e.submitter.getAttribute('data-intent') === 'signup';
+      emailAuth(intent);
+    }
+  });
+
+  // ---------- Boot ----------
+  loadLang();
+  loadTheme();
+  function applyInitialHashView() {
+    const h = (location.hash || '').replace('#', '');
+    if (APP_VIEWS.indexOf(h) >= 0) state.view = h;
+  }
+  if (initFirebase()) {
+    // Firebase configured: onAuthStateChanged drives rendering (splash → login screen or app).
+    // Seed a baseline state so the first render before auth resolves never crashes.
+    state = loadState();
+    applyInitialHashView();
+    state.nurses.forEach((n) => { n.status = deriveStatus(n); });
+    render(); // keeps the boot splash until onAuthStateChanged fires
+    // Safety net: if auth never resolves (SDK hiccup, storage blocked), fall through to the
+    // login screen instead of leaving the splash up forever.
+    setTimeout(() => { if (fbEnabled && !authResolved) { authResolved = true; render(); } }, 6000);
+  } else {
+    // Local demo mode: no auth, localStorage only.
+    state = loadState();
+    applyInitialHashView();
+    state.nurses.forEach((n) => { n.status = deriveStatus(n); });
+    render();
+  }
