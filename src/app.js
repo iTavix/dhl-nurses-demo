@@ -3256,6 +3256,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'open-guide': openGuide(); break;
       case 'close-guide': closeGuide(); break;
       case 'print-privacy': openPrivacyForm(t.getAttribute('data-id')); break;
+      case 'welcome-start': closeWelcome(); if (state.view !== 'dashboard') { state.view = 'dashboard'; render(); } startTour(); break;
+      case 'welcome-explore': closeWelcome(); break;
+      case 'welcome-prev': welcomeGo(welcomeIdx - 1, true); break;
+      case 'welcome-next': welcomeGo(welcomeIdx + 1, true); break;
+      case 'welcome-dot': welcomeGo(parseInt(t.getAttribute('data-i'), 10), true); break;
+      case 'welcome-lang': setLang(t.getAttribute('data-lang')); openWelcome(); break;
       case 'close-privacy': closePrivacyForm(); break;
       case 'set-lang': setLang(t.getAttribute('data-lang')); break;
       case 'toggle-theme': toggleTheme(); break;
@@ -3273,7 +3279,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   // Close any open modal / tour with the Escape key.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (document.getElementById('modal-layer')) closeModal();
+    if (document.getElementById('welcome-overlay')) closeWelcome();
+    else if (document.getElementById('modal-layer')) closeModal();
     else if (document.getElementById('privacy-overlay')) closePrivacyForm();
     else if (document.getElementById('guide-overlay')) closeGuide();
     else if (document.getElementById('manual-overlay')) closeManual();
@@ -3332,6 +3339,75 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     }
   });
 
+
+  // ---------- Demo welcome page (presentation cover with auto-playing feature tour) ----------
+  const WELCOME_SLIDES = [
+    { icon: 'layout-dashboard', key: 'wl_s1' },
+    { icon: 'folder-kanban', key: 'wl_s2' },
+    { icon: 'shield-check', key: 'wl_s3' },
+    { icon: 'files', key: 'wl_s4' },
+    { icon: 'plane', key: 'wl_s5' },
+    { icon: 'sparkles', key: 'wl_s6' },
+  ];
+  let welcomeTimer = null, welcomeIdx = 0;
+
+  function welcomeSlideHtml(sl, i) {
+    return '<div class="wl-slide' + (i === 0 ? ' active' : '') + '">' +
+      '<div class="mx-auto flex h-full max-w-2xl flex-col items-center justify-center px-6 text-center">' +
+        '<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/20"><i data-lucide="' + sl.icon + '" class="h-8 w-8 text-indigo-300"></i></div>' +
+        '<p class="mb-1 text-[11px] font-bold uppercase tracking-widest text-indigo-300">' + (i + 1) + ' / ' + WELCOME_SLIDES.length + '</p>' +
+        '<h2 class="text-xl font-extrabold sm:text-2xl">' + t(sl.key + '_title') + '</h2>' +
+        '<p class="mt-3 max-w-xl text-sm leading-relaxed text-slate-300">' + t(sl.key + '_text') + '</p>' +
+      '</div>' +
+    '</div>';
+  }
+
+  function openWelcome() {
+    closeWelcome();
+    tourAutoChecked = true; // the interactive tour starts from the CTA, never on its own under the cover
+    const o = document.createElement('div');
+    o.id = 'welcome-overlay';
+    o.innerHTML =
+      '<div class="flex items-center gap-3 px-5 py-4 sm:px-8">' +
+        '<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-900/40"><i data-lucide="heart-pulse" class="h-5 w-5 text-white"></i></div>' +
+        '<div><p class="text-sm font-extrabold leading-tight">DHL Nurses</p><p class="text-[11px] text-slate-400">' + t('wl_kicker') + '</p></div>' +
+        '<div class="ml-auto flex items-center gap-1 rounded-full bg-white/10 p-1">' +
+          ['it', 'en', 'es'].map((l) => '<button data-action="welcome-lang" data-lang="' + l + '" class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition ' + (LANG === l ? 'bg-white text-slate-900' : 'text-slate-300 hover:text-white') + '">' + l + '</button>').join('') +
+        '</div>' +
+      '</div>' +
+      '<div class="flex flex-1 flex-col items-center justify-center px-4 py-4">' +
+        '<h1 class="max-w-3xl px-4 text-center text-2xl font-extrabold leading-tight sm:text-4xl">' + t('wl_claim') + '</h1>' +
+        '<div class="relative mt-2 h-[250px] w-full sm:h-[230px]">' + WELCOME_SLIDES.map(welcomeSlideHtml).join('') + '</div>' +
+        '<div class="flex items-center gap-4">' +
+          '<button data-action="welcome-prev" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-300 transition hover:bg-white/20 hover:text-white"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>' +
+          '<div class="flex items-center gap-2">' + WELCOME_SLIDES.map((sl, i) => '<button data-action="welcome-dot" data-i="' + i + '" class="wl-dot' + (i === 0 ? ' active' : '') + '"></button>').join('') + '</div>' +
+          '<button data-action="welcome-next" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-300 transition hover:bg-white/20 hover:text-white"><i data-lucide="chevron-right" class="h-5 w-5"></i></button>' +
+        '</div>' +
+      '</div>' +
+      '<div class="flex flex-col items-center gap-3 px-6 pb-8 pt-2 sm:flex-row sm:justify-center">' +
+        '<button data-action="welcome-start" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-indigo-900/40 transition hover:bg-indigo-400 sm:w-auto"><i data-lucide="play" class="h-4 w-4"></i>' + t('wl_start') + '</button>' +
+        '<button data-action="welcome-explore" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-slate-300 ring-1 ring-inset ring-white/20 transition hover:bg-white/10 hover:text-white sm:w-auto"><i data-lucide="compass" class="h-4 w-4"></i>' + t('wl_explore') + '</button>' +
+      '</div>';
+    document.body.appendChild(o);
+    document.documentElement.classList.add('overflow-hidden');
+    lucide.createIcons();
+    welcomeIdx = 0;
+    welcomeTimer = setInterval(() => welcomeGo(welcomeIdx + 1), 5000);
+  }
+  function welcomeGo(i, manual) {
+    const o = document.getElementById('welcome-overlay'); if (!o) return;
+    welcomeIdx = (i + WELCOME_SLIDES.length) % WELCOME_SLIDES.length;
+    o.querySelectorAll('.wl-slide').forEach((el, k) => el.classList.toggle('active', k === welcomeIdx));
+    o.querySelectorAll('.wl-dot').forEach((el, k) => el.classList.toggle('active', k === welcomeIdx));
+    // A manual jump restarts the autoplay clock so the slide isn't cut short.
+    if (manual) { clearInterval(welcomeTimer); welcomeTimer = setInterval(() => welcomeGo(welcomeIdx + 1), 5000); }
+  }
+  function closeWelcome() {
+    clearInterval(welcomeTimer); welcomeTimer = null;
+    const o = document.getElementById('welcome-overlay'); if (o) o.remove();
+    document.documentElement.classList.remove('overflow-hidden');
+  }
+
   // ---------- Boot ----------
   loadLang();
   loadTheme();
@@ -3354,5 +3430,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     state = loadState();
     applyInitialHashView();
     state.nurses.forEach((n) => { n.status = deriveStatus(n); });
+    tourAutoChecked = true; // the welcome cover replaces the auto-started tour
     render();
+    openWelcome();
   }
