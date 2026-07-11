@@ -204,6 +204,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'A2 — in formazione',
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
+      specializations: ['Chirurgia'],
+      matchedRequestId: null, matchedDepartment: '',
+      specializations: ['Chirurgia'],
+      matchedRequestId: null, matchedDepartment: '',
       currentStep: 2,
       status: 'Missing Docs',
       lastUpdate: isoDaysAgo(74), // clearly over the 60d SLA of phase 2 → red risk
@@ -242,6 +246,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B1 — certificato CELI',
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
+      specializations: ['Terapia Intensiva', 'Emergenza-Urgenza'],
+      matchedRequestId: null, matchedDepartment: '',
+      specializations: ['Terapia Intensiva', 'Emergenza-Urgenza'],
+      matchedRequestId: null, matchedDepartment: '',
       currentStep: 7,
       status: 'Visa Obtained',
       lastUpdate: isoDaysAgo(6),
@@ -252,6 +260,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(178), validity: '2033-09-01', status: 'approved' },
         { id: uid(), name: 'Decreto di Riconoscimento del Titolo', language: 'IT', uploadDate: isoDaysAgo(40),  validity: '—',          status: 'approved' },
         { id: uid(), name: 'Visto di Ingresso (Lavoro Subordinato)', language: 'IT', uploadDate: isoDaysAgo(6), validity: '2026-12-15', status: 'approved' },
+        { id: uid(), name: 'Dossier «Italia in tasca»',            language: 'IT', uploadDate: isoDaysAgo(20), validity: null,         status: 'approved', optional: true },
         { id: uid(), name: 'Copia Passaporto',                       language: 'ES', uploadDate: isoDaysAgo(210), validity: '2031-03-01', status: 'approved' },
         { id: uid(), name: 'Cédula (Documento d’Identità RD)',   language: 'ES', uploadDate: isoDaysAgo(210), validity: '2029-05-01', status: 'approved' },
         { id: uid(), name: 'Consenso Privacy Firmato',               language: 'IT', uploadDate: isoDaysAgo(200), validity: null,         status: 'approved' },
@@ -284,6 +293,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B2 — certificato CELI',
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
+      specializations: ['Nefrologia e Dialisi'],
+      matchedRequestId: null, matchedDepartment: '',
+      specializations: ['Geriatria', 'Medicina Generale'],
+      matchedRequestId: null, matchedDepartment: '',
       currentStep: 10,
       status: 'Onboarding Completed',
       lastUpdate: isoDaysAgo(12),
@@ -329,6 +342,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B1 — corso intensivo',
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
+      specializations: ['Pediatria', 'Medicina Generale'],
+      matchedRequestId: null, matchedDepartment: '',
       currentStep: 3,
       status: 'In Progress',
       lastUpdate: isoDaysAgo(4),
@@ -368,6 +383,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B1 — certificato CELI',
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
+      specializations: ['Sala Operatoria', 'Chirurgia'],
+      matchedRequestId: null, matchedDepartment: '',
       currentStep: 4,
       status: 'In Progress',
       lastUpdate: isoDaysAgo(9),
@@ -377,6 +394,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(90),  validity: '2034-09-01', status: 'approved' },
         { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(88), validity: '2034-09-01', status: 'approved' },
         { id: uid(), name: 'Certificato Esperienza Professionale', language: 'ES', uploadDate: isoDaysAgo(9),  validity: '—', status: 'approved' },
+        { id: uid(), name: 'Dossier «Italia in tasca»',            language: 'IT', uploadDate: isoDaysAgo(9),  validity: null, status: 'approved', optional: true },
         { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(120), validity: '2033-04-01', status: 'approved' },
         { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(120), validity: '2029-08-01', status: 'approved' },
         { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(120), validity: null, status: 'approved' },
@@ -408,6 +426,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B2 — certificato CILS',
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
+      specializations: ['Nefrologia e Dialisi'],
+      matchedRequestId: null, matchedDepartment: '',
       currentStep: 6,
       status: 'In Progress',
       lastUpdate: isoDaysAgo(3),
@@ -418,6 +438,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(228), validity: '2033-01-01', status: 'approved' },
         { id: uid(), name: 'Decreto di Riconoscimento del Titolo', language: 'IT', uploadDate: isoDaysAgo(60),  validity: '—', status: 'approved' },
         { id: uid(), name: 'Visto di Ingresso (Lavoro Subordinato)', language: 'IT', uploadDate: isoDaysAgo(25), validity: '2027-01-31', status: 'approved' },
+        { id: uid(), name: 'Dossier «Italia in tasca»',            language: 'IT', uploadDate: isoDaysAgo(30), validity: null, status: 'approved', optional: true },
         { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(260), validity: '2031-10-01', status: 'approved' },
         { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(260), validity: '2028-02-01', status: 'approved' },
         { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(260), validity: null, status: 'approved' },
@@ -434,13 +455,28 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       ],
     };
 
+    // Example hospital request (Team Italia): open, ready to be matched.
+    const reqPadova = {
+      id: 'req_padova_ti',
+      employer: 'Azienda Ospedaliera di Padova',
+      department: 'Terapia Intensiva',
+      shift: 'Turni H24 (mattina/pomeriggio/notte)',
+      requiredSkills: ['Terapia Intensiva'],
+      preferredSkills: ['Emergenza-Urgenza'],
+      notes: 'Potenziamento organico area critica: richiesta pervenuta dalla direzione sanitaria.',
+      status: 'open',
+      createdAt: isoDaysAgo(5),
+      matchedNurseId: null, matchedNurseName: null, matchedAt: null,
+    };
+
     return {
       version: 1,
-      view: 'dashboard',          // 'dashboard' | 'cases' | 'settings'
+      view: 'dashboard',          // 'dashboard' | 'cases' | 'matching' | 'settings'
       selectedNurseId: 'nurse_ana',
       search: '',
       statusFilter: 'all',        // 'all' | 'risk' | a status key
       nurses: [ana, marisol, jose, carlos, rosa, elena],
+      requests: [reqPadova],
       settings: defaultSettings(),
     };
   }
@@ -466,8 +502,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Traduzione Asseverata del Titolo', language: 'IT' },
         { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT' },
       ].concat(PERSONAL_DOC_TYPES.map((d) => ({ id: uid(), name: d.name, language: d.language, optional: !!d.optional }))),
+      specialties: DEFAULT_SPECIALTIES.map((name) => ({ id: uid(), name: name })),
     };
   }
+
+  // Clinical-skill catalogue used to qualify profiles (RD team) and to run the
+  // technical matching (Italy team). Admins can extend it from Settings.
+  const DEFAULT_SPECIALTIES = [
+    'Terapia Intensiva', 'Emergenza-Urgenza', 'Pediatria', 'Nefrologia e Dialisi',
+    'Chirurgia', 'Sala Operatoria', 'Geriatria', 'Oncologia', 'Ostetricia-Ginecologia', 'Medicina Generale',
+  ];
 
   // Personal-file slots every candidate gets. Required: identity documents, signed
   // privacy consent and language certificate (needed for visa/OPI). Optional: photo,
@@ -482,6 +526,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     { name: 'Certificato di Lingua', language: 'IT' },
     { name: 'Certificato Penale', language: 'ES', optional: true },
     { name: 'Certificato Sanitario', language: 'ES', optional: true },
+    // Certifies the completion of the training programme; validated by the RD team
+    // and checked by the matching procedure (optional: it never blocks the pipeline).
+    { name: 'Dossier «Italia in tasca»', language: 'IT', optional: true },
   ];
 
   // ---------- Persistence ----------
@@ -502,9 +549,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   const OLD_TO_NEW_STEP = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 4, 9: 4, 10: 5, 11: DONE_STEP };
   function normalizeState(s) {
     if (!s.settings) s.settings = defaultSettings();
-    ['agencies', 'employers', 'operators', 'docTypes'].forEach((k) => { if (!Array.isArray(s.settings[k])) s.settings[k] = []; });
+    ['agencies', 'employers', 'operators', 'docTypes', 'specialties'].forEach((k) => { if (!Array.isArray(s.settings[k])) s.settings[k] = []; });
     // Backfill document types for states created before this feature existed.
     if (!s.settings.docTypes.length) s.settings.docTypes = defaultSettings().docTypes;
+    // Backfill the clinical-skill catalogue added with the matching protocol.
+    if (!s.settings.specialties.length) s.settings.specialties = DEFAULT_SPECIALTIES.map((name) => ({ id: uid(), name: name }));
+    // Hospital requests (Team Italia) added with the matching protocol.
+    if (!Array.isArray(s.requests)) s.requests = [];
     // Merge in the personal-file doc types added later (matched by name, case-insensitive).
     const typeNames = s.settings.docTypes.map((dt) => (dt.name || '').toLowerCase());
     PERSONAL_DOC_TYPES.forEach((d) => {
@@ -531,6 +582,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         n.checklist = makeChecklist({ __current: n.currentStep });
       }
       PERSONAL_FIELDS.forEach((k) => { if (n[k] === undefined) n[k] = ''; });
+      // Structured clinical specialisations + matching assignment (matching protocol).
+      if (!Array.isArray(n.specializations)) n.specializations = [];
+      if (n.matchedRequestId === undefined) n.matchedRequestId = null;
+      if (n.matchedDepartment === undefined) n.matchedDepartment = '';
       // The legacy "origin" field was superseded by birth place + nationality:
       // migrate its value into the birth place (when empty) and drop it.
       if (n.origin) { if (!n.birthPlace) n.birthPlace = n.origin; delete n.origin; }
@@ -560,7 +615,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         // Shared team workspace: cases and settings live in SEPARATE documents with
         // different permissions (operators write cases; only admins write settings).
         const data = db.collection('organizations').doc(ORG_ID).collection('data');
-        data.doc('cases').set({ nurses: state.nurses, updatedAt: serverTs() }, { merge: true })
+        data.doc('cases').set({ nurses: state.nurses, requests: state.requests || [], updatedAt: serverTs() }, { merge: true })
           .catch((err) => console.warn('Sync casi fallita:', err && err.message));
         if (isAdmin()) {
           data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true })
@@ -624,6 +679,91 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function myTeam() {
     const op = currentOperator();
     return op && (op.team === 'rd' || op.team === 'it') ? op.team : null;
+  }
+  // Operational split between the two teams. Admins and operators WITHOUT an
+  // assigned team keep full access (backward compatible); a team-assigned
+  // operator works only the phases of their own team.
+  function canOperatePhase(step) { return isAdmin() || !myTeam() || myTeam() === stepTeam(step); }
+  // Requests & matching belong to the Italy team.
+  function canManageMatching() { return isAdmin() || !myTeam() || myTeam() === 'it'; }
+  function teamTag(team) { return teamFlag(team) + ' ' + teamLabel(team); }
+
+  // ---------- Hospital requests & technical matching (protocol 2.0) ----------
+  function getRequest(id) { return (state.requests || []).find((r) => r.id === id); }
+  function requestLabel(r) { return r.employer + (r.department ? ' — ' + r.department : ''); }
+  function nurseSpecs(n) { return Array.isArray(n.specializations) ? n.specializations : []; }
+  function specsCatalog() { return (state.settings.specialties || []).map((s) => s.name); }
+  function dossierDoc(n) { return (n.documents || []).find((d) => (d.name || '').toLowerCase().indexOf('italia in tasca') >= 0); }
+  // Match score: eligible profiles hold ALL the required skills; preferred skills,
+  // validated dossier, complete documents and pipeline progress rank the shortlist.
+  function matchScore(r, n) {
+    const specs = nurseSpecs(n);
+    const req = r.requiredSkills || [], pref = r.preferredSkills || [];
+    const reqHit = req.filter((x) => specs.indexOf(x) >= 0).length;
+    const prefHit = pref.filter((x) => specs.indexOf(x) >= 0).length;
+    const docsOk = !(n.documents || []).some((d) => d.status !== 'approved' && !d.optional);
+    const dd = dossierDoc(n);
+    const dossierOk = !!(dd && dd.status === 'approved');
+    const full = req.length === 0 || reqHit === req.length;
+    const score = (full ? 100 : Math.round((reqHit / Math.max(1, req.length)) * 60))
+      + prefHit * 8 + (dossierOk ? 5 : 0) + (docsOk ? 4 : 0) + Math.min(n.currentStep, LAST_STEP);
+    return { reqHit: reqHit, reqTot: req.length, prefHit: prefHit, prefTot: pref.length, docsOk: docsOk, dossierOk: dossierOk, full: full, score: score };
+  }
+  // Matching pool: not yet matched and not yet in the employment phase (8+).
+  function matchCandidates(r) {
+    return state.nurses
+      .filter((n) => n.currentStep < 8 && !n.matchedRequestId)
+      .map((n) => ({ n: n, m: matchScore(r, n) }))
+      .sort((a, b) => b.m.score - a.m.score);
+  }
+  function assignMatch(reqId, nurseId) {
+    if (!canManageMatching()) return;
+    const r = getRequest(reqId); const n = getNurse(nurseId);
+    if (!r || !n || r.status !== 'open') return;
+    if (!confirm(t('mt_confirm_assign', { n: n.name, s: r.employer, r: r.department || '—' }))) return;
+    r.status = 'matched'; r.matchedNurseId = n.id; r.matchedNurseName = n.name;
+    r.matchedAt = new Date().toISOString().slice(0, 10);
+    n.matchedRequestId = r.id; n.matchedDepartment = r.department || '';
+    n.employer = r.employer;
+    pushLog(n, 'system', t('log_author_system'), t('log_matched', { s: r.employer, r: r.department || '—' }));
+    n.lastUpdate = new Date().toISOString().slice(0, 10);
+    closeModal();
+    commit();
+  }
+  function unassignMatch(reqId) {
+    if (!canManageMatching()) return;
+    const r = getRequest(reqId); if (!r || r.status !== 'matched') return;
+    const n = r.matchedNurseId ? getNurse(r.matchedNurseId) : null;
+    if (n) {
+      n.matchedRequestId = null; n.matchedDepartment = '';
+      pushLog(n, 'alert', t('log_author_system'), t('log_unmatched', { s: r.employer, r: r.department || '—' }));
+      n.lastUpdate = new Date().toISOString().slice(0, 10);
+    }
+    r.status = 'open'; r.matchedNurseId = null; r.matchedNurseName = null; r.matchedAt = null;
+    commit();
+  }
+  function closeRequest(reqId) {
+    if (!canManageMatching()) return;
+    const r = getRequest(reqId); if (!r || r.status === 'closed') return;
+    r.status = 'closed';
+    commit();
+  }
+  function reopenRequest(reqId) {
+    if (!canManageMatching()) return;
+    const r = getRequest(reqId); if (!r || r.status !== 'closed') return;
+    r.status = r.matchedNurseId ? 'matched' : 'open';
+    commit();
+  }
+  function deleteRequest(reqId) {
+    if (!canManageMatching()) return;
+    const r = getRequest(reqId); if (!r) return;
+    if (!confirm(t('mt_confirm_delete', { s: r.employer, r: r.department || '—' }))) return;
+    if (r.matchedNurseId) {
+      const n = getNurse(r.matchedNurseId);
+      if (n) { n.matchedRequestId = null; n.matchedDepartment = ''; }
+    }
+    state.requests = (state.requests || []).filter((x) => x.id !== reqId);
+    commit();
   }
   function setDemoRole(role) {
     if (role !== 'admin' && role !== 'operator') return;
@@ -802,6 +942,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
   function toggleChecklist(nurseId, stepId, itemId) {
     const n = getNurse(nurseId);
+    if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     const item = (n.checklist[stepId] || []).find((i) => i.id === itemId);
     if (!item) return;
     item.done = !item.done;
@@ -811,6 +952,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
   function advanceStatus(nurseId) {
     const n = getNurse(nurseId);
+    if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     if (!canAdvance(n)) return;
     if (n.currentStep >= DONE_STEP) return;
     const from = stepName(n.currentStep);
@@ -905,6 +1047,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         inputField('nn-lang', t('nn_lang'), 'A2') +
         selectField('nn-employer', t('nn_employer'), employerOptions(), e ? e.employer : '') +
         selectField('nn-hr', t('nn_hr'), operatorOptions(), e ? e.hrReferent : '') +
+        '<div class="sm:col-span-2"><label class="mb-1 block text-xs font-semibold text-slate-500">' + t('nn_specs') + '</label>' + specChips('nn-spec', e ? (e.specializations || []) : []) + '</div>' +
         '<label class="sm:col-span-2 flex cursor-pointer items-start gap-2.5 rounded-xl border border-slate-200 bg-slate-50 p-3">' +
           '<input id="nn-privacy" type="checkbox"' + (e && e.privacyConsent ? ' checked' : '') + ' class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200" />' +
           '<span class="text-xs leading-relaxed text-slate-600"><b>' + t('nn_privacy') + '</b><br>' + t('nn_privacy_hint') + '</span>' +
@@ -943,6 +1086,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         e.name = name; e.passport = passport;
         e.partnerAgency = fieldVal('nn-agency') || '—';
         e.languageLevel = fieldVal('nn-lang') || e.languageLevel;
+        e.specializations = chipValues('nn-spec');
         e.employer = fieldVal('nn-employer') || t('nn_default_employer');
         e.hrReferent = fieldVal('nn-hr') || '—';
         e.cedula = fieldVal('nn-cedula');
@@ -968,6 +1112,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       id: uid(), name: name, passport: passport,
       partnerAgency: fieldVal('nn-agency') || '—',
       languageLevel: fieldVal('nn-lang') || t('nn_default_lang'),
+      specializations: chipValues('nn-spec'),
+      matchedRequestId: null, matchedDepartment: '',
       employer: fieldVal('nn-employer') || t('nn_default_employer'),
       hrReferent: fieldVal('nn-hr') || '—',
       cedula: fieldVal('nn-cedula'),
@@ -1062,13 +1208,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
   function exportCandidatesCsv() {
     if (!isAdmin()) return;
-    const headers = ['Nome', 'Passaporto', 'Luogo di nascita', 'Nazionalità', 'Agenzia', 'Livello linguistico', 'Datore di lavoro', 'Referente HR', 'Fase', 'Team', 'Stato', 'Ultimo aggiornamento', 'Documenti approvati', 'Documenti totali'];
+    const headers = ['Nome', 'Passaporto', 'Luogo di nascita', 'Nazionalità', 'Agenzia', 'Livello linguistico', 'Specializzazioni', 'Datore di lavoro', 'Referente HR', 'Fase', 'Team', 'Stato', 'Ultimo aggiornamento', 'Documenti approvati', 'Documenti totali'];
     const lines = [headers.map(csvCell).join(',')];
     state.nurses.forEach((n) => {
       const appr = (n.documents || []).filter((d) => d.status === 'approved').length;
       const fase = Math.min(n.currentStep, LAST_STEP) + '/9';
       const team = n.currentStep >= DONE_STEP ? '—' : t(stepTeam(n.currentStep) === 'rd' ? 'team_rd' : 'team_it');
-      lines.push([n.name, n.passport, n.birthPlace, n.nationality, n.partnerAgency, n.languageLevel, n.employer, n.hrReferent,
+      lines.push([n.name, n.passport, n.birthPlace, n.nationality, n.partnerAgency, n.languageLevel, nurseSpecs(n).join(' | '), n.employer, n.hrReferent,
         fase, team, statusLabel(deriveStatus(n)), n.lastUpdate, appr, (n.documents || []).length].map(csvCell).join(','));
     });
     // BOM so Excel opens UTF-8 correctly.
@@ -1228,6 +1374,20 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<select id="' + id + '" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100">' + opts + '</select>' +
     '</div>';
   }
+  // Multi-select "chips" over the clinical-skill catalogue (candidate profile & requests).
+  function specChips(prefix, selected) {
+    const sel = selected || [];
+    const items = specsCatalog();
+    if (!items.length) return '<p class="text-xs text-slate-400">—</p>';
+    return '<div class="flex flex-wrap gap-1.5">' + items.map((name) =>
+      '<label class="inline-flex cursor-pointer items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-600">' +
+        '<input type="checkbox" value="' + escapeHtml(name) + '"' + (sel.indexOf(name) >= 0 ? ' checked' : '') + ' class="' + prefix + '-chip h-3.5 w-3.5 rounded border-slate-300 text-indigo-600 focus:ring-indigo-200" />' +
+        escapeHtml(name) +
+      '</label>').join('') + '</div>';
+  }
+  function chipValues(prefix) {
+    return Array.from(document.querySelectorAll('input.' + prefix + '-chip:checked')).map((e) => e.value);
+  }
   function agencyOptions() { return (state.settings.agencies || []).map((a) => a.name); }
   function employerOptions() { return (state.settings.employers || []).map((e) => e.name + (e.city ? ' · ' + e.city : '')); }
   function operatorOptions() {
@@ -1241,12 +1401,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     employers: [{ key: 'name', label: 'f_name', req: true }, { key: 'city', label: 'f_city' }],
     operators: [{ key: 'name', label: 'f_name', req: true }, { key: 'role', label: 'f_role' }, { key: 'email', label: 'f_email' }, { key: 'team', label: 'f_team', type: 'select', options: [{ value: 'rd', labelKey: 'team_rd' }, { value: 'it', labelKey: 'team_it' }] }, { key: 'accessRole', label: 'access_role', type: 'select', options: [{ value: 'admin', labelKey: 'role_admin' }, { value: 'operator', labelKey: 'role_operator' }] }],
     docTypes: [{ key: 'name', label: 'f_name', req: true }, { key: 'language', label: 'ad_lang', type: 'select', options: ['ES', 'IT'] }],
+    specialties: [{ key: 'name', label: 'f_name', req: true }],
   };
   const ENTITY_META = {
     agencies: { title: 'set_agencies', desc: 'set_agencies_desc', icon: 'handshake', add: 'new_agency' },
     employers: { title: 'set_employers', desc: 'set_employers_desc', icon: 'hospital', add: 'new_employer' },
     operators: { title: 'set_operators', desc: 'set_operators_desc', icon: 'user-cog', add: 'new_operator' },
     docTypes: { title: 'set_doctypes', desc: 'set_doctypes_desc', icon: 'file-text', add: 'new_doctype' },
+    specialties: { title: 'set_specialties', desc: 'set_specialties_desc', icon: 'stethoscope', add: 'new_specialty' },
   };
   function fieldDisplay(f, value) {
     if (f.type === 'select' && Array.isArray(f.options)) {
@@ -1286,7 +1448,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="grid grid-cols-1 gap-5 lg:grid-cols-3">' +
         settingsSection('agencies') + settingsSection('employers') + settingsSection('operators') +
       '</div>' +
-      '<div class="mt-5">' + settingsSection('docTypes') + '</div>' +
+      '<div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">' + settingsSection('docTypes') + settingsSection('specialties') + '</div>' +
     '</main>';
   }
 
@@ -1334,6 +1496,185 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (!confirm(t('confirm_delete', { x: it.name || '' }))) return;
     state.settings[type] = list.filter((x) => x.id !== id);
     commit();
+  }
+
+  // ------------------------------------------------------------------ MATCHING (Team Italia)
+  function requestStatusMeta(st) {
+    return st === 'matched' ? { cls: 'bg-emerald-100 text-emerald-700 ring-emerald-200', key: 'mt_status_matched' }
+      : st === 'closed' ? { cls: 'bg-slate-100 text-slate-500 ring-slate-200', key: 'mt_status_closed' }
+      : { cls: 'bg-amber-100 text-amber-700 ring-amber-200', key: 'mt_status_open' };
+  }
+  function skillChipsRO(list, cls) {
+    if (!list || !list.length) return '<span class="text-xs text-slate-300">—</span>';
+    return list.map((s) => '<span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + cls + '">' + escapeHtml(s) + '</span>').join(' ');
+  }
+  function requestCard(r) {
+    const meta = requestStatusMeta(r.status);
+    const canIt = canManageMatching();
+    const btn = (action, label, icon, tone) =>
+      '<button data-action="' + action + '" data-id="' + r.id + '" class="inline-flex items-center gap-1 rounded-lg px-2.5 py-1.5 text-xs font-semibold ring-1 ring-inset transition ' + tone + '"><i data-lucide="' + icon + '" class="h-3.5 w-3.5"></i>' + label + '</button>';
+    let actions = '';
+    if (canIt) {
+      if (r.status === 'open') {
+        actions = btn('find-candidates', t('mt_find'), 'search', 'bg-indigo-600 text-white ring-indigo-600 hover:bg-indigo-700') +
+          btn('open-request', t('edit'), 'pencil', 'text-slate-500 ring-slate-200 hover:bg-slate-50') +
+          btn('delete-request', t('del'), 'trash-2', 'text-rose-600 ring-rose-200 hover:bg-rose-50');
+      } else if (r.status === 'matched') {
+        actions = btn('unassign-match', t('mt_unassign'), 'unlink', 'text-amber-600 ring-amber-200 hover:bg-amber-50') +
+          btn('close-request', t('mt_close'), 'check-circle-2', 'text-emerald-700 ring-emerald-200 hover:bg-emerald-50');
+      } else {
+        actions = btn('reopen-request', t('mt_reopen'), 'rotate-ccw', 'text-slate-500 ring-slate-200 hover:bg-slate-50') +
+          btn('delete-request', t('del'), 'trash-2', 'text-rose-600 ring-rose-200 hover:bg-rose-50');
+      }
+    }
+    const matchedLine = r.matchedNurseName
+      ? '<button data-action="open-nurse" data-id="' + (r.matchedNurseId || '') + '" class="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-100"><i data-lucide="user-check" class="h-3.5 w-3.5"></i>' + t('mt_matched_to') + ' ' + escapeHtml(r.matchedNurseName) + (r.matchedAt ? ' · ' + formatDate(r.matchedAt) : '') + '</button>'
+      : '';
+    return '<div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm' + (r.status === 'closed' ? ' opacity-70' : '') + '">' +
+      '<div class="flex flex-wrap items-start justify-between gap-2">' +
+        '<div class="min-w-0">' +
+          '<p class="text-sm font-bold text-slate-900">' + escapeHtml(r.employer) + '</p>' +
+          '<p class="text-xs text-slate-500"><i data-lucide="stethoscope" class="mr-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + escapeHtml(r.department || '—') + (r.shift ? ' · <i data-lucide="clock" class="mx-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + escapeHtml(r.shift) : '') + '</p>' +
+        '</div>' +
+        '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ' + meta.cls + '">' + t(meta.key) + '</span>' +
+      '</div>' +
+      '<div class="mt-3 space-y-1.5 text-xs">' +
+        '<p class="font-semibold uppercase tracking-wide text-slate-400">' + t('mt_required') + '</p>' +
+        '<div class="flex flex-wrap gap-1">' + skillChipsRO(r.requiredSkills, 'bg-indigo-50 text-indigo-700 ring-indigo-200') + '</div>' +
+        '<p class="pt-1 font-semibold uppercase tracking-wide text-slate-400">' + t('mt_preferred') + '</p>' +
+        '<div class="flex flex-wrap gap-1">' + skillChipsRO(r.preferredSkills, 'bg-slate-100 text-slate-600 ring-slate-200') + '</div>' +
+      '</div>' +
+      (r.notes ? '<p class="mt-3 text-xs text-slate-500">' + escapeHtml(r.notes) + '</p>' : '') +
+      matchedLine +
+      '<div class="mt-4 flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">' + actions +
+        '<span class="ml-auto text-[11px] text-slate-400">' + t('mt_created', { d: formatDate(r.createdAt) }) + '</span>' +
+      '</div>' +
+    '</div>';
+  }
+  function matchingView() {
+    const reqs = state.requests || [];
+    const canIt = canManageMatching();
+    const cards = reqs.length === 0
+      ? '<div class="rounded-2xl border border-dashed border-slate-200 bg-white p-10 text-center text-sm text-slate-400 lg:col-span-2">' + t('mt_none') + '</div>'
+      : reqs.slice().sort((a, b) => (a.status === 'open' ? 0 : a.status === 'matched' ? 1 : 2) - (b.status === 'open' ? 0 : b.status === 'matched' ? 1 : 2)).map(requestCard).join('');
+    return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
+      '<div class="mb-6 flex flex-wrap items-end justify-between gap-3">' +
+        '<div><h2 class="text-xl font-extrabold text-slate-900">' + t('mt_title') + '</h2>' +
+        '<p class="max-w-2xl text-sm text-slate-500">' + t('mt_subtitle') + '</p></div>' +
+        (canIt
+          ? '<button data-action="open-request" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700"><i data-lucide="plus" class="h-4 w-4"></i>' + t('mt_new') + '</button>'
+          : '<span class="inline-flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-200"><i data-lucide="users" class="h-4 w-4"></i>' + t('mt_ro_hint') + '</span>') +
+      '</div>' +
+      '<div class="grid grid-cols-1 gap-5 lg:grid-cols-2">' + cards + '</div>' +
+    '</main>';
+  }
+
+  // Request editor (create / edit).
+  let pendingRequestId = null;
+  function openRequestModal(id) {
+    if (!canManageMatching()) return;
+    pendingRequestId = id || null;
+    const r = id ? getRequest(id) : null;
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="target" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + (r ? t('edit') : t('mt_new')) + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div id="rq-error" class="mx-5 mt-4 hidden rounded-xl bg-rose-50 px-3 py-2 text-xs font-medium text-rose-600 ring-1 ring-inset ring-rose-200"></div>' +
+      '<div class="grid gap-3 p-5">' +
+        selectField('rq-employer', t('mt_facility') + ' <span class="text-rose-500">*</span>', employerOptions(), r ? r.employer : '') +
+        inputField('rq-department', t('mt_department'), 'Terapia Intensiva', true) +
+        inputField('rq-shift', t('mt_shift'), 'Turni H24 (mattina/pomeriggio/notte)') +
+        '<div><label class="mb-1 block text-xs font-semibold text-slate-500">' + t('mt_required') + '</label>' + specChips('rq-req', r ? r.requiredSkills : []) + '</div>' +
+        '<div><label class="mb-1 block text-xs font-semibold text-slate-500">' + t('mt_preferred') + '</label>' + specChips('rq-pref', r ? r.preferredSkills : []) + '</div>' +
+        inputField('rq-notes', t('mt_notes'), '') +
+      '</div>' +
+      '<div class="flex justify-end gap-2 border-t border-slate-100 p-5">' +
+        '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('cancel') + '</button>' +
+        '<button data-action="save-request" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + t('save') + '</button>' +
+      '</div>';
+    modalShell(inner, true);
+    if (r) {
+      const set = (fid, v) => { const el = document.getElementById(fid); if (el) el.value = v || ''; };
+      set('rq-department', r.department); set('rq-shift', r.shift); set('rq-notes', r.notes);
+    }
+    const el = document.getElementById('rq-department'); if (el) el.focus();
+  }
+  function saveRequestFromForm() {
+    if (!canManageMatching()) return;
+    const employer = fieldVal('rq-employer'), department = fieldVal('rq-department');
+    if (!employer || !department) {
+      const err = document.getElementById('rq-error');
+      if (err) { err.textContent = t('mt_error_required'); err.classList.remove('hidden'); }
+      return;
+    }
+    const data = {
+      employer: employer, department: department,
+      shift: fieldVal('rq-shift'), notes: fieldVal('rq-notes'),
+      requiredSkills: chipValues('rq-req'), preferredSkills: chipValues('rq-pref'),
+    };
+    if (pendingRequestId) {
+      const r = getRequest(pendingRequestId);
+      if (r) Object.assign(r, data);
+    } else {
+      state.requests.push(Object.assign({
+        id: uid(), status: 'open', createdAt: new Date().toISOString().slice(0, 10),
+        matchedNurseId: null, matchedNurseName: null, matchedAt: null,
+      }, data));
+    }
+    pendingRequestId = null;
+    closeModal();
+    commit();
+  }
+
+  // Candidate shortlist for a request: interrogazione → identificazione → validazione.
+  function openMatchCandidates(reqId) {
+    const r = getRequest(reqId); if (!r) return;
+    const canIt = canManageMatching();
+    const list = matchCandidates(r);
+    const rows = list.length === 0
+      ? '<div class="rounded-xl border border-dashed border-slate-200 p-6 text-center text-sm text-slate-400">' + t('mt_no_candidates') + '</div>'
+      : list.map((it) => {
+          const n = it.n, m = it.m;
+          const badge = (ok, okKey, koKey, vars) =>
+            '<span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + (ok ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-amber-50 text-amber-700 ring-amber-200') + '">' +
+            '<i data-lucide="' + (ok ? 'check' : 'alert-triangle') + '" class="h-3 w-3"></i>' + t(ok ? okKey : koKey, vars) + '</span>';
+          const specs = nurseSpecs(n);
+          const specHtml = specs.length
+            ? specs.map((s) => {
+                const isReq = (r.requiredSkills || []).indexOf(s) >= 0;
+                const isPref = (r.preferredSkills || []).indexOf(s) >= 0;
+                return '<span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + (isReq ? 'bg-indigo-50 text-indigo-700 ring-indigo-300' : isPref ? 'bg-sky-50 text-sky-700 ring-sky-200' : 'bg-slate-100 text-slate-500 ring-slate-200') + '">' + escapeHtml(s) + '</span>';
+              }).join(' ')
+            : '<span class="text-[11px] text-slate-400">' + t('mt_no_specs') + '</span>';
+          return '<div class="rounded-xl border p-4 ' + (m.full ? 'border-emerald-200 bg-emerald-50/30' : 'border-slate-200 bg-white') + '">' +
+            '<div class="flex flex-wrap items-start justify-between gap-2">' +
+              '<div class="min-w-0">' +
+                '<p class="text-sm font-bold text-slate-900">' + escapeHtml(n.name) + '</p>' +
+                '<p class="text-[11px] text-slate-500">' + t('step_x', { n: n.currentStep }) + ' · ' + escapeHtml(stepName(n.currentStep)) + ' · ' + escapeHtml(n.languageLevel.split(' ')[0]) + '</p>' +
+              '</div>' +
+              '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-bold ring-1 ring-inset ' + (m.full ? 'bg-emerald-100 text-emerald-700 ring-emerald-200' : 'bg-amber-100 text-amber-700 ring-amber-200') + '">' + t(m.full ? 'mt_full_match' : 'mt_partial_match') + '</span>' +
+            '</div>' +
+            '<div class="mt-2 flex flex-wrap gap-1">' + specHtml + '</div>' +
+            '<div class="mt-2 flex flex-wrap gap-1.5">' +
+              badge(m.reqHit === m.reqTot, 'mt_req_ok', 'mt_req_ok', { a: m.reqHit, b: m.reqTot }) +
+              (m.prefTot ? badge(m.prefHit > 0, 'mt_pref_ok', 'mt_pref_ok', { a: m.prefHit, b: m.prefTot }) : '') +
+              badge(m.docsOk, 'mt_docs_ok', 'mt_docs_ko') +
+              badge(m.dossierOk, 'mt_dossier_ok', 'mt_dossier_ko') +
+            '</div>' +
+            '<div class="mt-3 flex justify-end gap-1.5">' +
+              '<button data-action="open-nurse" data-id="' + n.id + '" class="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('doc_view') + '</button>' +
+              (canIt && r.status === 'open' ? '<button data-action="assign-match" data-req="' + r.id + '" data-nurse="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-indigo-700"><i data-lucide="link" class="h-3 w-3"></i>' + t('mt_assign') + '</button>' : '') +
+            '</div>' +
+          '</div>';
+        }).join('');
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="search" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + t('mt_candidates_title', { x: escapeHtml(requestLabel(r)) }) + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div class="space-y-2.5 p-5">' + rows + '</div>';
+    modalShell(inner, true);
   }
 
   // ---------- Operator profile ----------
@@ -1635,7 +1976,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
           <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-4 py-2">Elemento</th><th class="px-4 py-2">A cosa serve</th></tr></thead>
           <tbody class="divide-y divide-slate-100">
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Gestione Pratiche / Documenti / Impostazioni</td><td class="px-4 py-2.5 text-slate-600">Le viste: visione d'insieme, lavoro sul candidato, archivio documenti e (solo admin) anagrafiche di base.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Gestione Pratiche / Matching / Documenti / Impostazioni</td><td class="px-4 py-2.5 text-slate-600">Le viste: visione d'insieme, lavoro sul candidato, richieste delle strutture e incrocio domanda–offerta, archivio documenti e (solo admin) anagrafiche di base.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Badge "a rischio"</td><td class="px-4 py-2.5 text-slate-600">Conta le pratiche ferme oltre i tempi previsti. Verde = nessun rischio.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manuale</td><td class="px-4 py-2.5 text-slate-600">Apre questo documento.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Guida</td><td class="px-4 py-2.5 text-slate-600">Avvia il tour interattivo a riflettore.</td></tr>
@@ -1714,6 +2055,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           </tbody>
         </table></div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Una tantum vs operativo.</b> Alcune attività dei team sono accordi quadro <b>una tantum</b> (convenzioni con agenzie riconosciute, contratti quadro per gli alloggi, contrattualizzazione preventiva delle aziende, convenzioni con professionisti legali/fiscali) e non compaiono nella checklist del singolo candidato: la checklist contiene solo le attività <b>operative</b> da ripetere per ogni pratica.</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">6.1 · Il protocollo di matching tecnico</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Il gestionale è la <b>fonte unica di verità</b> del progetto: il <b>Team Dominicana inserisce e qualifica</b> i dati (specializzazioni cliniche verificate del candidato, documentazione asseverata, dossier «Italia in tasca»), il <b>Team Italia interroga ed estrae</b> (riceve i fabbisogni dalle strutture, filtra il database per competenze, abbina il profilo idoneo e ne monitora la conformità).</p>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Specializzazioni del candidato:</b> si spuntano dal catalogo in <b>Modifica anagrafica</b> (sezione Competenze); il catalogo si gestisce in <b>Impostazioni → Specializzazioni</b>.</li>
+          <li><b>Richieste delle strutture:</b> nella vista <b>Matching</b>, con «Nuova Richiesta» si registrano reparto di destinazione, competenze minime, specializzazioni preferenziali e turno.</li>
+          <li><b>Incrocio:</b> «Trova candidati» ordina i profili per compatibilità (interrogazione → identificazione → validazione documentale) e con «Abbina» si finalizza la proposta: il datore di lavoro del candidato viene aggiornato e tutto resta tracciato nel log.</li>
+        </ul>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -1872,7 +2220,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
           <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-4 py-2">Element</th><th class="px-4 py-2">Purpose</th></tr></thead>
           <tbody class="divide-y divide-slate-100">
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Cases / Documents / Settings</td><td class="px-4 py-2.5 text-slate-600">The views: overview, single-candidate work, document archive, and (admin only) base records.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Cases / Matching / Documents / Settings</td><td class="px-4 py-2.5 text-slate-600">The views: overview, single-candidate work, facility requests and demand–supply matching, document archive, and (admin only) base records.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">"At risk" badge</td><td class="px-4 py-2.5 text-slate-600">Counts cases stuck beyond expected times. Click it to open the at-risk list. Green = no risk.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Theme toggle</td><td class="px-4 py-2.5 text-slate-600">Switch between light and dark mode.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">IT · EN · ES</td><td class="px-4 py-2.5 text-slate-600">Change the interface language.</td></tr>
@@ -1945,6 +2293,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           </tbody>
         </table></div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>One-off vs operational.</b> Some team activities are <b>one-off</b> framework agreements (recognised agencies, housing contracts, pre-contracted employers, legal/tax professionals) and don't appear in a candidate's checklist: the checklist only contains the <b>operational</b> tasks repeated for each case.</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">6.1 · The technical matching protocol</h3>
+        <p class="text-sm leading-relaxed text-slate-600">The app is the project's <b>single source of truth</b>: the <b>Dominican team enters and qualifies</b> the data (the candidate's verified clinical specialisations, sworn documentation, «Italia in tasca» dossier), while the <b>Italy team queries and extracts</b> (receives facility needs, filters the database by skills, matches the eligible profile and monitors its compliance).</p>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Candidate specialisations:</b> ticked from the catalogue in <b>Edit details</b> (Skills section); the catalogue is managed in <b>Settings → Specialisations</b>.</li>
+          <li><b>Facility requests:</b> in the <b>Matching</b> view, "New Request" records the destination ward, minimum skills, preferred specialisations and shift.</li>
+          <li><b>Matching:</b> "Find candidates" ranks the profiles by compatibility (query → shortlist → document validation) and "Match" finalises the proposal: the candidate's employer is updated and everything is tracked in the log.</li>
+        </ul>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -2102,7 +2457,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
           <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-4 py-2">Elemento</th><th class="px-4 py-2">Función</th></tr></thead>
           <tbody class="divide-y divide-slate-100">
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Panel / Expedientes / Documentos / Ajustes</td><td class="px-4 py-2.5 text-slate-600">Las vistas: visión global, trabajo por candidato, archivo de documentos y (solo admin) registros base.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Panel / Expedientes / Matching / Documentos / Ajustes</td><td class="px-4 py-2.5 text-slate-600">Las vistas: visión global, trabajo por candidato, solicitudes de las estructuras y cruce demanda–oferta, archivo de documentos y (solo admin) registros base.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Distintivo "en riesgo"</td><td class="px-4 py-2.5 text-slate-600">Cuenta los expedientes detenidos más de lo previsto. Haz clic para abrir la lista en riesgo. Verde = sin riesgo.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Cambio de tema</td><td class="px-4 py-2.5 text-slate-600">Alterna entre modo claro y oscuro.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">IT · EN · ES</td><td class="px-4 py-2.5 text-slate-600">Cambia el idioma de la interfaz.</td></tr>
@@ -2175,6 +2530,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           </tbody>
         </table></div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Una tantum vs operativo.</b> Algunas actividades de los equipos son acuerdos marco <b>una tantum</b> (agencias reconocidas, contratos marco de alojamiento, empresas precontratadas, profesionales legales/fiscales) y no aparecen en la checklist del candidato: la checklist contiene solo las tareas <b>operativas</b> repetidas para cada expediente.</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">6.1 · El protocolo de matching técnico</h3>
+        <p class="text-sm leading-relaxed text-slate-600">La app es la <b>única fuente de verdad</b> del proyecto: el <b>Equipo Dominicana introduce y cualifica</b> los datos (especializaciones clínicas verificadas del candidato, documentación jurada, dossier «Italia in tasca»), mientras el <b>Equipo Italia consulta y extrae</b> (recibe las necesidades de las estructuras, filtra la base de datos por competencias, empareja el perfil idóneo y supervisa su conformidad).</p>
+        <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
+          <li><b>Especializaciones del candidato:</b> se marcan desde el catálogo en <b>Editar datos</b> (sección Competencias); el catálogo se gestiona en <b>Ajustes → Especializaciones</b>.</li>
+          <li><b>Solicitudes de las estructuras:</b> en la vista <b>Matching</b>, «Nueva Solicitud» registra la unidad de destino, las competencias mínimas, las especializaciones preferentes y el turno.</li>
+          <li><b>Cruce:</b> «Buscar candidatos» ordena los perfiles por compatibilidad (consulta → selección → validación documental) y con «Emparejar» se finaliza la propuesta: el empleador del candidato se actualiza y todo queda registrado en el log.</li>
+        </ul>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -2310,6 +2672,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const body = state.view === 'dashboard' ? dashboardView()
       : state.view === 'settings' ? settingsView()
       : state.view === 'documents' ? archiveView()
+      : state.view === 'matching' ? matchingView()
       : casesView();
     root.innerHTML = demoBanner() + header() + body + appFooter();
     lucide.createIcons();
@@ -2318,7 +2681,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   // ---------- Browser history: back/forward navigates between the main sections ----------
-  const APP_VIEWS = ['dashboard', 'cases', 'documents', 'settings'];
+  const APP_VIEWS = ['dashboard', 'cases', 'matching', 'documents', 'settings'];
   let _lastHistoryView = null;
   function syncHistory() {
     const v = state.view;
@@ -2370,6 +2733,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           '<nav data-tour="views" class="flex w-full items-center gap-1 overflow-x-auto rounded-2xl bg-slate-100 p-1 sm:w-max sm:max-w-full">' +
             tab('dashboard', t('nav_dashboard'), 'layout-dashboard') +
             tab('cases', t('nav_cases'), 'folder-kanban') +
+            tab('matching', t('nav_matching'), 'target') +
             tab('documents', t('nav_docs'), 'folder-archive') +
             (isAdmin() ? tab('settings', t('settings'), 'settings') : '') +
           '</nav>' +
@@ -2754,6 +3118,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         field('mail', t('f_email'), n.email || '—') +
         field('handshake', t('f_agency'), n.partnerAgency) +
         field('languages', t('f_lang'), n.languageLevel) +
+        field('stethoscope', t('f_specs'), nurseSpecs(n).length ? nurseSpecs(n).join(' · ') : '—') +
+        (n.matchedRequestId ? field('target', t('f_match'), n.employer + (n.matchedDepartment ? ' — ' + n.matchedDepartment : '')) : '') +
         field('hospital', t('f_employer'), n.employer) +
         field('user-cog', t('f_hr'), n.hrReferent + (operatorByName(n.hrReferent) && operatorByName(n.hrReferent).team ? ' · ' + teamFlag(operatorByName(n.hrReferent).team) + ' ' + teamLabel(operatorByName(n.hrReferent).team) : '')) +
         field('flag', t('f_status'), (n.currentStep >= DONE_STEP ? t('state_done') : t('step_state', { n: n.currentStep, name: stepName(n.currentStep) }))) +
@@ -2852,24 +3218,31 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const reasons = blockers(n);
     const ok = reasons.length === 0;
     const done = n.currentStep >= DONE_STEP;
+    // Phase owned by the other team: the current operator can watch, not act.
+    const locked = !done && !canOperatePhase(n.currentStep);
 
     const btn = done
       ? '<button disabled class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white opacity-90"><i data-lucide="badge-check" class="h-4 w-4"></i>' + t('case_completed_btn') + '</button>'
-      : ok
-        ? '<button data-action="advance" data-id="' + n.id + '" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 active:scale-[.98]"><i data-lucide="arrow-right-circle" class="h-4 w-4"></i>' + t('advance_btn') + '</button>'
-        : '<button disabled data-tooltip="' + escapeHtml(t('adv_blocked_tip')) + '" class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-400"><i data-lucide="lock" class="h-4 w-4"></i>' + t('advance_btn') + '</button>';
+      : locked
+        ? '<button disabled class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-400"><i data-lucide="users" class="h-4 w-4"></i>' + t('advance_btn') + '</button>'
+        : ok
+          ? '<button data-action="advance" data-id="' + n.id + '" class="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700 active:scale-[.98]"><i data-lucide="arrow-right-circle" class="h-4 w-4"></i>' + t('advance_btn') + '</button>'
+          : '<button disabled data-tooltip="' + escapeHtml(t('adv_blocked_tip')) + '" class="inline-flex cursor-not-allowed items-center gap-2 rounded-xl bg-slate-200 px-5 py-2.5 text-sm font-semibold text-slate-400"><i data-lucide="lock" class="h-4 w-4"></i>' + t('advance_btn') + '</button>';
 
+    const lockedNote = locked
+      ? '<div class="mb-1.5 flex items-center gap-2 text-sm font-semibold text-sky-700"><i data-lucide="users" class="h-4 w-4"></i>' + t('phase_team_locked', { team: escapeHtml(teamTag(stepTeam(n.currentStep))) }) + '</div>'
+      : '';
     const banner = done
       ? '<div class="flex items-center gap-2 text-sm text-emerald-600"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('adv_done_banner') + '</div>'
       : ok
-        ? '<div class="flex items-center gap-2 text-sm text-emerald-600"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('adv_ok_banner', { state: escapeHtml(stepName(n.currentStep)) }) + '</div>'
-        : '<div class="space-y-1.5">' +
+        ? lockedNote + '<div class="flex items-center gap-2 text-sm text-emerald-600"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('adv_ok_banner', { state: escapeHtml(stepName(n.currentStep)) }) + '</div>'
+        : '<div class="space-y-1.5">' + lockedNote +
             '<div class="flex items-center gap-2 text-sm font-semibold text-amber-600"><i data-lucide="alert-triangle" class="h-4 w-4"></i>' + t('adv_blocked_title') + '</div>' +
             '<ul class="ml-6 list-disc space-y-0.5 text-xs text-slate-500">' + reasons.slice(0, 6).map((r) => '<li>' + escapeHtml(r) + '</li>').join('') + '</ul>' +
           '</div>';
 
     return '<div data-tour="advance" class="flex flex-col items-start justify-between gap-4 rounded-2xl border p-5 shadow-sm sm:flex-row sm:items-center ' +
-      (done ? 'border-emerald-200 bg-emerald-50/40' : ok ? 'border-indigo-200 bg-indigo-50/30' : 'border-amber-200 bg-amber-50/40') + '">' +
+      (done ? 'border-emerald-200 bg-emerald-50/40' : locked ? 'border-sky-200 bg-sky-50/40' : ok ? 'border-indigo-200 bg-indigo-50/30' : 'border-amber-200 bg-amber-50/40') + '">' +
       '<div class="min-w-0 flex-1">' + banner + '</div>' + btn +
     '</div>';
   }
@@ -2926,11 +3299,15 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function checklistSection(n) {
     const items = n.checklist[n.currentStep] || [];
     const done = items.filter((i) => i.done).length;
+    const locked = n.currentStep < DONE_STEP && !canOperatePhase(n.currentStep);
+    const lockedNote = locked
+      ? '<div class="mb-2 flex items-center gap-2 rounded-xl bg-sky-50 p-3 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-200"><i data-lucide="users" class="h-4 w-4 shrink-0"></i>' + t('phase_team_locked', { team: escapeHtml(teamTag(stepTeam(n.currentStep))) }) + '</div>'
+      : '';
     const list = n.currentStep >= DONE_STEP
       ? '<div class="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-200"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('checklist_all_done') + '</div>'
       : items.map((i) =>
-          '<label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ' + (i.done ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white hover:bg-slate-50') + '">' +
-            '<input type="checkbox" ' + (i.done ? 'checked' : '') + ' data-action="toggle-check" data-nurse="' + n.id + '" data-step="' + n.currentStep + '" data-item="' + i.id + '" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />' +
+          '<label class="flex items-start gap-3 rounded-xl border p-3 transition ' + (locked ? 'cursor-not-allowed opacity-70 ' : 'cursor-pointer ') + (i.done ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white' + (locked ? '' : ' hover:bg-slate-50')) + '">' +
+            '<input type="checkbox" ' + (i.done ? 'checked' : '') + (locked ? ' disabled' : '') + ' data-action="toggle-check" data-nurse="' + n.id + '" data-step="' + n.currentStep + '" data-item="' + i.id + '" class="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500" />' +
             '<span class="text-sm ' + (i.done ? 'text-slate-400 line-through' : 'text-slate-700') + '">' + escapeHtml(checklistLabel(i.step, i.idx)) + '</span>' +
           '</label>'
         ).join('');
@@ -2942,6 +3319,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         (n.currentStep < DONE_STEP ? '<span class="ml-auto text-xs text-slate-400">' + t('checklist_count', { a: done, b: items.length, s: n.currentStep }) + '</span>' : '') +
       '</div>' +
       '<p class="mb-3 text-xs text-slate-400">' + t('checklist_sub', { state: escapeHtml(n.currentStep >= DONE_STEP ? t('state_done') : stepName(n.currentStep)) }) + '</p>' +
+      lockedNote +
       '<div class="space-y-2">' + list + '</div>' +
     '</div>';
   }
@@ -3165,11 +3543,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const [casesSnap, settingsSnap] = await Promise.all([data.doc('cases').get(), data.doc('settings').get()]);
     state = seed;
     if (casesSnap.exists && Array.isArray(casesSnap.data().nurses)) state.nurses = casesSnap.data().nurses;
+    if (casesSnap.exists) state.requests = Array.isArray(casesSnap.data().requests) ? casesSnap.data().requests : [];
     if (settingsSnap.exists && settingsSnap.data().settings) state.settings = settingsSnap.data().settings;
     normalizeState(state);
     state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
     // First-run initialization: seed the shared docs (writes succeed only for an admin).
-    if (!casesSnap.exists) data.doc('cases').set({ nurses: state.nurses, updatedAt: serverTs() }, { merge: true }).catch(() => {});
+    if (!casesSnap.exists) data.doc('cases').set({ nurses: state.nurses, requests: state.requests || [], updatedAt: serverTs() }, { merge: true }).catch(() => {});
     if (!settingsSnap.exists && isAdmin()) data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true }).catch(() => {});
   }
 
@@ -3301,7 +3680,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (a === 'toggle-tools') { if (_menu) _menu.classList.toggle('open'); return; }
     switch (a) {
       case 'set-view': setView(t.getAttribute('data-view')); break;
-      case 'open-nurse': selectNurse(t.getAttribute('data-id')); break;
+      case 'open-nurse': closeModal(); selectNurse(t.getAttribute('data-id')); break;
       case 'set-filter': setFilter(t.getAttribute('data-filter')); break;
       case 'advance': advanceStatus(t.getAttribute('data-id')); break;
       case 'approve-doc': approveDoc(t.getAttribute('data-nurse'), t.getAttribute('data-doc')); break;
@@ -3348,6 +3727,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'show-risk': state.statusFilter = 'risk'; state.view = 'cases'; commit(); break;
       case 'open-entity': openEntityModal(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
       case 'save-entity': saveEntity(); break;
+      case 'open-request': openRequestModal(t.getAttribute('data-id')); break;
+      case 'save-request': saveRequestFromForm(); break;
+      case 'delete-request': deleteRequest(t.getAttribute('data-id')); break;
+      case 'find-candidates': openMatchCandidates(t.getAttribute('data-id')); break;
+      case 'assign-match': assignMatch(t.getAttribute('data-req'), t.getAttribute('data-nurse')); break;
+      case 'unassign-match': unassignMatch(t.getAttribute('data-id')); break;
+      case 'close-request': closeRequest(t.getAttribute('data-id')); break;
+      case 'reopen-request': reopenRequest(t.getAttribute('data-id')); break;
       case 'delete-entity': deleteEntity(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
       case 'set-demo-role': setDemoRole(t.getAttribute('data-role')); break;
     }
