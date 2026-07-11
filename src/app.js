@@ -93,22 +93,28 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     return s;
   }
 
-  // ---------- The 11 sequential workflow states (localized) ----------
-  const STEP_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
+  // ---------- The 9 workflow phases, split between two teams (localized) ----------
+  // Phases 1-4: Team Repubblica Dominicana (selezione → viaggio).
+  // Phases 5-9: Team Italia (arrivo → tutor e assistenza).
+  const STEP_IDS = [1, 2, 3, 4, 5, 6, 7, 8, 9];
+  const LAST_STEP = 9;
+  const DONE_STEP = 10;            // advancing past phase 9 marks the case as completed
+  const FIRST_ITALY_STEP = 5;      // first phase handled by the Italy team (= arrived in Italy)
   function stepName(id) { const L = STEP_I18N[LANG] || STEP_I18N.it; return L.names[id] || STEP_I18N.it.names[id] || '—'; }
   function stepShort(id) { const L = STEP_I18N[LANG] || STEP_I18N.it; return L.short[id] || STEP_I18N.it.short[id] || ''; }
   function steps() { return STEP_IDS.map((id) => ({ id: id, name: stepName(id), short: stepShort(id) })); }
+  function stepTeam(id) { return id < FIRST_ITALY_STEP ? 'rd' : 'it'; }
 
-  // Realistic max days a case should sit in a given step before it becomes a risk.
-  const STEP_SLA_DAYS = { 1: 14, 2: 30, 3: 21, 4: 45, 5: 30, 6: 60, 7: 45, 8: 30, 9: 21, 10: 20, 11: 30 };
+  // Realistic max days a case should sit in a given phase before it becomes a risk.
+  const STEP_SLA_DAYS = { 1: 21, 2: 60, 3: 60, 4: 21, 5: 7, 6: 21, 7: 30, 8: 30, 9: 60 };
 
-  // Per-step mandatory checklist templates (same item count across languages).
+  // Per-phase mandatory checklist templates (same item count across languages).
   function checklistLabels(step) { const L = CHECKLIST_I18N[LANG] || CHECKLIST_I18N.it; return L[step] || CHECKLIST_I18N.it[step] || []; }
   function checklistLabel(step, idx) { const a = checklistLabels(step); return a[idx] != null ? a[idx] : ''; }
 
-  // Document gating rules per step.
-  const STEP_REQUIRES_NO_MISSING_DOCS = 2; // can't leave "Documents missing" while a doc is still missing
-  const STEP_REQUIRES_ALL_DOCS_APPROVED = 3; // can't leave "Documents verified" until every doc is approved
+  // Document gating: phase 2 (Gestione Documentale) can't be left until every
+  // required document is uploaded AND approved.
+  const STEP_REQUIRES_ALL_DOCS_APPROVED = 2;
 
   // Status badge metadata (colors fixed; labels localized via i18n).
   const STATUS_CLS = {
@@ -183,7 +189,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   function seedState() {
-    // -------- Candidate 1: Ana Valeria Rosario — Missing Docs (stuck at step 2) --------
+    // -------- Candidate 1: Ana Valeria Rosario — Missing Docs (stuck at phase 2, Gestione Documentale) --------
     const ana = {
       id: 'nurse_ana',
       name: 'Ana Valeria Rosario',
@@ -200,7 +206,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       hrReferent: 'Dott.ssa Giulia Ferraro',
       currentStep: 2,
       status: 'Missing Docs',
-      lastUpdate: isoDaysAgo(74), // clearly over the 30g SLA → red risk
+      lastUpdate: isoDaysAgo(74), // clearly over the 60d SLA of phase 2 → red risk
       documents: [
         { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(90), validity: '2034-05-01', status: 'approved' },
         { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(88), validity: '2030-01-01', status: 'approved' },
@@ -209,8 +215,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       ],
       checklist: makeChecklist({
         __current: 2,
-        1: [true, true, true],
-        2: [true, true, false, false], // translation + legalization not uploaded
+        1: [true, true, true, true],
+        2: [true, false, false, false, false, false, false], // titles uploaded; translation/legalisation still missing
       }),
       relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Non avviato' },
       logs: [
@@ -221,7 +227,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       ],
     };
 
-    // -------- Candidate 2: Carlos Manuel Tejeda — Visa Obtained (step 8) --------
+    // -------- Candidate 2: Carlos Manuel Tejeda — Italy team, Matching phase (7) --------
     const carlos = {
       id: 'nurse_carlos',
       name: 'Carlos Manuel Tejeda',
@@ -236,7 +242,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B1 — certificato CELI',
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
-      currentStep: 8,
+      currentStep: 7,
       status: 'Visa Obtained',
       lastUpdate: isoDaysAgo(6),
       documents: [
@@ -252,20 +258,18 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Certificato di Lingua',                  language: 'IT', uploadDate: isoDaysAgo(190), validity: null,         status: 'approved' },
       ],
       checklist: makeChecklist({
-        __current: 8,
-        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
-        4: [true, true], 5: [true, true], 6: [true], 7: [true, true],
-        8: [true, true], // visa fully obtained → ready to advance to OPI
+        __current: 7,
+        7: [true, false, false], // facility request received, matching in progress
       }),
-      relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Pre-contratto firmato' },
+      relocation: { flight: 'AZ 681 · SDQ → MXP · arrivato ' + formatDate(isoDaysAgo(12)), housing: 'Alloggio temporaneo, Via Altinate 45, Padova', tutor: null, contractStatus: 'Pre-contratto firmato' },
       logs: [
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 40), type: 'system', author: 'Sistema', text: 'Decreto di riconoscimento del titolo ricevuto.' },
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 20), type: 'note', author: 'Dott. Bianchi', text: 'Nulla osta al lavoro emesso dallo Sportello Unico Immigrazione.' },
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 6),  type: 'alert', author: 'Sistema', text: 'Visto rilasciato dal consolato. Prossimo passo: iscrizione OPI e logistica viaggio.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 40), type: 'system', author: 'Sistema', text: 'Formazione «Italia in tasca» completata. Visto e iscrizione OPI ottenuti.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 12), type: 'note', author: 'Dott. Bianchi', text: 'Arrivato in Italia: accoglienza in aeroporto e trasferimento in alloggio completati.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 6),  type: 'alert', author: 'Sistema', text: 'Richiesta ricevuta dall’Azienda Ospedaliera di Padova: matching competenze in corso.' },
       ],
     };
 
-    // -------- Candidate 3: Elena Maria Santos — Onboarding Completed (step 11) --------
+    // -------- Candidate 3: Elena Maria Santos — path completed (past phase 9) --------
     const elena = {
       id: 'nurse_elena',
       name: 'Elena Maria Santos',
@@ -280,7 +284,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B2 — certificato CELI',
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
-      currentStep: 11,
+      currentStep: 10,
       status: 'Onboarding Completed',
       lastUpdate: isoDaysAgo(12),
       documents: [
@@ -296,12 +300,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(420), validity: null,         status: 'approved' },
         { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(400), validity: null,         status: 'approved' },
       ],
-      checklist: makeChecklist({
-        __current: 12,
-        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
-        4: [true, true], 5: [true, true], 6: [true], 7: [true, true],
-        8: [true, true], 9: [true, true, true], 10: [true, true, true], 11: [true, true, true],
-      }),
+      checklist: makeChecklist({ __current: 10 }), // every phase done
       relocation: {
         flight: 'AZ 681 · SDQ → MXP · arrivo 18 mag 2026',
         housing: 'Foresteria aziendale, Via Giustiniani 12, Padova',
@@ -311,11 +310,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       logs: [
         { id: uid(), at: isoMinutesAgo(60 * 24 * 42), type: 'system', author: 'Sistema', text: 'Iscrizione OPI completata.' },
         { id: uid(), at: isoMinutesAgo(60 * 24 * 30), type: 'note', author: 'Dott. Bianchi', text: 'Arrivo in Italia e permesso di soggiorno ritirato.' },
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 12), type: 'system', author: 'Sistema', text: 'Onboarding completato: tutor assegnato, contratto attivo. Integrazione conclusa.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 12), type: 'system', author: 'Sistema', text: 'Percorso completato: tutor assegnato, contratto attivo, assistenza legale/fiscale convenzionata attivata.' },
       ],
     };
 
-    // -------- Candidate 4: Marisol Pena Urena — Documents under verification (step 3) --------
+    // -------- Candidate 4: Marisol Pena Urena — Formazione (phase 3) --------
     const marisol = {
       id: 'nurse_marisol',
       name: 'Marisol Peña Ureña',
@@ -336,8 +335,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       documents: [
         { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES', uploadDate: isoDaysAgo(30), validity: '2035-02-01', status: 'approved' },
         { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(28), validity: '2031-06-01', status: 'approved' },
-        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(6),  validity: '2035-02-01', status: 'pending' },
-        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(5), validity: '2035-02-01', status: 'pending' },
+        { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(6),  validity: '2035-02-01', status: 'approved' },
+        { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(5), validity: '2035-02-01', status: 'approved' },
         { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(35), validity: '2032-01-01', status: 'approved' },
         { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(35), validity: '2030-01-01', status: 'approved' },
         { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(35), validity: null, status: 'approved' },
@@ -345,16 +344,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       ],
       checklist: makeChecklist({
         __current: 3,
-        1: [true, true, true], 2: [true, true, true, true], 3: [true, false],
+        3: [true, true, false, false], // digital content delivered, meetings attended; support + final language check pending
       }),
       relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Non avviato' },
       logs: [
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 30), type: 'system', author: 'Sistema', text: 'Profilo completato: documenti d’identità e consenso privacy acquisiti.' },
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 6), type: 'note', author: 'Dott.ssa Ferraro', text: 'Traduzione asseverata e apostille ricevute: verifica di conformità in corso.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 30), type: 'system', author: 'Sistema', text: 'Fascicolo documentale completato e approvato: riconoscimento, nulla osta e visto ottenuti.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 4), type: 'note', author: 'Dott.ssa Ferraro', text: 'Formazione «Italia in tasca» in corso: contenuti digitali consegnati, primi incontri online completati.' },
       ],
     };
 
-    // -------- Candidate 5: Jose Alberto Guzman — Integration requested (step 5) --------
+    // -------- Candidate 5: Jose Alberto Guzman — Organizzazione Viaggio (phase 4) --------
     const jose = {
       id: 'nurse_jose',
       name: 'José Alberto Guzmán',
@@ -369,7 +368,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B1 — certificato CELI',
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
-      currentStep: 5,
+      currentStep: 4,
       status: 'In Progress',
       lastUpdate: isoDaysAgo(9),
       documents: [
@@ -377,25 +376,24 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Certificato Professionale (Exatec)',   language: 'ES', uploadDate: isoDaysAgo(113), validity: '2030-12-01', status: 'approved' },
         { id: uid(), name: 'Traduzione Asseverata del Titolo',     language: 'IT', uploadDate: isoDaysAgo(90),  validity: '2034-09-01', status: 'approved' },
         { id: uid(), name: 'Legalizzazione (Apostille de La Haya)', language: 'IT', uploadDate: isoDaysAgo(88), validity: '2034-09-01', status: 'approved' },
-        { id: uid(), name: 'Certificato Esperienza Professionale', language: 'ES', uploadDate: isoDaysAgo(9),  validity: '—', status: 'pending' },
+        { id: uid(), name: 'Certificato Esperienza Professionale', language: 'ES', uploadDate: isoDaysAgo(9),  validity: '—', status: 'approved' },
         { id: uid(), name: 'Copia Passaporto',                     language: 'ES', uploadDate: isoDaysAgo(120), validity: '2033-04-01', status: 'approved' },
         { id: uid(), name: 'Cédula (Documento d’Identità RD)', language: 'ES', uploadDate: isoDaysAgo(120), validity: '2029-08-01', status: 'approved' },
         { id: uid(), name: 'Consenso Privacy Firmato',             language: 'IT', uploadDate: isoDaysAgo(120), validity: null, status: 'approved' },
         { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(100), validity: null, status: 'approved' },
       ],
       checklist: makeChecklist({
-        __current: 5,
-        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
-        4: [true, true], 5: [true, false],
+        __current: 4,
+        4: [true, false], // flight purchased; airport transfer still to arrange
       }),
-      relocation: { flight: null, housing: null, tutor: null, contractStatus: 'Non avviato' },
+      relocation: { flight: 'UX 92 · SDQ → MAD → MXP · partenza 24 lug 2026', housing: null, tutor: null, contractStatus: 'Non avviato' },
       logs: [
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 20), type: 'alert', author: 'Sistema', text: 'Il Ministero della Salute ha richiesto un’integrazione documentale: certificato di esperienza professionale.' },
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 9), type: 'note', author: 'Dott. Bianchi', text: 'Certificato di esperienza ricevuto dall’agenzia e inviato al Ministero. In attesa di riscontro.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 20), type: 'system', author: 'Sistema', text: 'Formazione completata e fascicolo documentale chiuso: si passa all’organizzazione del viaggio.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 9), type: 'note', author: 'Dott. Bianchi', text: 'Biglietto aereo acquistato (partenza 24 luglio). Da organizzare il trasferimento verso l’aeroporto di Santo Domingo.' },
       ],
     };
 
-    // -------- Candidate 6: Rosa Altagracia Feliz — OPI registration (step 9) --------
+    // -------- Candidate 6: Rosa Altagracia Feliz — Domicilio e Servizi (phase 6) --------
     const rosa = {
       id: 'nurse_rosa',
       name: 'Rosa Altagracia Féliz',
@@ -410,7 +408,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       languageLevel: 'B2 — certificato CILS',
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
-      currentStep: 9,
+      currentStep: 6,
       status: 'In Progress',
       lastUpdate: isoDaysAgo(3),
       documents: [
@@ -426,15 +424,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Certificato di Lingua',                language: 'IT', uploadDate: isoDaysAgo(240), validity: null, status: 'approved' },
       ],
       checklist: makeChecklist({
-        __current: 9,
-        1: [true, true, true], 2: [true, true, true, true], 3: [true, true],
-        4: [true, true], 5: [true, true], 6: [true], 7: [true, true],
-        8: [true, true], 9: [true, true, false],
+        __current: 6,
+        6: [false, true, false], // essential services active; housing contract + residence permit in progress
       }),
-      relocation: { flight: 'IB 6501 · SDQ → MXP · partenza 02 ago 2026', housing: 'In ricerca — zona San Raffaele', tutor: null, contractStatus: 'Proposta contrattuale inviata' },
+      relocation: { flight: 'IB 6501 · SDQ → MXP · arrivata 05 lug 2026', housing: 'In ricerca — zona San Raffaele', tutor: null, contractStatus: 'Proposta contrattuale inviata' },
       logs: [
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 25), type: 'system', author: 'Sistema', text: 'Visto rilasciato dal consolato italiano di Santo Domingo.' },
-        { id: uid(), at: isoMinutesAgo(60 * 24 * 3), type: 'note', author: 'Dott.ssa Ferraro', text: 'Domanda di iscrizione OPI presentata; quota versata. In attesa di delibera dell’Ordine.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 6), type: 'system', author: 'Sistema', text: 'Arrivata in Italia: accoglienza in aeroporto e trasferimento all’alloggio temporaneo completati.' },
+        { id: uid(), at: isoMinutesAgo(60 * 24 * 3), type: 'note', author: 'Dott.ssa Ferraro', text: 'Alloggio definitivo in ricerca (zona San Raffaele); avviata la richiesta del permesso di soggiorno.' },
       ],
     };
 
@@ -461,8 +457,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         { id: uid(), name: 'Azienda Ospedaliera di Padova', city: 'Padova' },
       ],
       operators: [
-        { id: uid(), name: 'Dott.ssa Giulia Ferraro', role: 'HR Specialist', email: 'giulia.ferraro@dhl.it', accessRole: 'operator' },
-        { id: uid(), name: 'Dott. Marco Bianchi', role: 'HR Manager', email: 'marco.bianchi@dhl.it', accessRole: 'admin' },
+        { id: uid(), name: 'Dott.ssa Giulia Ferraro', role: 'HR Specialist', email: 'giulia.ferraro@dhl.it', accessRole: 'operator', team: 'rd' },
+        { id: uid(), name: 'Dott. Marco Bianchi', role: 'HR Manager', email: 'marco.bianchi@dhl.it', accessRole: 'admin', team: 'it' },
       ],
       docTypes: [
         { id: uid(), name: 'Diploma di Laurea in Infermieristica', language: 'ES' },
@@ -502,6 +498,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
   // Backfill fields added in later versions so older saved states keep working.
   const PERSONAL_FIELDS = ['cedula', 'birthDate', 'birthPlace', 'nationality', 'maritalStatus', 'phone', 'email', 'address'];
+  // Migration map: legacy 11-state workflow → new 9-phase / two-team workflow.
+  const OLD_TO_NEW_STEP = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 4, 9: 4, 10: 5, 11: DONE_STEP };
   function normalizeState(s) {
     if (!s.settings) s.settings = defaultSettings();
     ['agencies', 'employers', 'operators', 'docTypes'].forEach((k) => { if (!Array.isArray(s.settings[k])) s.settings[k] = []; });
@@ -519,8 +517,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const syncFlag = (d) => { const f = flagByName[(d.name || '').toLowerCase()]; if (f !== undefined) d.optional = f; };
     s.settings.docTypes.forEach(syncFlag);
     (s.nurses || []).forEach((n) => { (n.documents || []).forEach(syncFlag); });
+    // Legacy filter keys that no longer exist.
+    if (s.statusFilter === 'opi') s.statusFilter = 'all';
+    // Backfill the team field on operators saved before the two-team structure.
+    (s.settings.operators || []).forEach((o) => { if (o.team === undefined) o.team = ''; });
     // Backfill the personal anagrafica fields and document slots on every saved nurse.
     (s.nurses || []).forEach((n) => {
+      // Migrate nurses saved with the legacy 11-state workflow: their checklist still
+      // has the old keys 10/11. Map the step and rebuild the checklist on the new
+      // 9-phase templates (phases below the current one are marked as done).
+      if (n.checklist && (n.checklist[10] || n.checklist[11])) {
+        n.currentStep = OLD_TO_NEW_STEP[n.currentStep] || Math.min(n.currentStep || 1, DONE_STEP);
+        n.checklist = makeChecklist({ __current: n.currentStep });
+      }
       PERSONAL_FIELDS.forEach((k) => { if (n[k] === undefined) n[k] = ''; });
       // The legacy "origin" field was superseded by birth place + nationality:
       // migrate its value into the birth place (when empty) and drop it.
@@ -590,6 +599,32 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     return state.demoRole || 'admin';
   }
   function isAdmin() { return currentRole() === 'admin'; }
+
+  // ---------- Operator teams (RD / Italy) ----------
+  function teamLabel(team) { return team === 'rd' ? t('team_rd') : (team === 'it' ? t('team_it') : ''); }
+  function teamFlag(team) { return team === 'rd' ? '🇩🇴' : (team === 'it' ? '🇮🇹' : ''); }
+  function operatorByName(name) {
+    const k = (name || '').trim().toLowerCase();
+    if (!k) return null;
+    return (state.settings.operators || []).find((o) => (o.name || '').trim().toLowerCase() === k) || null;
+  }
+  // The operator record of whoever is using the app: matched by email in cloud mode,
+  // by the locally saved operator name in demo mode.
+  function currentOperator() {
+    if (fbEnabled && currentUser) {
+      const email = (currentUser.email || '').toLowerCase();
+      if (email) {
+        const op = (state.settings.operators || []).find((o) => (o.email || '').toLowerCase() === email);
+        if (op) return op;
+      }
+      return operatorByName(currentUser.displayName || '');
+    }
+    return operatorByName(localOperatorName());
+  }
+  function myTeam() {
+    const op = currentOperator();
+    return op && (op.team === 'rd' || op.team === 'it') ? op.team : null;
+  }
   function setDemoRole(role) {
     if (role !== 'admin' && role !== 'operator') return;
     state.demoRole = role;
@@ -598,26 +633,25 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   function deriveStatus(nurse) {
-    if (nurse.currentStep >= 11) return 'Onboarding Completed';
+    if (nurse.currentStep >= DONE_STEP) return 'Onboarding Completed';
     // Optional documents (language/criminal/health certificates) never flag the case.
     if (nurse.documents.some((d) => d.status === 'missing' && !d.optional)) return 'Missing Docs';
-    if (nurse.currentStep === 8) return 'Visa Obtained';
+    // Italy-team phases (5-9): the candidate has arrived and is being placed/assisted.
+    if (nurse.currentStep >= FIRST_ITALY_STEP) return 'Visa Obtained';
     return 'In Progress';
   }
 
   function blockers(nurse) {
     // Returns array of human-readable reasons the case cannot advance. Empty => can advance.
     const reasons = [];
-    if (nurse.currentStep >= 11) { reasons.push(t('bl_done')); return reasons; }
+    if (nurse.currentStep >= DONE_STEP) { reasons.push(t('bl_done')); return reasons; }
     const items = nurse.checklist[nurse.currentStep] || [];
     const pending = items.filter((i) => !i.done);
     pending.forEach((i) => reasons.push(t('bl_checklist', { x: checklistLabel(i.step, i.idx) })));
-    if (nurse.currentStep === STEP_REQUIRES_NO_MISSING_DOCS) {
+    if (nurse.currentStep === STEP_REQUIRES_ALL_DOCS_APPROVED) {
       const miss = nurse.documents.filter((d) => d.status === 'missing' && !d.optional);
       miss.forEach((d) => reasons.push(t('bl_doc_missing', { x: d.name })));
-    }
-    if (nurse.currentStep === STEP_REQUIRES_ALL_DOCS_APPROVED) {
-      const notOk = nurse.documents.filter((d) => d.status !== 'approved' && !d.optional);
+      const notOk = nurse.documents.filter((d) => d.status === 'pending' && !d.optional);
       notOk.forEach((d) => reasons.push(t('bl_doc_approve', { x: d.name })));
     }
     return reasons;
@@ -625,26 +659,26 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function canAdvance(nurse) { return blockers(nurse).length === 0; }
 
   function isAtRisk(nurse) {
-    if (nurse.currentStep >= 11) return false;
+    if (nurse.currentStep >= DONE_STEP) return false;
     const sla = STEP_SLA_DAYS[nurse.currentStep] || 30;
     return daysBetween(nurse.lastUpdate) > sla;
   }
 
-  // A candidate is considered "sent to Italy" once they arrive in Italy (step 10) or complete onboarding (step 11).
-  const SENT_TO_ITALY_STEP = 10;
+  // A candidate is considered "sent to Italy" once the Italy team takes over (phase 5, arrival).
+  const SENT_TO_ITALY_STEP = FIRST_ITALY_STEP;
 
   function computeKpis() {
-    const active = state.nurses.filter((n) => n.currentStep < 11).length;
+    const active = state.nurses.filter((n) => n.currentStep < DONE_STEP).length;
     const missing = state.nurses.filter((n) => n.documents.some((d) => d.status === 'missing' && !d.optional)).length;
-    // Pending OPI: cases that obtained the visa or are at the OPI-registration step.
-    const opi = state.nurses.filter((n) => n.currentStep === 8 || n.currentStep === 9).length;
-    const completed = state.nurses.filter((n) => n.currentStep >= 11).length;
+    // Matching phase: cases being matched with a healthcare facility request.
+    const matching = state.nurses.filter((n) => n.currentStep === 7).length;
+    const completed = state.nurses.filter((n) => n.currentStep >= DONE_STEP).length;
     const expiring = computeExpiring().length;
     // Transfer summary: total under management, sent to Italy, still to send.
     const treating = state.nurses.length;
     const sent = state.nurses.filter((n) => n.currentStep >= SENT_TO_ITALY_STEP).length;
     const toSend = state.nurses.filter((n) => n.currentStep < SENT_TO_ITALY_STEP).length;
-    return { active, missing, opi, completed, expiring, treating, sent, toSend };
+    return { active, missing, matching, completed, expiring, treating, sent, toSend };
   }
 
   // Documents that are expired or expiring within 60 days, across all candidates.
@@ -667,7 +701,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       const key = n.employer || 'Non assegnato';
       if (!map[key]) map[key] = { total: 0, completed: 0, active: 0 };
       map[key].total++;
-      if (n.currentStep >= 11) map[key].completed++; else map[key].active++;
+      if (n.currentStep >= DONE_STEP) map[key].completed++; else map[key].active++;
     });
     return Object.entries(map).map(([employer, v]) => ({ employer, ...v }))
       .sort((a, b) => b.total - a.total);
@@ -778,11 +812,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function advanceStatus(nurseId) {
     const n = getNurse(nurseId);
     if (!canAdvance(n)) return;
-    if (n.currentStep >= 11) return;
+    if (n.currentStep >= DONE_STEP) return;
     const from = stepName(n.currentStep);
     n.currentStep += 1;
     n.lastUpdate = new Date().toISOString().slice(0, 10);
-    pushLog(n, 'system', t('log_author_system'), t('log_advanced', { from: from, to: stepName(n.currentStep) }));
+    const to = n.currentStep >= DONE_STEP ? t('state_done') : stepName(n.currentStep);
+    pushLog(n, 'system', t('log_author_system'), t('log_advanced', { from: from, to: to }));
     commit();
   }
 
@@ -1027,12 +1062,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
   function exportCandidatesCsv() {
     if (!isAdmin()) return;
-    const headers = ['Nome', 'Passaporto', 'Luogo di nascita', 'Nazionalità', 'Agenzia', 'Livello linguistico', 'Datore di lavoro', 'Referente HR', 'Step', 'Stato', 'Ultimo aggiornamento', 'Documenti approvati', 'Documenti totali'];
+    const headers = ['Nome', 'Passaporto', 'Luogo di nascita', 'Nazionalità', 'Agenzia', 'Livello linguistico', 'Datore di lavoro', 'Referente HR', 'Fase', 'Team', 'Stato', 'Ultimo aggiornamento', 'Documenti approvati', 'Documenti totali'];
     const lines = [headers.map(csvCell).join(',')];
     state.nurses.forEach((n) => {
       const appr = (n.documents || []).filter((d) => d.status === 'approved').length;
+      const fase = Math.min(n.currentStep, LAST_STEP) + '/9';
+      const team = n.currentStep >= DONE_STEP ? '—' : t(stepTeam(n.currentStep) === 'rd' ? 'team_rd' : 'team_it');
       lines.push([n.name, n.passport, n.birthPlace, n.nationality, n.partnerAgency, n.languageLevel, n.employer, n.hrReferent,
-        n.currentStep + '/11', statusLabel(deriveStatus(n)), n.lastUpdate, appr, (n.documents || []).length].map(csvCell).join(','));
+        fase, team, statusLabel(deriveStatus(n)), n.lastUpdate, appr, (n.documents || []).length].map(csvCell).join(','));
     });
     // BOM so Excel opens UTF-8 correctly.
     downloadFile('candidati.csv', '﻿' + lines.join('\r\n'), 'text/csv;charset=utf-8');
@@ -1193,13 +1230,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
   function agencyOptions() { return (state.settings.agencies || []).map((a) => a.name); }
   function employerOptions() { return (state.settings.employers || []).map((e) => e.name + (e.city ? ' · ' + e.city : '')); }
-  function operatorOptions() { return (state.settings.operators || []).map((o) => o.name); }
+  function operatorOptions() {
+    // Value stays the plain name (stored as hrReferent); the label shows the team.
+    return (state.settings.operators || []).map((o) => o.team ? { value: o.name, label: o.name + ' · ' + teamFlag(o.team) + ' ' + teamLabel(o.team) } : o.name);
+  }
 
   // ---------- Settings: manage base records (agencies, employers, operators) ----------
   const ENTITY_FIELDS = {
     agencies: [{ key: 'name', label: 'f_name', req: true }, { key: 'country', label: 'f_country' }, { key: 'contact', label: 'f_contact' }],
     employers: [{ key: 'name', label: 'f_name', req: true }, { key: 'city', label: 'f_city' }],
-    operators: [{ key: 'name', label: 'f_name', req: true }, { key: 'role', label: 'f_role' }, { key: 'email', label: 'f_email' }, { key: 'accessRole', label: 'access_role', type: 'select', options: [{ value: 'admin', labelKey: 'role_admin' }, { value: 'operator', labelKey: 'role_operator' }] }],
+    operators: [{ key: 'name', label: 'f_name', req: true }, { key: 'role', label: 'f_role' }, { key: 'email', label: 'f_email' }, { key: 'team', label: 'f_team', type: 'select', options: [{ value: 'rd', labelKey: 'team_rd' }, { value: 'it', labelKey: 'team_it' }] }, { key: 'accessRole', label: 'access_role', type: 'select', options: [{ value: 'admin', labelKey: 'role_admin' }, { value: 'operator', labelKey: 'role_operator' }] }],
     docTypes: [{ key: 'name', label: 'f_name', req: true }, { key: 'language', label: 'ad_lang', type: 'select', options: ['ES', 'IT'] }],
   };
   const ENTITY_META = {
@@ -1525,9 +1565,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
   function manualHtml() {
     const TOC = {
-      it: [['intro','1. Introduzione'],['accesso','2. Accesso e profilo'],['interfaccia',"3. L'interfaccia"],['dashboard','4. Dashboard Analitica'],['pratiche','5. Gestione Pratiche'],['workflow','6. I 11 stati'],['procedure','7. Usare il gestionale'],['dati','8. Salvataggio dati'],['faq','9. Domande frequenti'],['glossario','10. Glossario']],
-      en: [['intro','1. Introduction'],['accesso','2. Access & profile'],['interfaccia','3. The interface'],['dashboard','4. Analytics Dashboard'],['pratiche','5. Case Management'],['workflow','6. The 11 states'],['procedure','7. Using the app'],['dati','8. Data storage'],['faq','9. FAQ'],['glossario','10. Glossary']],
-      es: [['intro','1. Introducción'],['accesso','2. Acceso y perfil'],['interfaccia','3. La interfaz'],['dashboard','4. Panel Analítico'],['pratiche','5. Gestión de Expedientes'],['workflow','6. Los 11 estados'],['procedure','7. Usar la app'],['dati','8. Almacenamiento'],['faq','9. Preguntas frecuentes'],['glossario','10. Glosario']],
+      it: [['intro','1. Introduzione'],['accesso','2. Accesso e profilo'],['interfaccia',"3. L'interfaccia"],['dashboard','4. Dashboard Analitica'],['pratiche','5. Gestione Pratiche'],['workflow','6. Le 9 fasi e i 2 team'],['procedure','7. Usare il gestionale'],['dati','8. Salvataggio dati'],['faq','9. Domande frequenti'],['glossario','10. Glossario']],
+      en: [['intro','1. Introduction'],['accesso','2. Access & profile'],['interfaccia','3. The interface'],['dashboard','4. Analytics Dashboard'],['pratiche','5. Case Management'],['workflow','6. The 9 phases & 2 teams'],['procedure','7. Using the app'],['dati','8. Data storage'],['faq','9. FAQ'],['glossario','10. Glossary']],
+      es: [['intro','1. Introducción'],['accesso','2. Acceso y perfil'],['interfaccia','3. La interfaz'],['dashboard','4. Panel Analítico'],['pratiche','5. Gestión de Expedientes'],['workflow','6. Las 9 fases y los 2 equipos'],['procedure','7. Usar la app'],['dati','8. Almacenamiento'],['faq','9. Preguntas frecuentes'],['glossario','10. Glosario']],
     };
     const tocItems = TOC[LANG] || TOC.it;
     const toc = tocItems.map((item) => '<a href="#' + item[0] + '" class="toc-link block rounded-lg px-3 py-1.5 text-slate-600 transition hover:bg-slate-50">' + item[1] + '</a>').join('');
@@ -1560,7 +1600,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
       <section id="intro" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="info" class="h-5 w-5 text-indigo-500"></i>1. Introduzione</h2>
-        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses è il gestionale che segue ogni candidato infermiere lungo l'intero percorso burocratico: dall'acquisizione del profilo fino all'inserimento nella struttura sanitaria italiana. Ogni candidato è una <b>pratica</b> che attraversa <b>11 stati sequenziali</b>. Il sistema impedisce di saltare passaggi e segnala le pratiche in ritardo.</p>
+        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses è il gestionale che segue ogni candidato infermiere lungo l'intero percorso: dalla selezione in Repubblica Dominicana fino all'inserimento e all'assistenza nella struttura sanitaria italiana. Ogni candidato è una <b>pratica</b> che attraversa <b>9 fasi sequenziali</b>, divise tra due team: il <b>Team Repubblica Dominicana</b> (fasi 1–4, fino alla partenza) e il <b>Team Italia</b> (fasi 5–9, dall'arrivo in poi). Il sistema impedisce di saltare passaggi e segnala le pratiche in ritardo.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Dashboard Analitica</p><p class="mt-1 text-xs text-slate-500">La visione d'insieme: numeri chiave e allarmi.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Gestione Pratiche</p><p class="mt-1 text-xs text-slate-500">Il lavoro sul singolo candidato.</p></div>
@@ -1612,23 +1652,23 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">In cima alla dashboard trovi il colpo d'occhio richiesto più spesso: <b>quanti infermieri stiamo trattando</b>, quanti sono stati <b>trasferiti in Italia</b> e quanti <b>devono ancora essere trasferiti</b>. Vale sempre la relazione: <b>In Gestione = Trasferiti + Da Trasferire</b>.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">In Gestione</p><p class="mt-1 text-xs text-slate-500">Totale infermieri che stiamo seguendo (tutte le pratiche presenti).</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Trasferiti</p><p class="mt-1 text-xs text-slate-500">Chi è già partito: <b>Arrivo in Italia</b> (stato 10) oppure <b>Onboarding completato</b> (stato 11).</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Da Trasferire</p><p class="mt-1 text-xs text-slate-500">Ancora nel percorso, non ancora partiti (stati 1–9).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Trasferiti</p><p class="mt-1 text-xs text-slate-500">Chi è già in Italia: fasi del <b>Team Italia</b> (5–9) o percorso completato.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Da Trasferire</p><p class="mt-1 text-xs text-slate-500">Ancora seguiti dal <b>Team Rep. Dominicana</b> (fasi 1–4).</p></div>
         </div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Suggerimento.</b> Ogni riquadro è <b>cliccabile</b>: ti porta direttamente in <b>Gestione Pratiche</b> già filtrato (es. "Trasferiti" mostra solo chi è partito).</div>
         <h3 id="kpi" class="pt-2 text-base font-bold text-slate-800">4.2 · Indicatori chiave (KPI)</h3>
         <p class="text-sm leading-relaxed text-slate-600"><b>Tutti i KPI sono cliccabili</b> e aprono la sezione corrispondente già filtrata.</p>
         <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Pratiche Attive</p><p class="mt-1 text-xs text-slate-500">Candidati in lavorazione (stati 1–10). → apre le pratiche attive.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Pratiche Attive</p><p class="mt-1 text-xs text-slate-500">Candidati in lavorazione (fasi 1–9). → apre le pratiche attive.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Documenti Mancanti</p><p class="mt-1 text-xs text-slate-500">Con almeno un documento da caricare. → apre le pratiche con doc. mancanti.</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">In attesa OPI</p><p class="mt-1 text-xs text-slate-500">Pronti o in iscrizione all'albo OPI. → apre le pratiche in attesa OPI.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">In Matching</p><p class="mt-1 text-xs text-slate-500">In abbinamento con le richieste delle strutture (fase 7). → apre le pratiche in matching.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Doc. in Scadenza</p><p class="mt-1 text-xs text-slate-500">Scaduti o entro 60 giorni. → apre l'Archivio Documenti filtrato.</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Onboarding Completati</p><p class="mt-1 text-xs text-slate-500">Percorso concluso. → apre le pratiche completate.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Percorsi Completati</p><p class="mt-1 text-xs text-slate-500">Percorso concluso. → apre le pratiche completate.</p></div>
         </div>
         <h3 id="rischio" class="pt-2 text-base font-bold text-slate-800">4.3 · Semafori di Rischio e Scadenze</h3>
         <p class="text-sm leading-relaxed text-slate-600">Elenca le pratiche ferme <b>troppo a lungo</b> nello stato attuale, e un pannello con i <b>documenti in scadenza/scaduti</b>. <b>Azione:</b> clicca la riga per aprire la pratica; il KPI "Doc. in Scadenza" apre l'archivio filtrato.</p>
         <h3 id="strutture" class="pt-2 text-base font-bold text-slate-800">4.4 · Candidati per Struttura</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Mostra quanti candidati sono assegnati a ciascun datore di lavoro e quanti hanno completato l'onboarding. In fondo, la distribuzione nei 11 stati.</p>
+        <p class="text-sm leading-relaxed text-slate-600">Mostra quanti candidati sono assegnati a ciascun datore di lavoro e quanti hanno concluso il percorso. In fondo, la distribuzione nelle 9 fasi, raggruppate per team.</p>
       </section>
 
       <section id="pratiche" class="space-y-4">
@@ -1637,40 +1677,43 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · Elenco e ricerca</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Ricerca:</b> per nome, passaporto o struttura di destinazione.</li>
-          <li><b>Filtri di stato:</b> Tutti, <b>Trasferiti</b>, <b>Da Trasferire</b>, A rischio, Doc. Mancanti, In corso, Visto, Completati. Arrivando da un KPI (es. "In attesa OPI") compare un filtro temporaneo evidenziato, con la ✕ per rimuoverlo.</li>
-          <li><b>Scheda:</b> mostra badge di stato, livello linguistico e step. L'icona ⏰ segnala un rischio ritardo.</li>
+          <li><b>Filtri di stato:</b> Tutti, <b>Trasferiti</b>, <b>Da Trasferire</b>, A rischio, Doc. Mancanti, In corso, Fase Italia, Completati. Arrivando da un KPI (es. "In Matching") compare un filtro temporaneo evidenziato, con la ✕ per rimuoverlo.</li>
+          <li><b>Filtro "Il mio team":</b> se in <b>Impostazioni → Operatori HR</b> il tuo profilo ha un Team assegnato (Rep. Dominicana o Italia), compare un filtro dedicato che mostra solo i candidati nelle fasi del tuo team. L'abbinamento avviene tramite l'email di accesso (o il nome operatore in modalità demo).</li>
+          <li><b>Scheda:</b> mostra badge di stato, livello linguistico e fase. L'icona ⏰ segnala un rischio ritardo.</li>
         </ul>
-        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · Lo stepper (timeline 11 stati)</h3>
-        <p class="text-sm leading-relaxed text-slate-600">I colori: <span class="font-semibold text-emerald-600">verde</span> = completato, <span class="font-semibold text-indigo-600">indaco</span> = in corso, <span class="font-semibold text-amber-600">ambra</span> = bloccato, grigio = da fare.</p>
-        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · Il pulsante "Avanza Stato"</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Porta la pratica allo stato successivo. <b>Si sblocca solo</b> quando checklist e documenti del passo corrente sono soddisfatti; in caso contrario, sopra il pulsante compare l'elenco dei requisiti mancanti.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · Lo stepper (timeline 9 fasi · 2 team)</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Sopra la timeline, due bande indicano il team responsabile: <b>🇩🇴 Team Rep. Dominicana</b> (fasi 1–4) e <b>🇮🇹 Team Italia</b> (fasi 5–9). I colori dei cerchi: <span class="font-semibold text-emerald-600">verde</span> = completata, <span class="font-semibold text-indigo-600">indaco</span> = in corso, <span class="font-semibold text-amber-600">ambra</span> = bloccata, grigio = da fare.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · Il pulsante "Avanza Fase"</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Porta la pratica alla fase successiva. <b>Si sblocca solo</b> quando checklist e documenti della fase corrente sono soddisfatti; in caso contrario, sopra il pulsante compare l'elenco dei requisiti mancanti.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">5.4 · Documenti, checklist, logistica, log</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Documenti:</b> stati Approvato / In Verifica / Mancante; azioni Carica, Approva, Respingi, Aggiungi.</li>
-          <li><b>Checklist:</b> attività obbligatorie del passo corrente, cambia a ogni avanzamento.</li>
+          <li><b>Checklist:</b> attività obbligatorie della fase corrente, cambia a ogni avanzamento.</li>
           <li><b>Logistica &amp; Onboarding HR:</b> volo, alloggio, tutor, contratto.</li>
           <li><b>Log &amp; audit trail:</b> note, chiamate e avvisi con data e autore.</li>
         </ul>
       </section>
 
       <section id="workflow" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. I 11 stati del workflow</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. Le 9 fasi e i 2 team</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Il progetto è organizzato su una chiara suddivisione geografica e operativa. Il <b>Team Repubblica Dominicana</b> segue il candidato fino alla partenza (fasi 1–4); il <b>Team Italia</b> subentra all'arrivo e cura logistica, matching lavorativo e stabilità (fasi 5–9). Il coordinamento avviene tramite l'aggiornamento costante di documenti e checklist nel gestionale.</p>
         <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
-          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Stato</th><th class="px-3 py-2">Cosa fare</th></tr></thead>
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Fase</th><th class="px-3 py-2">Cosa fare</th></tr></thead>
           <tbody class="divide-y divide-slate-100 align-top">
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Candidato acquisito</td><td class="px-3 py-2.5 text-slate-600">Dati anagrafici, mandato agenzia, valutazione linguistica.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Documenti mancanti</td><td class="px-3 py-2.5 text-slate-600">Caricamento di diploma, certificato, traduzione, legalizzazione.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Documenti verificati</td><td class="px-3 py-2.5 text-slate-600">Verifica e approvazione di tutti i documenti.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Pratica inviata</td><td class="px-3 py-2.5 text-slate-600">Invio telematico al Ministero della Salute.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Integrazione richiesta</td><td class="px-3 py-2.5 text-slate-600">Invio documenti integrativi richiesti.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Titolo riconosciuto</td><td class="px-3 py-2.5 text-slate-600">Ricezione decreto di riconoscimento.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Nulla osta richiesto</td><td class="px-3 py-2.5 text-slate-600">Richiesta nulla osta allo SUI, conferma datore.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Visto ottenuto</td><td class="px-3 py-2.5 text-slate-600">Appuntamento consolato e rilascio visto.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Iscrizione OPI</td><td class="px-3 py-2.5 text-slate-600">Domanda, pagamento quota, iscrizione albo.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">10</td><td class="px-3 py-2.5 font-medium text-slate-700">Arrivo in Italia</td><td class="px-3 py-2.5 text-slate-600">Volo, alloggio, permesso di soggiorno.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">11</td><td class="px-3 py-2.5 font-medium text-slate-700">Onboarding completato</td><td class="px-3 py-2.5 text-slate-600">Contratto, tutor, inserimento in struttura.</td></tr>
+            <tr class="bg-sky-50"><td colspan="3" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">🇩🇴 Team Repubblica Dominicana — dalla selezione alla partenza</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Selezione e Reclutamento</td><td class="px-3 py-2.5 text-slate-600">Solo strutture riconosciute dal governo dominicano; verifica di competenze e specializzazioni infermieristiche, dati anagrafici, valutazione linguistica.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Gestione Documentale</td><td class="px-3 py-2.5 text-slate-600">La fase cruciale, gestita tramite l'app: titoli tradotti e asseverati, apostille, riconoscimento del Ministero, nulla osta, visto e iscrizione OPI. Non si avanza finché ogni documento richiesto non è caricato e approvato.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Formazione</td><td class="px-3 py-2.5 text-slate-600">Contenuti digitali e incontri (online o in presenza) sul modello «Italia in tasca», con assistenza diretta durante il percorso.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Organizzazione Viaggio</td><td class="px-3 py-2.5 text-slate-600">Acquisto del biglietto aereo e trasferimento all'aeroporto in territorio dominicano.</td></tr>
+            <tr class="bg-emerald-50"><td colspan="3" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">🇮🇹 Team Italia — dall'arrivo alla piena integrazione</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Arrivo in Italia</td><td class="px-3 py-2.5 text-slate-600">Accoglienza in aeroporto e trasferimento verso l'alloggio prestabilito.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Domicilio e Servizi</td><td class="px-3 py-2.5 text-slate-600">Contratto individuale di alloggio (sui contratti quadro già stipulati), attivazione servizi, permesso di soggiorno.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Matching</td><td class="px-3 py-2.5 text-slate-600">Ricezione delle richieste dalle strutture sanitarie e incrocio mirato con le competenze e specializzazioni caricate dal Team Dominicana: l'inserimento non è generico ma su misura del reparto.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Rapporto di Lavoro</td><td class="px-3 py-2.5 text-slate-600">Identificazione del datore, firma del contratto, gestione continua della relazione (controversie, welfare aziendale).</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Tutor e Assistenza</td><td class="px-3 py-2.5 text-slate-600">Tutor, servizi socio-culturali e assistenza legale/fiscale a condizioni agevolate per le questioni extra-lavorative.</td></tr>
           </tbody>
         </table></div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Una tantum vs operativo.</b> Alcune attività dei team sono accordi quadro <b>una tantum</b> (convenzioni con agenzie riconosciute, contratti quadro per gli alloggi, contrattualizzazione preventiva delle aziende, convenzioni con professionisti legali/fiscali) e non compaiono nella checklist del singolo candidato: la checklist contiene solo le attività <b>operative</b> da ripetere per ogni pratica.</div>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -1679,8 +1722,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <p class="text-sm font-bold text-indigo-800">Il flusso completo in 6 passi</p>
           <ol class="prose-list mt-1 ml-5 list-decimal text-sm text-indigo-900/80">
             <li><b>Accedi</b> con il tuo account.</li><li><b>Crea l'anagrafica</b> del candidato (procedura 1).</li>
-            <li><b>Inserisci e approva i documenti</b> (procedure 2 e 3).</li><li><b>Spunta la checklist</b> del passo corrente.</li>
-            <li><b>Avanza lo stato</b> quando il pulsante si sblocca (procedura 4).</li><li><b>Registra le comunicazioni</b> e controlla i semafori (5 e 6).</li>
+            <li><b>Inserisci e approva i documenti</b> (procedure 2 e 3).</li><li><b>Spunta la checklist</b> della fase corrente.</li>
+            <li><b>Avanza la fase</b> quando il pulsante si sblocca (procedura 4).</li><li><b>Registra le comunicazioni</b> e controlla i semafori (5 e 6).</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -1689,7 +1732,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li>Vai sulla vista <b>Gestione Pratiche</b>.</li>
             <li>In cima all'elenco, premi <b>Nuovo Candidato</b>.</li>
             <li>Compila i campi. <b>Nome e Passaporto</b> sono obbligatori (*); gli altri facoltativi.</li>
-            <li>Premi <b>Crea candidato</b>: la pratica si apre allo stato <b>1 · Candidato acquisito</b> con i documenti standard già predisposti.</li>
+            <li>Premi <b>Crea candidato</b>: la pratica si apre alla fase <b>1 · Selezione e Reclutamento</b> con i documenti standard già predisposti.</li>
           </ol>
           <p class="mt-2 text-xs text-slate-400">Per chiudere senza salvare: <b>Annulla</b>, tasto <b>Esc</b> o click fuori dal riquadro.</p>
         </div>
@@ -1713,8 +1756,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <div class="rounded-xl border border-slate-200 bg-white p-5">
           <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>Far avanzare una pratica</p>
           <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
-            <li>Spunta la <b>Checklist</b> del passo corrente.</li><li>Verifica che i documenti siano <b>Approvati</b>.</li>
-            <li>Completa gli eventuali <b>requisiti mancanti</b> indicati.</li><li>Premi <b>Avanza Stato</b>.</li>
+            <li>Spunta la <b>Checklist</b> della fase corrente.</li><li>Verifica che i documenti siano <b>Approvati</b>.</li>
+            <li>Completa gli eventuali <b>requisiti mancanti</b> indicati.</li><li>Premi <b>Avanza Fase</b>.</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -1758,9 +1801,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       <section id="faq" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="help-circle" class="h-5 w-5 text-indigo-500"></i>9. Domande frequenti</h2>
         <div class="space-y-2">
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché "Avanza Stato" è grigio?</summary><p class="mt-2 text-slate-600">Mancano requisiti nello stato corrente: spunta la checklist e approva i documenti elencati sopra il pulsante.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché "Avanza Fase" è grigio?</summary><p class="mt-2 text-slate-600">Mancano requisiti nella fase corrente: spunta la checklist e approva i documenti elencati sopra il pulsante.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Ho approvato un documento per errore.</summary><p class="mt-2 text-slate-600">Premi <b>Respingi</b> sullo stesso documento: torna "Mancante" e l'azione resta nel log.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Posso tornare a uno stato precedente?</summary><p class="mt-2 text-slate-600">Il flusso è pensato per avanzare. Agisci su documenti/checklist e annota la motivazione nel log; per casi particolari contatta l'amministratore.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Posso tornare a una fase precedente?</summary><p class="mt-2 text-slate-600">Il flusso è pensato per avanzare. Agisci su documenti/checklist e annota la motivazione nel log; per casi particolari contatta l'amministratore.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Cosa fa "Ripristina"?</summary><p class="mt-2 text-slate-600">Riporta ai 3 profili demo e cancella le modifiche locali. Usalo solo per dimostrazioni/formazione.</p></details>
         </div>
       </section>
@@ -1773,7 +1816,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Legalizzazione / Apostille</td><td class="px-4 py-2.5 text-slate-600">Certificazione che rende valido in Italia un documento straniero.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Nulla osta</td><td class="px-4 py-2.5 text-slate-600">Autorizzazione al lavoro dello Sportello Unico Immigrazione (SUI).</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Decreto di riconoscimento</td><td class="px-4 py-2.5 text-slate-600">Provvedimento che riconosce il titolo estero di infermiere.</td></tr>
-          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Tempo massimo previsto per uno stato; superarlo accende il semaforo.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Tempo massimo previsto per una fase; superarlo accende il semaforo.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Matching</td><td class="px-4 py-2.5 text-slate-600">Incrocio tra le richieste delle strutture sanitarie e le competenze/specializzazioni dei candidati registrate nel gestionale.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Una tantum / Operativo</td><td class="px-4 py-2.5 text-slate-600">Accordi quadro stipulati una sola volta (agenzie, alloggi, aziende, professionisti) vs attività ripetute per ogni candidato.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Audit trail</td><td class="px-4 py-2.5 text-slate-600">Registro tracciabile di tutte le azioni e comunicazioni.</td></tr>
         </tbody></table></div>
       </section>
@@ -1792,7 +1837,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
       <section id="intro" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="info" class="h-5 w-5 text-indigo-500"></i>1. Introduction</h2>
-        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses tracks each nurse candidate along the entire bureaucratic path: from acquiring the profile to integration into an Italian facility. Each candidate is a <b>case</b> that goes through <b>11 sequential states</b>. The system prevents skipping steps and flags overdue cases.</p>
+        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses tracks each nurse candidate along the entire path: from selection in the Dominican Republic to placement and support in an Italian facility. Each candidate is a <b>case</b> that goes through <b>9 sequential phases</b>, split between two teams: the <b>Dominican Republic Team</b> (phases 1–4, up to departure) and the <b>Italy Team</b> (phases 5–9, from arrival onwards). The system prevents skipping steps and flags overdue cases.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Analytics Dashboard</p><p class="mt-1 text-xs text-slate-500">The overview: key numbers and alerts.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Case Management</p><p class="mt-1 text-xs text-slate-500">Work on a single candidate.</p></div>
@@ -1845,16 +1890,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">At the top you get the most-asked figures at a glance: <b>how many nurses we are handling</b>, how many have been <b>transferred to Italy</b>, and how many <b>still have to be transferred</b>. The relationship always holds: <b>Under Management = Transferred + To Transfer</b>.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Under Management</p><p class="mt-1 text-xs text-slate-500">Total nurses we are handling (all existing cases).</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Transferred</p><p class="mt-1 text-xs text-slate-500">Already departed: <b>Arrival in Italy</b> (state 10) or <b>Onboarding completed</b> (state 11).</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">To Transfer</p><p class="mt-1 text-xs text-slate-500">Still in the pipeline, not yet departed (states 1–9).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Transferred</p><p class="mt-1 text-xs text-slate-500">Already in Italy: <b>Italy Team</b> phases (5–9) or path completed.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">To Transfer</p><p class="mt-1 text-xs text-slate-500">Still with the <b>Dominican Republic Team</b> (phases 1–4).</p></div>
         </div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Tip.</b> Each tile is <b>clickable</b>: it opens <b>Case Management</b> already filtered (e.g. "Transferred" shows only those who departed).</div>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.2 · Key indicators (KPI)</h3>
-        <p class="text-sm leading-relaxed text-slate-600"><b>All KPIs are clickable</b> and open the matching section already filtered: Active Cases, Missing Documents, Awaiting OPI, Expiring Docs, Onboarding Completed.</p>
+        <p class="text-sm leading-relaxed text-slate-600"><b>All KPIs are clickable</b> and open the corresponding section already filtered: Active Cases, Missing Documents, In Matching, Expiring Docs, Paths Completed.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.3 · Risk alerts &amp; expiries</h3>
         <p class="text-sm leading-relaxed text-slate-600">Lists cases stuck <b>too long</b> in their current state, plus a panel of <b>expiring/expired documents</b>. <b>Action:</b> click a row to open the case; the "Expiring Docs" KPI opens the filtered archive.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.4 · Candidates per facility</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Shows how many candidates are assigned to each employer and how many have completed onboarding, plus the distribution across the 11 states.</p>
+        <p class="text-sm leading-relaxed text-slate-600">Shows how many candidates are assigned to each employer and how many have completed the path, plus the distribution across the 9 phases, grouped by team.</p>
       </section>
 
       <section id="pratiche" class="space-y-4">
@@ -1863,40 +1908,43 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · List and search</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Search:</b> by name, passport or destination facility.</li>
-          <li><b>Status filters:</b> All, <b>Transferred</b>, <b>To transfer</b>, At risk, Missing Docs, In progress, Visa, Completed. Coming from a KPI (e.g. "Awaiting OPI") a temporary highlighted filter appears, with an ✕ to clear it.</li>
-          <li><b>Card:</b> shows the status badge, language level and step. The ⏰ icon flags a delay risk.</li>
+          <li><b>Status filters:</b> All, <b>Transferred</b>, <b>To transfer</b>, At risk, Missing Docs, In progress, Italy Phase, Completed. Coming from a KPI (e.g. "In Matching") a temporary highlighted filter appears, with an ✕ to clear it.</li>
+          <li><b>"My team" filter:</b> if your profile in <b>Settings → HR Operators</b> has a Team assigned (Dominican Republic or Italy), a dedicated filter appears showing only candidates in your team's phases. Matching is done via the sign-in email (or the operator name in demo mode).</li>
+          <li><b>Card:</b> shows the status badge, language level and phase. The ⏰ icon flags a delay risk.</li>
         </ul>
-        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · The stepper (11-state timeline)</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Colours: <span class="font-semibold text-emerald-600">green</span> = completed, <span class="font-semibold text-indigo-600">indigo</span> = current, <span class="font-semibold text-amber-600">amber</span> = blocked, grey = to do.</p>
-        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · The "Advance State" button</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Moves the case to the next state. It <b>unlocks only</b> when the current step's checklist and documents are satisfied; otherwise the missing requirements are listed above the button.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · The stepper (9 phases · 2 teams)</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Above the timeline, two bands show the team in charge: <b>🇩🇴 Dominican Republic Team</b> (phases 1–4) and <b>🇮🇹 Italy Team</b> (phases 5–9). Circle colours: <span class="font-semibold text-emerald-600">green</span> = completed, <span class="font-semibold text-indigo-600">indigo</span> = current, <span class="font-semibold text-amber-600">amber</span> = blocked, grey = to do.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · The "Advance Phase" button</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Moves the case to the next phase. It <b>unlocks only</b> when the current phase's checklist and documents are satisfied; otherwise the missing requirements are listed above the button.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">5.4 · Documents, checklist, logistics, log</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Documents:</b> statuses Approved / Under Review / Missing; actions Upload, Approve, Reject, Add.</li>
-          <li><b>Checklist:</b> mandatory tasks for the current step, changing on each advance.</li>
+          <li><b>Checklist:</b> mandatory tasks for the current phase, changing on each advance.</li>
           <li><b>Logistics &amp; HR Onboarding:</b> flight, housing, tutor, contract.</li>
           <li><b>Log &amp; audit trail:</b> notes, calls and alerts with date and author.</li>
         </ul>
       </section>
 
       <section id="workflow" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. The 11 workflow states</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. The 9 phases &amp; the 2 teams</h2>
+        <p class="text-sm leading-relaxed text-slate-600">The project is organised around a clear geographical and operational split. The <b>Dominican Republic Team</b> follows the candidate up to departure (phases 1–4); the <b>Italy Team</b> takes over on arrival, handling logistics, job matching and stability (phases 5–9). Coordination happens through the constant update of documents and checklists in the app.</p>
         <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
-          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">State</th><th class="px-3 py-2">What to do</th></tr></thead>
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Phase</th><th class="px-3 py-2">What to do</th></tr></thead>
           <tbody class="divide-y divide-slate-100 align-top">
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Candidate acquired</td><td class="px-3 py-2.5 text-slate-600">Personal data, agency mandate, language assessment.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Documents missing</td><td class="px-3 py-2.5 text-slate-600">Upload degree, certificate, sworn translation, legalisation.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Documents verified</td><td class="px-3 py-2.5 text-slate-600">Verify and approve all documents.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Application submitted</td><td class="px-3 py-2.5 text-slate-600">Online submission to the Ministry of Health.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Integration requested</td><td class="px-3 py-2.5 text-slate-600">Send requested supplementary documents.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Qualification recognised</td><td class="px-3 py-2.5 text-slate-600">Receive the recognition decree.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Clearance requested</td><td class="px-3 py-2.5 text-slate-600">Request clearance from the Immigration desk, confirm employer.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Visa obtained</td><td class="px-3 py-2.5 text-slate-600">Consulate appointment and visa issue.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">OPI registration</td><td class="px-3 py-2.5 text-slate-600">Application, fee payment, register enrolment.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">10</td><td class="px-3 py-2.5 font-medium text-slate-700">Arrival in Italy</td><td class="px-3 py-2.5 text-slate-600">Flight, housing, residence permit.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">11</td><td class="px-3 py-2.5 font-medium text-slate-700">Onboarding completed</td><td class="px-3 py-2.5 text-slate-600">Contract, tutor, integration in the facility.</td></tr>
+            <tr class="bg-sky-50"><td colspan="3" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">🇩🇴 Dominican Republic Team — from selection to departure</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Selection &amp; Recruitment</td><td class="px-3 py-2.5 text-slate-600">Only government-recognised structures; verify nursing skills and specialisations, personal data, language assessment.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Document Management</td><td class="px-3 py-2.5 text-slate-600">The crucial phase, run through the app: sworn-translated qualifications, apostille, Ministry recognition, clearance, visa and OPI registration. You cannot advance until every required document is uploaded and approved.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Training</td><td class="px-3 py-2.5 text-slate-600">Digital content and meetings (online or in person) based on the «Italia in tasca» model, with direct support along the way.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Travel Arrangements</td><td class="px-3 py-2.5 text-slate-600">Flight ticket purchase and transfer to the airport in the Dominican Republic.</td></tr>
+            <tr class="bg-emerald-50"><td colspan="3" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">🇮🇹 Italy Team — from arrival to full integration</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Arrival in Italy</td><td class="px-3 py-2.5 text-slate-600">Airport welcome and transfer to the assigned housing.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Housing &amp; Services</td><td class="px-3 py-2.5 text-slate-600">Individual housing contract (under the framework agreements already in place), services activation, residence permit.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Matching</td><td class="px-3 py-2.5 text-slate-600">Receive facility requests and match them precisely with the skills and specialisations loaded by the Dominican team: the placement is tailored to the ward, not generic.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Employment</td><td class="px-3 py-2.5 text-slate-600">Identify the employer, sign the contract, manage the ongoing relationship (disputes, company welfare).</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Tutoring &amp; Support</td><td class="px-3 py-2.5 text-slate-600">Tutor, socio-cultural services and legal/tax assistance at agreed conditions for non-work matters.</td></tr>
           </tbody>
         </table></div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>One-off vs operational.</b> Some team activities are <b>one-off</b> framework agreements (recognised agencies, housing contracts, pre-contracted employers, legal/tax professionals) and don't appear in a candidate's checklist: the checklist only contains the <b>operational</b> tasks repeated for each case.</div>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -1905,8 +1953,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <p class="text-sm font-bold text-indigo-800">The full flow in 6 steps</p>
           <ol class="prose-list mt-1 ml-5 list-decimal text-sm text-indigo-900/80">
             <li><b>Sign in</b> with your account.</li><li><b>Create the candidate</b> record (procedure 1).</li>
-            <li><b>Add and approve documents</b> (procedures 2 and 3).</li><li><b>Tick the checklist</b> for the current step.</li>
-            <li><b>Advance the state</b> when the button unlocks (procedure 4).</li><li><b>Log communications</b> and watch the risk alerts (5 and 6).</li>
+            <li><b>Add and approve documents</b> (procedures 2 and 3).</li><li><b>Tick the checklist</b> for the current phase.</li>
+            <li><b>Advance the phase</b> when the button unlocks (procedure 4).</li><li><b>Log communications</b> and watch the risk alerts (5 and 6).</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -1915,7 +1963,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li>Go to the <b>Case Management</b> view.</li>
             <li>At the top of the list, press <b>New Candidate</b>.</li>
             <li>Fill in the fields. <b>Name and Passport</b> are required (*); the agency, employer and HR contact are chosen from the lists managed in <b>Settings</b>.</li>
-            <li>Press <b>Create candidate</b>: the case opens at state <b>1 · Candidate acquired</b> with the standard documents prepared.</li>
+            <li>Press <b>Create candidate</b>: the case opens at phase <b>1 · Selection &amp; Recruitment</b> with the standard documents prepared.</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -1938,8 +1986,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <div class="rounded-xl border border-slate-200 bg-white p-5">
           <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>Advance a case</p>
           <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
-            <li>Tick the <b>Checklist</b> for the current step.</li><li>Check the required documents are <b>Approved</b>.</li>
-            <li>Complete any <b>missing requirements</b> listed.</li><li>Press <b>Advance State</b>.</li>
+            <li>Tick the <b>Checklist</b> for the current phase.</li><li>Check the required documents are <b>Approved</b>.</li>
+            <li>Complete any <b>missing requirements</b> listed.</li><li>Press <b>Advance Phase</b>.</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -1983,9 +2031,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       <section id="faq" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="help-circle" class="h-5 w-5 text-indigo-500"></i>9. FAQ</h2>
         <div class="space-y-2">
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why is "Advance State" greyed out?</summary><p class="mt-2 text-slate-600">Requirements are missing in the current state: tick the checklist and approve the documents listed above the button.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why is "Advance Phase" greyed out?</summary><p class="mt-2 text-slate-600">Requirements are missing in the current phase: tick the checklist and approve the documents listed above the button.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">I approved a document by mistake.</summary><p class="mt-2 text-slate-600">Press <b>Reject</b> on the same document: it returns to "Missing" and the action stays in the log.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Can I go back to a previous state?</summary><p class="mt-2 text-slate-600">The flow is designed to advance. Act on documents/checklist and note the reason in the log; for special cases contact the administrator.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Can I go back to a previous phase?</summary><p class="mt-2 text-slate-600">The flow is designed to advance. Act on documents/checklist and note the reason in the log; for special cases contact the administrator.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">What does "Reset" do?</summary><p class="mt-2 text-slate-600">Restores the 3 demo profiles and discards local changes. Use it only for demos/training.</p></details>
         </div>
       </section>
@@ -1998,7 +2046,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Legalisation / Apostille</td><td class="px-4 py-2.5 text-slate-600">Certification that makes a foreign document valid in Italy.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Clearance (nulla osta)</td><td class="px-4 py-2.5 text-slate-600">Work authorisation issued by the Immigration One-Stop Desk.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Recognition decree</td><td class="px-4 py-2.5 text-slate-600">The act recognising the foreign nursing qualification.</td></tr>
-          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Maximum expected time for a state; exceeding it triggers the risk alert.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Maximum expected time for a phase; exceeding it triggers the risk alert.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Matching</td><td class="px-4 py-2.5 text-slate-600">Crossing facility requests with the candidates' skills and specialisations recorded in the app.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">One-off / Operational</td><td class="px-4 py-2.5 text-slate-600">Framework agreements signed once (agencies, housing, employers, professionals) vs tasks repeated for each candidate.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Audit trail</td><td class="px-4 py-2.5 text-slate-600">Traceable chronological record of all actions and communications.</td></tr>
         </tbody></table></div>
       </section>
@@ -2017,7 +2067,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
       <section id="intro" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="info" class="h-5 w-5 text-indigo-500"></i>1. Introducción</h2>
-        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses sigue a cada candidato enfermero a lo largo de todo el recorrido burocrático: desde la adquisición del perfil hasta la integración en una estructura italiana. Cada candidato es un <b>expediente</b> que atraviesa <b>11 estados secuenciales</b>. El sistema impide saltar pasos y señala los expedientes con retraso.</p>
+        <p class="text-sm leading-relaxed text-slate-600">DHL Nurses sigue a cada candidato enfermero a lo largo de todo el recorrido: desde la selección en la República Dominicana hasta la inserción y la asistencia en una estructura italiana. Cada candidato es un <b>expediente</b> que atraviesa <b>9 fases secuenciales</b>, divididas entre dos equipos: el <b>Equipo República Dominicana</b> (fases 1–4, hasta la partida) y el <b>Equipo Italia</b> (fases 5–9, desde la llegada). El sistema impide saltar pasos y señala los expedientes con retraso.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="layout-dashboard" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Panel Analítico</p><p class="mt-1 text-xs text-slate-500">La visión global: cifras clave y alertas.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Gestión de Expedientes</p><p class="mt-1 text-xs text-slate-500">Trabajo sobre un candidato.</p></div>
@@ -2070,16 +2120,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">Arriba tienes de un vistazo las cifras más consultadas: <b>cuántos enfermeros estamos gestionando</b>, cuántos han sido <b>trasladados a Italia</b> y cuántos <b>aún deben trasladarse</b>. Siempre se cumple: <b>En Gestión = Trasladados + Por Trasladar</b>.</p>
         <div class="grid gap-3 sm:grid-cols-3">
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">En Gestión</p><p class="mt-1 text-xs text-slate-500">Total de enfermeros que seguimos (todos los expedientes).</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Trasladados</p><p class="mt-1 text-xs text-slate-500">Ya partieron: <b>Llegada a Italia</b> (estado 10) u <b>Onboarding completado</b> (estado 11).</p></div>
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Por Trasladar</p><p class="mt-1 text-xs text-slate-500">Todavía en el proceso, aún no partidos (estados 1–9).</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Trasladados</p><p class="mt-1 text-xs text-slate-500">Ya en Italia: fases del <b>Equipo Italia</b> (5–9) o proceso completado.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-sm font-bold text-slate-800">Por Trasladar</p><p class="mt-1 text-xs text-slate-500">Todavía con el <b>Equipo Rep. Dominicana</b> (fases 1–4).</p></div>
         </div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Consejo.</b> Cada recuadro es <b>clicable</b>: abre <b>Gestión de Expedientes</b> ya filtrado (p. ej. "Trasladados" muestra solo quienes partieron).</div>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.2 · Indicadores clave (KPI)</h3>
-        <p class="text-sm leading-relaxed text-slate-600"><b>Todos los KPI son clicables</b> y abren la sección correspondiente ya filtrada: Expedientes Activos, Documentos Faltantes, En espera OPI, Docs por Vencer, Onboarding Completado.</p>
+        <p class="text-sm leading-relaxed text-slate-600"><b>Todos los KPI son clicables</b> y abren la sección correspondiente ya filtrada: Expedientes Activos, Documentos Faltantes, En Matching, Docs por Vencer, Procesos Completados.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.3 · Semáforos de riesgo y vencimientos</h3>
         <p class="text-sm leading-relaxed text-slate-600">Lista los expedientes detenidos <b>demasiado tiempo</b> en su estado actual, y un panel de <b>documentos por vencer/vencidos</b>. <b>Acción:</b> haz clic en una fila para abrir el expediente; el KPI "Docs por Vencer" abre el archivo filtrado.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.4 · Candidatos por estructura</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Muestra cuántos candidatos están asignados a cada empleador y cuántos han completado el onboarding, además de la distribución en los 11 estados.</p>
+        <p class="text-sm leading-relaxed text-slate-600">Muestra cuántos candidatos están asignados a cada empleador y cuántos han concluido el proceso, además de la distribución en las 9 fases, agrupadas por equipo.</p>
       </section>
 
       <section id="pratiche" class="space-y-4">
@@ -2088,40 +2138,43 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · Lista y búsqueda</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Búsqueda:</b> por nombre, pasaporte o estructura de destino.</li>
-          <li><b>Filtros de estado:</b> Todos, <b>Trasladados</b>, <b>Por Trasladar</b>, En riesgo, Docs Faltantes, En curso, Visado, Completados. Al venir de un KPI (p. ej. "En espera OPI") aparece un filtro temporal resaltado, con la ✕ para quitarlo.</li>
-          <li><b>Ficha:</b> muestra el estado, el nivel lingüístico y el paso. El icono ⏰ señala riesgo de retraso.</li>
+          <li><b>Filtros de estado:</b> Todos, <b>Trasladados</b>, <b>Por Trasladar</b>, En riesgo, Docs Faltantes, En curso, Fase Italia, Completados. Al venir de un KPI (p. ej. "En Matching") aparece un filtro temporal resaltado, con la ✕ para quitarlo.</li>
+          <li><b>Filtro "Mi equipo":</b> si tu perfil en <b>Ajustes → Operadores RR.HH.</b> tiene un Equipo asignado (Rep. Dominicana o Italia), aparece un filtro dedicado que muestra solo los candidatos en las fases de tu equipo. La correspondencia se hace por el correo de acceso (o el nombre del operador en modo demo).</li>
+          <li><b>Ficha:</b> muestra el estado, el nivel lingüístico y la fase. El icono ⏰ señala riesgo de retraso.</li>
         </ul>
-        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · El stepper (línea de 11 estados)</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Colores: <span class="font-semibold text-emerald-600">verde</span> = completado, <span class="font-semibold text-indigo-600">índigo</span> = actual, <span class="font-semibold text-amber-600">ámbar</span> = bloqueado, gris = por hacer.</p>
-        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · El botón "Avanzar Estado"</h3>
-        <p class="text-sm leading-relaxed text-slate-600">Lleva el expediente al estado siguiente. Se <b>desbloquea solo</b> cuando la checklist y los documentos del paso actual están cumplidos; de lo contrario, los requisitos faltantes se muestran sobre el botón.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.2 · El stepper (9 fases · 2 equipos)</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Sobre la línea de tiempo, dos bandas indican el equipo responsable: <b>🇩🇴 Equipo Rep. Dominicana</b> (fases 1–4) y <b>🇮🇹 Equipo Italia</b> (fases 5–9). Colores de los círculos: <span class="font-semibold text-emerald-600">verde</span> = completada, <span class="font-semibold text-indigo-600">índigo</span> = actual, <span class="font-semibold text-amber-600">ámbar</span> = bloqueada, gris = por hacer.</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">5.3 · El botón "Avanzar Fase"</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Lleva el expediente a la fase siguiente. Se <b>desbloquea solo</b> cuando la checklist y los documentos de la fase actual están cumplidos; de lo contrario, los requisitos faltantes se muestran sobre el botón.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">5.4 · Documentos, checklist, logística, registro</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Documentos:</b> estados Aprobado / En Verificación / Faltante; acciones Subir, Aprobar, Rechazar, Añadir.</li>
-          <li><b>Checklist:</b> tareas obligatorias del paso actual, cambian en cada avance.</li>
+          <li><b>Checklist:</b> tareas obligatorias de la fase actual, cambian en cada avance.</li>
           <li><b>Logística &amp; Onboarding RR.HH.:</b> vuelo, alojamiento, tutor, contrato.</li>
           <li><b>Registro y auditoría:</b> notas, llamadas y avisos con fecha y autor.</li>
         </ul>
       </section>
 
       <section id="workflow" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. Los 11 estados del flujo</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>6. Las 9 fases y los 2 equipos</h2>
+        <p class="text-sm leading-relaxed text-slate-600">El proyecto se organiza sobre una clara división geográfica y operativa. El <b>Equipo República Dominicana</b> sigue al candidato hasta la partida (fases 1–4); el <b>Equipo Italia</b> toma el relevo a la llegada y se ocupa de la logística, el matching laboral y la estabilidad (fases 5–9). La coordinación se realiza mediante la actualización constante de documentos y checklists en la app.</p>
         <div class="overflow-hidden rounded-xl border border-slate-200"><table class="w-full text-sm">
-          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Estado</th><th class="px-3 py-2">Qué hacer</th></tr></thead>
+          <thead class="bg-slate-50 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400"><tr><th class="px-3 py-2 w-10">#</th><th class="px-3 py-2">Fase</th><th class="px-3 py-2">Qué hacer</th></tr></thead>
           <tbody class="divide-y divide-slate-100 align-top">
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Candidato adquirido</td><td class="px-3 py-2.5 text-slate-600">Datos personales, mandato de agencia, evaluación lingüística.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Documentos faltantes</td><td class="px-3 py-2.5 text-slate-600">Subir diploma, certificado, traducción jurada, legalización.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Documentos verificados</td><td class="px-3 py-2.5 text-slate-600">Verificar y aprobar todos los documentos.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Expediente enviado</td><td class="px-3 py-2.5 text-slate-600">Envío telemático al Ministerio de Sanidad.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Integración solicitada</td><td class="px-3 py-2.5 text-slate-600">Enviar documentos complementarios solicitados.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Título reconocido</td><td class="px-3 py-2.5 text-slate-600">Recepción del decreto de reconocimiento.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Autorización solicitada</td><td class="px-3 py-2.5 text-slate-600">Solicitar autorización a la Ventanilla de Inmigración, confirmar empleador.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Visado obtenido</td><td class="px-3 py-2.5 text-slate-600">Cita en el consulado y expedición del visado.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Inscripción OPI</td><td class="px-3 py-2.5 text-slate-600">Solicitud, pago de cuota, inscripción en el colegio.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-indigo-600">10</td><td class="px-3 py-2.5 font-medium text-slate-700">Llegada a Italia</td><td class="px-3 py-2.5 text-slate-600">Vuelo, alojamiento, permiso de residencia.</td></tr>
-            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">11</td><td class="px-3 py-2.5 font-medium text-slate-700">Onboarding completado</td><td class="px-3 py-2.5 text-slate-600">Contrato, tutor, integración en la estructura.</td></tr>
+            <tr class="bg-sky-50"><td colspan="3" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-sky-700">🇩🇴 Equipo República Dominicana — de la selección a la partida</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">1</td><td class="px-3 py-2.5 font-medium text-slate-700">Selección y Reclutamiento</td><td class="px-3 py-2.5 text-slate-600">Solo estructuras reconocidas por el gobierno dominicano; verificación de competencias y especializaciones de enfermería, datos personales, evaluación lingüística.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">2</td><td class="px-3 py-2.5 font-medium text-slate-700">Gestión Documental</td><td class="px-3 py-2.5 text-slate-600">La fase crucial, gestionada mediante la app: títulos traducidos y jurados, apostilla, reconocimiento del Ministerio, autorización, visado e inscripción OPI. No se avanza hasta que cada documento requerido esté cargado y aprobado.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">3</td><td class="px-3 py-2.5 font-medium text-slate-700">Formación</td><td class="px-3 py-2.5 text-slate-600">Contenidos digitales y encuentros (online o presenciales) según el modelo «Italia in tasca», con asistencia directa durante el itinerario.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-sky-600">4</td><td class="px-3 py-2.5 font-medium text-slate-700">Organización del Viaje</td><td class="px-3 py-2.5 text-slate-600">Compra del billete de avión y traslado al aeropuerto en territorio dominicano.</td></tr>
+            <tr class="bg-emerald-50"><td colspan="3" class="px-3 py-2 text-[11px] font-bold uppercase tracking-wide text-emerald-700">🇮🇹 Equipo Italia — de la llegada a la plena integración</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">5</td><td class="px-3 py-2.5 font-medium text-slate-700">Llegada a Italia</td><td class="px-3 py-2.5 text-slate-600">Recibimiento en el aeropuerto y traslado al alojamiento previsto.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">6</td><td class="px-3 py-2.5 font-medium text-slate-700">Alojamiento y Servicios</td><td class="px-3 py-2.5 text-slate-600">Contrato individual de alojamiento (sobre los contratos marco ya firmados), activación de servicios, permiso de residencia.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">7</td><td class="px-3 py-2.5 font-medium text-slate-700">Matching</td><td class="px-3 py-2.5 text-slate-600">Recepción de las solicitudes de las estructuras sanitarias y cruce preciso con las competencias y especializaciones cargadas por el equipo dominicano: la inserción se ajusta a la unidad, no es genérica.</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">8</td><td class="px-3 py-2.5 font-medium text-slate-700">Relación Laboral</td><td class="px-3 py-2.5 text-slate-600">Identificación del empleador, firma del contrato, gestión continua de la relación (controversias, welfare de empresa).</td></tr>
+            <tr><td class="px-3 py-2.5 font-bold text-emerald-600">9</td><td class="px-3 py-2.5 font-medium text-slate-700">Tutoría y Asistencia</td><td class="px-3 py-2.5 text-slate-600">Tutor, servicios socioculturales y asistencia legal/fiscal en condiciones concertadas para las cuestiones extralaborales.</td></tr>
           </tbody>
         </table></div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Una tantum vs operativo.</b> Algunas actividades de los equipos son acuerdos marco <b>una tantum</b> (agencias reconocidas, contratos marco de alojamiento, empresas precontratadas, profesionales legales/fiscales) y no aparecen en la checklist del candidato: la checklist contiene solo las tareas <b>operativas</b> repetidas para cada expediente.</div>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -2130,8 +2183,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <p class="text-sm font-bold text-indigo-800">El flujo completo en 6 pasos</p>
           <ol class="prose-list mt-1 ml-5 list-decimal text-sm text-indigo-900/80">
             <li><b>Accede</b> con tu cuenta.</li><li><b>Crea el registro</b> del candidato (procedimiento 1).</li>
-            <li><b>Añade y aprueba documentos</b> (procedimientos 2 y 3).</li><li><b>Marca la checklist</b> del paso actual.</li>
-            <li><b>Avanza el estado</b> cuando el botón se desbloquee (procedimiento 4).</li><li><b>Registra comunicaciones</b> y vigila los semáforos (5 y 6).</li>
+            <li><b>Añade y aprueba documentos</b> (procedimientos 2 y 3).</li><li><b>Marca la checklist</b> de la fase actual.</li>
+            <li><b>Avanza la fase</b> cuando el botón se desbloquee (procedimiento 4).</li><li><b>Registra comunicaciones</b> y vigila los semáforos (5 y 6).</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -2140,7 +2193,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li>Ve a la vista <b>Gestión de Expedientes</b>.</li>
             <li>En la parte superior de la lista, pulsa <b>Nuevo Candidato</b>.</li>
             <li>Rellena los campos. <b>Nombre y Pasaporte</b> son obligatorios (*); la agencia, el empleador y el referente de RR.HH. se eligen de las listas gestionadas en <b>Ajustes</b>.</li>
-            <li>Pulsa <b>Crear candidato</b>: el expediente se abre en el estado <b>1 · Candidato adquirido</b> con los documentos estándar preparados.</li>
+            <li>Pulsa <b>Crear candidato</b>: el expediente se abre en la fase <b>1 · Selección y Reclutamiento</b> con los documentos estándar preparados.</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -2163,8 +2216,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <div class="rounded-xl border border-slate-200 bg-white p-5">
           <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">4</span>Avanzar un expediente</p>
           <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
-            <li>Marca la <b>Checklist</b> del paso actual.</li><li>Comprueba que los documentos requeridos estén <b>Aprobados</b>.</li>
-            <li>Completa los <b>requisitos faltantes</b> indicados.</li><li>Pulsa <b>Avanzar Estado</b>.</li>
+            <li>Marca la <b>Checklist</b> de la fase actual.</li><li>Comprueba que los documentos requeridos estén <b>Aprobados</b>.</li>
+            <li>Completa los <b>requisitos faltantes</b> indicados.</li><li>Pulsa <b>Avanzar Fase</b>.</li>
           </ol>
         </div>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -2208,9 +2261,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       <section id="faq" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="help-circle" class="h-5 w-5 text-indigo-500"></i>9. Preguntas frecuentes</h2>
         <div class="space-y-2">
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué "Avanzar Estado" está en gris?</summary><p class="mt-2 text-slate-600">Faltan requisitos en el estado actual: marca la checklist y aprueba los documentos indicados sobre el botón.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué "Avanzar Fase" está en gris?</summary><p class="mt-2 text-slate-600">Faltan requisitos en la fase actual: marca la checklist y aprueba los documentos indicados sobre el botón.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Aprobé un documento por error.</summary><p class="mt-2 text-slate-600">Pulsa <b>Rechazar</b> en el mismo documento: vuelve a "Faltante" y la acción queda en el registro.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Puedo volver a un estado anterior?</summary><p class="mt-2 text-slate-600">El flujo está pensado para avanzar. Actúa sobre documentos/checklist y anota el motivo en el registro; para casos especiales contacta con el administrador.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Puedo volver a una fase anterior?</summary><p class="mt-2 text-slate-600">El flujo está pensado para avanzar. Actúa sobre documentos/checklist y anota el motivo en el registro; para casos especiales contacta con el administrador.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Qué hace "Restablecer"?</summary><p class="mt-2 text-slate-600">Restaura los 3 perfiles demo y descarta los cambios locales. Úsalo solo para demos/formación.</p></details>
         </div>
       </section>
@@ -2223,7 +2276,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Legalización / Apostilla</td><td class="px-4 py-2.5 text-slate-600">Certificación que hace válido en Italia un documento extranjero.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Autorización (nulla osta)</td><td class="px-4 py-2.5 text-slate-600">Autorización de trabajo emitida por la Ventanilla Única de Inmigración.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Decreto de reconocimiento</td><td class="px-4 py-2.5 text-slate-600">El acto que reconoce el título extranjero de enfermería.</td></tr>
-          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Tiempo máximo previsto para un estado; superarlo enciende el semáforo de riesgo.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">SLA</td><td class="px-4 py-2.5 text-slate-600">Tiempo máximo previsto para una fase; superarlo enciende el semáforo de riesgo.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Matching</td><td class="px-4 py-2.5 text-slate-600">Cruce entre las solicitudes de las estructuras sanitarias y las competencias/especializaciones de los candidatos registradas en la app.</td></tr>
+          <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Una tantum / Operativo</td><td class="px-4 py-2.5 text-slate-600">Acuerdos marco firmados una sola vez (agencias, alojamientos, empresas, profesionales) vs tareas repetidas para cada candidato.</td></tr>
           <tr><td class="px-4 py-2.5 font-semibold text-slate-700">Auditoría (audit trail)</td><td class="px-4 py-2.5 text-slate-600">Registro cronológico y trazable de todas las acciones y comunicaciones.</td></tr>
         </tbody></table></div>
       </section>
@@ -2458,7 +2513,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '</div>';
     }).join('');
 
-    // Pipeline distribution mini-overview
+    // Pipeline distribution mini-overview, grouped by team (1-4 RD · 5-9 Italy)
     const pipeline = steps().map((s) => {
       const count = state.nurses.filter((n) => n.currentStep === s.id).length;
       return '<div class="flex flex-col items-center gap-1">' +
@@ -2466,6 +2521,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<span class="w-14 text-center text-[10px] leading-tight text-slate-400">' + escapeHtml(s.short) + '</span>' +
       '</div>';
     }).join('');
+    const pipelineTeams =
+      '<div class="mb-3 flex gap-1.5">' +
+        '<div style="flex:4" class="rounded-lg bg-sky-50 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide text-sky-700 ring-1 ring-inset ring-sky-200">🇩🇴 ' + escapeHtml(t('team_rd')) + ' · 1–4</div>' +
+        '<div style="flex:5" class="rounded-lg bg-emerald-50 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-inset ring-emerald-200">🇮🇹 ' + escapeHtml(t('team_it')) + ' · 5–9</div>' +
+      '</div>';
 
     return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
       '<div class="mb-6 flex items-end justify-between gap-3">' +
@@ -2490,7 +2550,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div data-tour="kpi" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">' +
         kpiCard('users-round', t('kpi_active'), k.active, 'indigo', t('kpi_active_sub'), 'goto-cases', 'active') +
         kpiCard('file-warning', t('kpi_missing'), k.missing, 'rose', t('kpi_missing_sub'), 'goto-cases', 'Missing Docs') +
-        kpiCard('clipboard-check', t('kpi_opi'), k.opi, 'amber', t('kpi_opi_sub'), 'goto-cases', 'opi') +
+        kpiCard('target', t('kpi_matching'), k.matching, 'amber', t('kpi_matching_sub'), 'goto-cases', 'matching') +
         kpiCard('calendar-clock', t('kpi_expiring'), k.expiring, k.expiring ? 'rose' : 'emerald', t('kpi_expiring_sub'), 'show-expiring') +
         kpiCard('badge-check', t('kpi_done'), k.completed, 'emerald', t('kpi_done_sub'), 'goto-cases', 'Onboarding Completed') +
       '</div>' +
@@ -2529,7 +2589,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           '<i data-lucide="git-commit-horizontal" class="h-5 w-5 text-indigo-500"></i>' +
           '<h3 class="text-sm font-bold text-slate-900">' + t('pipeline_title') + '</h3>' +
         '</div>' +
-        '<div class="flex items-start justify-between gap-1 overflow-x-auto pb-1">' + pipeline + '</div>' +
+        '<div class="overflow-x-auto pb-1"><div class="min-w-[560px]">' +
+          pipelineTeams +
+          '<div class="flex items-start justify-between gap-1">' + pipeline + '</div>' +
+        '</div></div>' +
       '</section>' +
     '</main>';
   }
@@ -2548,8 +2611,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       if (f === 'risk') { if (!isAtRisk(n)) return false; }
       else if (f === 'sent') { if (!(n.currentStep >= SENT_TO_ITALY_STEP)) return false; }
       else if (f === 'tosend') { if (!(n.currentStep < SENT_TO_ITALY_STEP)) return false; }
-      else if (f === 'active') { if (!(n.currentStep < 11)) return false; }
-      else if (f === 'opi') { if (!(n.currentStep === 8 || n.currentStep === 9)) return false; }
+      else if (f === 'active') { if (!(n.currentStep < DONE_STEP)) return false; }
+      else if (f === 'matching') { if (!(n.currentStep === 7)) return false; }
+      else if (f === 'myteam') {
+        // Cases in the phases handled by the current operator's team (completed excluded).
+        // If the operator has no team the filter is inert (shows everything).
+        const tm = myTeam();
+        if (tm && !(n.currentStep < DONE_STEP && stepTeam(n.currentStep) === tm)) return false;
+      }
       else if (f !== 'all' && deriveStatus(n) !== f) return false;
       if (!q) return true;
       return (
@@ -2567,11 +2636,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     '</div>';
   }
 
-  // Filters reachable from the chip row directly. Others (set from dashboard KPIs, e.g. 'active'/'opi')
+  // Filters reachable from the chip row directly. Others (set from dashboard KPIs, e.g. 'active'/'matching')
   // are shown as a temporary, removable highlighted chip so the user always sees what is filtered.
-  const STANDARD_FILTERS = ['all', 'risk', 'sent', 'tosend', 'Missing Docs', 'In Progress', 'Visa Obtained', 'Onboarding Completed'];
+  const STANDARD_FILTERS = ['all', 'myteam', 'risk', 'sent', 'tosend', 'Missing Docs', 'In Progress', 'Visa Obtained', 'Onboarding Completed'];
   function activeFilterLabel(f) {
-    const map = { active: t('kpi_active'), opi: t('kpi_opi') };
+    const map = { active: t('kpi_active'), matching: t('kpi_matching') };
     return map[f] || f;
   }
   function extraFilterChip() {
@@ -2604,7 +2673,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
               statusBadge(deriveStatus(n)) +
               '<span class="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400"><i data-lucide="languages" class="h-3 w-3"></i>' + escapeHtml(n.languageLevel.split(' ')[0]) + '</span>' +
             '</div>' +
-            '<div class="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400"><i data-lucide="map-pin" class="h-3 w-3"></i>' + t('step_x', { n: n.currentStep }) + ' • ' + escapeHtml(stepName(n.currentStep)) + '</div>' +
+            '<div class="mt-2 flex items-center gap-1.5 text-[11px] text-slate-400"><i data-lucide="map-pin" class="h-3 w-3"></i>' + (n.currentStep >= DONE_STEP ? escapeHtml(t('state_done')) : t('step_x', { n: n.currentStep }) + ' • ' + escapeHtml(stepName(n.currentStep))) + '</div>' +
           '</button>';
         }).join('');
 
@@ -2619,6 +2688,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<div class="mb-3 flex flex-wrap gap-1.5">' +
           extraFilterChip() +
           filterChip('all', t('filter_all')) +
+          (myTeam() ? filterChip('myteam', teamFlag(myTeam()) + ' ' + t('filter_myteam')) : '') +
           filterChip('sent', t('filter_sent')) +
           filterChip('tosend', t('filter_tosend')) +
           filterChip('risk', t('risk_filter')) +
@@ -2685,8 +2755,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         field('handshake', t('f_agency'), n.partnerAgency) +
         field('languages', t('f_lang'), n.languageLevel) +
         field('hospital', t('f_employer'), n.employer) +
-        field('user-cog', t('f_hr'), n.hrReferent) +
-        field('flag', t('f_status'), t('step_state', { n: n.currentStep, name: stepName(n.currentStep) })) +
+        field('user-cog', t('f_hr'), n.hrReferent + (operatorByName(n.hrReferent) && operatorByName(n.hrReferent).team ? ' · ' + teamFlag(operatorByName(n.hrReferent).team) + ' ' + teamLabel(operatorByName(n.hrReferent).team) : '')) +
+        field('flag', t('f_status'), (n.currentStep >= DONE_STEP ? t('state_done') : t('step_state', { n: n.currentStep, name: stepName(n.currentStep) }))) +
         '<div class="flex items-start gap-2">' +
           '<i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0 ' + (n.privacyConsent ? 'text-emerald-500' : 'text-rose-400') + '"></i>' +
           '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + t('f_privacy') + '</p>' +
@@ -2759,19 +2829,29 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       }
     });
 
+    // Two-team band above the phase nodes: RD team covers 4 of the 9 phases, Italy team 5.
+    const teamBand =
+      '<div class="mb-3 flex gap-1.5">' +
+        '<div style="flex:4" class="rounded-lg px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ' + (stepTeam(Math.min(n.currentStep, LAST_STEP)) === 'rd' && n.currentStep < DONE_STEP ? 'bg-sky-100 text-sky-800 ring-sky-300' : 'bg-sky-50 text-sky-600 ring-sky-200') + '">🇩🇴 ' + escapeHtml(t('team_rd')) + ' · 1–4</div>' +
+        '<div style="flex:5" class="rounded-lg px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide ring-1 ring-inset ' + (stepTeam(Math.min(n.currentStep, LAST_STEP)) === 'it' && n.currentStep < DONE_STEP ? 'bg-emerald-100 text-emerald-800 ring-emerald-300' : 'bg-emerald-50 text-emerald-600 ring-emerald-200') + '">🇮🇹 ' + escapeHtml(t('team_it')) + ' · 5–9</div>' +
+      '</div>';
+
     return '<div data-tour="stepper" class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
       '<div class="mb-4 flex items-center gap-2">' +
         '<i data-lucide="route" class="h-5 w-5 text-indigo-500"></i>' +
         '<h3 class="text-sm font-bold text-slate-900">' + t('stepper_title') + '</h3>' +
       '</div>' +
-      '<div class="flex items-start overflow-x-auto pb-1">' + withConnectors.join('') + '</div>' +
+      '<div class="overflow-x-auto pb-1"><div class="min-w-[700px]">' +
+        teamBand +
+        '<div class="flex items-start">' + withConnectors.join('') + '</div>' +
+      '</div></div>' +
     '</div>';
   }
 
   function advanceBar(n) {
     const reasons = blockers(n);
     const ok = reasons.length === 0;
-    const done = n.currentStep >= 11;
+    const done = n.currentStep >= DONE_STEP;
 
     const btn = done
       ? '<button disabled class="inline-flex items-center gap-2 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white opacity-90"><i data-lucide="badge-check" class="h-4 w-4"></i>' + t('case_completed_btn') + '</button>'
@@ -2846,7 +2926,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function checklistSection(n) {
     const items = n.checklist[n.currentStep] || [];
     const done = items.filter((i) => i.done).length;
-    const list = n.currentStep >= 11
+    const list = n.currentStep >= DONE_STEP
       ? '<div class="flex items-center gap-2 rounded-xl bg-emerald-50 p-3 text-sm text-emerald-700 ring-1 ring-inset ring-emerald-200"><i data-lucide="check-circle-2" class="h-4 w-4"></i>' + t('checklist_all_done') + '</div>'
       : items.map((i) =>
           '<label class="flex cursor-pointer items-start gap-3 rounded-xl border p-3 transition ' + (i.done ? 'border-emerald-200 bg-emerald-50/50' : 'border-slate-200 bg-white hover:bg-slate-50') + '">' +
@@ -2859,9 +2939,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="mb-3 flex items-center gap-2">' +
         '<i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>' +
         '<h3 class="text-sm font-bold text-slate-900">' + t('checklist_title') + '</h3>' +
-        (n.currentStep < 11 ? '<span class="ml-auto text-xs text-slate-400">' + t('checklist_count', { a: done, b: items.length, s: n.currentStep }) + '</span>' : '') +
+        (n.currentStep < DONE_STEP ? '<span class="ml-auto text-xs text-slate-400">' + t('checklist_count', { a: done, b: items.length, s: n.currentStep }) + '</span>' : '') +
       '</div>' +
-      '<p class="mb-3 text-xs text-slate-400">' + t('checklist_sub', { state: escapeHtml(stepName(n.currentStep)) }) + '</p>' +
+      '<p class="mb-3 text-xs text-slate-400">' + t('checklist_sub', { state: escapeHtml(n.currentStep >= DONE_STEP ? t('state_done') : stepName(n.currentStep)) }) + '</p>' +
       '<div class="space-y-2">' + list + '</div>' +
     '</div>';
   }
@@ -3369,13 +3449,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     o.id = 'welcome-overlay';
     o.innerHTML =
       '<div class="flex items-center gap-3 px-5 py-4 sm:px-8">' +
-        '<div class="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-lg shadow-indigo-900/40"><i data-lucide="heart-pulse" class="h-5 w-5 text-white"></i></div>' +
+        '<div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-indigo-900/40"><img src="logo_dhl_nurses.png" alt="DHL Nurses" class="h-9 w-9 object-contain" /></div>' +
         '<div><p class="text-sm font-extrabold leading-tight">DHL Nurses</p><p class="text-[11px] text-slate-400">' + t('wl_kicker') + '</p></div>' +
         '<div class="ml-auto flex items-center gap-1 rounded-full bg-white/10 p-1">' +
           ['it', 'en', 'es'].map((l) => '<button data-action="welcome-lang" data-lang="' + l + '" class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition ' + (LANG === l ? 'bg-white text-slate-900' : 'text-slate-300 hover:text-white') + '">' + l + '</button>').join('') +
         '</div>' +
       '</div>' +
       '<div class="flex flex-1 flex-col items-center justify-center px-4 py-4">' +
+        '<img src="logo_dhl_nurses.png" alt="DHL Nurses — DominicaHealthLink" class="mb-5 h-28 w-28 rounded-3xl bg-white object-contain p-1.5 shadow-2xl shadow-indigo-900/50 ring-1 ring-white/20 sm:h-36 sm:w-36" />' +
         '<h1 class="max-w-3xl px-4 text-center text-2xl font-extrabold leading-tight sm:text-4xl">' + t('wl_claim') + '</h1>' +
         '<div class="relative mt-2 h-[250px] w-full sm:h-[230px]">' + WELCOME_SLIDES.map(welcomeSlideHtml).join('') + '</div>' +
         '<div class="flex items-center gap-4">' +
