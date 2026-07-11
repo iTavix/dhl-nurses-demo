@@ -205,6 +205,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
       specializations: ['Chirurgia'],
+      profRole: 'Infermiera', profSector: 'Chirurgia generale', profExperience: '4 anni',
+      passportExpiry: isoDaysAgo(-1200), cedulaExpiry: isoDaysAgo(-45), // cédula in scadenza → semaforo ambra
       matchedRequestId: null, matchedDepartment: '',
       specializations: ['Chirurgia'],
       matchedRequestId: null, matchedDepartment: '',
@@ -247,6 +249,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
       specializations: ['Terapia Intensiva', 'Emergenza-Urgenza'],
+      profRole: 'Infermiere', profSector: 'Terapia Intensiva', profExperience: '7 anni',
+      passportExpiry: isoDaysAgo(-1800), cedulaExpiry: isoDaysAgo(-600),
       matchedRequestId: null, matchedDepartment: '',
       specializations: ['Terapia Intensiva', 'Emergenza-Urgenza'],
       matchedRequestId: null, matchedDepartment: '',
@@ -294,8 +298,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
       specializations: ['Nefrologia e Dialisi'],
+      profRole: 'Infermiera', profSector: 'Nefrologia e Dialisi', profExperience: '5 anni',
+      passportExpiry: isoDaysAgo(-1600), cedulaExpiry: isoDaysAgo(-500),
       matchedRequestId: null, matchedDepartment: '',
       specializations: ['Geriatria', 'Medicina Generale'],
+      profRole: 'Infermiera', profSector: 'Geriatria', profExperience: '8 anni',
+      passportExpiry: isoDaysAgo(-2200), cedulaExpiry: isoDaysAgo(-800),
       matchedRequestId: null, matchedDepartment: '',
       currentStep: 10,
       status: 'Onboarding Completed',
@@ -343,6 +351,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
       specializations: ['Pediatria', 'Medicina Generale'],
+      profRole: 'Infermiera pediatrica', profSector: 'Pediatria', profExperience: '3 anni',
+      passportExpiry: isoDaysAgo(-1500), cedulaExpiry: isoDaysAgo(-900),
       matchedRequestId: null, matchedDepartment: '',
       currentStep: 3,
       status: 'In Progress',
@@ -384,6 +394,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Azienda Ospedaliera di Padova',
       hrReferent: 'Dott. Marco Bianchi',
       specializations: ['Sala Operatoria', 'Chirurgia'],
+      profRole: 'Infermiere strumentista', profSector: 'Sala Operatoria', profExperience: '6 anni',
+      passportExpiry: isoDaysAgo(-2000), cedulaExpiry: isoDaysAgo(-700),
       matchedRequestId: null, matchedDepartment: '',
       currentStep: 4,
       status: 'In Progress',
@@ -544,7 +556,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     return normalizeState(seedState());
   }
   // Backfill fields added in later versions so older saved states keep working.
-  const PERSONAL_FIELDS = ['cedula', 'birthDate', 'birthPlace', 'nationality', 'maritalStatus', 'phone', 'email', 'address'];
+  const PERSONAL_FIELDS = ['cedula', 'birthDate', 'birthPlace', 'nationality', 'maritalStatus', 'phone', 'email', 'address', 'passportExpiry', 'cedulaExpiry', 'profRole', 'profSector', 'profExperience'];
   // Migration map: legacy 11-state workflow → new 9-phase / two-team workflow.
   const OLD_TO_NEW_STEP = { 1: 1, 2: 2, 3: 2, 4: 2, 5: 2, 6: 2, 7: 2, 8: 4, 9: 4, 10: 5, 11: DONE_STEP };
   function normalizeState(s) {
@@ -1031,7 +1043,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="grid gap-3 p-5 sm:grid-cols-2">' +
         inputField('nn-name', t('nn_name'), 'Ana Valeria Rosario', true) +
         inputField('nn-passport', t('nn_passport'), 'RD-XX0000000', true) +
+        inputField('nn-passport-exp', t('nn_passport_exp'), '', false, 'date') +
         inputField('nn-cedula', t('nn_cedula'), '001-0000000-0') +
+        inputField('nn-cedula-exp', t('nn_cedula_exp'), '', false, 'date') +
         inputField('nn-birthdate', t('nn_birthdate'), '', false, 'date') +
         inputField('nn-birthplace', t('nn_birthplace'), 'Santo Domingo') +
         inputField('nn-nationality', t('nn_nationality'), t('nn_default_nationality')) +
@@ -1043,6 +1057,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         inputField('nn-phone', t('nn_phone'), '+1 809 000 0000', false, 'tel') +
         inputField('nn-email', t('nn_email'), 'nome@example.com', false, 'email') +
         '<div class="sm:col-span-2">' + inputField('nn-address', t('nn_address'), 'Calle, numero, città, provincia') + '</div>' +
+        '<p class="sm:col-span-2 -mb-1 mt-1 text-[11px] font-bold uppercase tracking-wide text-slate-400">' + t('tab_competenze') + '</p>' +
+        inputField('nn-role', t('f_role'), 'Infermiere/a') +
+        inputField('nn-sector', t('f_sector'), 'Terapia intensiva') +
+        inputField('nn-exp', t('f_experience'), '5 anni') +
         selectField('nn-agency', t('nn_agency'), agencyOptions(), e ? e.partnerAgency : '') +
         inputField('nn-lang', t('nn_lang'), 'A2') +
         selectField('nn-employer', t('nn_employer'), employerOptions(), e ? e.employer : '') +
@@ -1065,6 +1083,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v || ''; };
       set('nn-name', e.name); set('nn-passport', e.passport); set('nn-lang', e.languageLevel);
       set('nn-cedula', e.cedula); set('nn-birthdate', e.birthDate); set('nn-birthplace', e.birthPlace);
+      set('nn-passport-exp', e.passportExpiry); set('nn-cedula-exp', e.cedulaExpiry);
+      set('nn-role', e.profRole); set('nn-sector', e.profSector); set('nn-exp', e.profExperience);
       set('nn-nationality', e.nationality); set('nn-phone', e.phone); set('nn-email', e.email); set('nn-address', e.address);
     }
     const el = document.getElementById('nn-name'); if (el) el.focus();
@@ -1090,6 +1110,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         e.employer = fieldVal('nn-employer') || t('nn_default_employer');
         e.hrReferent = fieldVal('nn-hr') || '—';
         e.cedula = fieldVal('nn-cedula');
+        e.passportExpiry = fieldVal('nn-passport-exp');
+        e.cedulaExpiry = fieldVal('nn-cedula-exp');
+        e.profRole = fieldVal('nn-role');
+        e.profSector = fieldVal('nn-sector');
+        e.profExperience = fieldVal('nn-exp');
         e.birthDate = fieldVal('nn-birthdate');
         e.birthPlace = fieldVal('nn-birthplace');
         e.nationality = fieldVal('nn-nationality');
@@ -1117,6 +1142,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: fieldVal('nn-employer') || t('nn_default_employer'),
       hrReferent: fieldVal('nn-hr') || '—',
       cedula: fieldVal('nn-cedula'),
+      passportExpiry: fieldVal('nn-passport-exp'),
+      cedulaExpiry: fieldVal('nn-cedula-exp'),
+      profRole: fieldVal('nn-role'),
+      profSector: fieldVal('nn-sector'),
+      profExperience: fieldVal('nn-exp'),
       birthDate: fieldVal('nn-birthdate'),
       birthPlace: fieldVal('nn-birthplace'),
       nationality: fieldVal('nn-nationality') || t('nn_default_nationality'),
@@ -3107,21 +3137,65 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           '<button data-action="open-edit-nurse" data-id="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-white"><i data-lucide="pencil" class="h-3 w-3"></i>' + t('edit_candidate') + '</button>' +
         '</div>' +
       '</div>' +
-      '<div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">' +
-        field('book-user', t('f_passport'), n.passport) +
-        field('credit-card', t('f_cedula'), n.cedula || '—') +
+      profileTabsHtml(n) +
+      personalDocsStrip(n) +
+    '</div>';
+  }
+
+  // Which anagrafica tab is open (kept across renders; not persisted).
+  let profileTab = 'dati';
+
+  function profileTabsHtml(n) {
+    const field = (icon, label, value) =>
+      '<div class="flex items-start gap-2">' +
+        '<i data-lucide="' + icon + '" class="mt-0.5 h-4 w-4 shrink-0 text-slate-400"></i>' +
+        '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</p>' +
+        '<p class="text-sm font-medium text-slate-700">' + escapeHtml(value) + '</p></div>' +
+      '</div>';
+    // Expiry field with traffic-light coloring (red = expired, amber = within 60 days).
+    const expField = (label, dateStr) => {
+      let cls = 'text-slate-700', icon = 'calendar', iconCls = 'text-slate-400';
+      if (dateStr) {
+        const days = Math.floor((new Date(dateStr) - today()) / 86400000);
+        if (days < 0) { cls = 'text-rose-600'; icon = 'calendar-x'; iconCls = 'text-rose-400'; }
+        else if (days <= 60) { cls = 'text-amber-600'; icon = 'calendar-clock'; iconCls = 'text-amber-500'; }
+      }
+      return '<div class="flex items-start gap-2">' +
+        '<i data-lucide="' + icon + '" class="mt-0.5 h-4 w-4 shrink-0 ' + iconCls + '"></i>' +
+        '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</p>' +
+        '<p class="text-sm font-medium ' + cls + '">' + (dateStr ? formatDate(dateStr) : '—') + '</p></div>' +
+      '</div>';
+    };
+    const tabBtn = (id, icon, label) =>
+      '<button data-action="profile-tab" data-tab="' + id + '" class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition ' +
+      (profileTab === id ? 'bg-white text-indigo-700 shadow-sm ring-1 ring-slate-200' : 'text-slate-500 hover:text-slate-800') + '"><i data-lucide="' + icon + '" class="h-3.5 w-3.5"></i>' + label + '</button>';
+
+    let body;
+    if (profileTab === 'contatti') {
+      body =
+        field('phone', t('f_phone'), n.phone || '—') +
+        field('mail', t('f_email'), n.email || '—') +
+        field('handshake', t('f_agency'), n.partnerAgency) +
+        field('hospital', t('f_employer'), n.employer) +
+        field('user-cog', t('f_hr'), n.hrReferent + (operatorByName(n.hrReferent) && operatorByName(n.hrReferent).team ? ' · ' + teamFlag(operatorByName(n.hrReferent).team) + ' ' + teamLabel(operatorByName(n.hrReferent).team) : ''));
+    } else if (profileTab === 'competenze') {
+      body =
+        field('briefcase', t('f_role'), n.profRole || '—') +
+        field('building-2', t('f_sector'), n.profSector || '—') +
+        field('history', t('f_experience'), n.profExperience || '—') +
+        field('languages', t('f_lang'), n.languageLevel) +
+        field('stethoscope', t('f_specs'), nurseSpecs(n).length ? nurseSpecs(n).join(' · ') : '—') +
+        (n.matchedRequestId ? field('target', t('f_match'), n.employer + (n.matchedDepartment ? ' — ' + n.matchedDepartment : '')) : '');
+    } else {
+      body =
         field('cake', t('f_birth'), [n.birthDate ? formatDate(n.birthDate) : '', n.birthPlace || ''].filter(Boolean).join(' · ') || '—') +
         field('globe', t('f_nationality'), n.nationality || '—') +
         field('heart', t('f_marital'), n.maritalStatus ? t('ms_' + n.maritalStatus) : '—') +
         field('map-pin', t('f_address'), n.address || '—') +
-        field('phone', t('f_phone'), n.phone || '—') +
-        field('mail', t('f_email'), n.email || '—') +
-        field('handshake', t('f_agency'), n.partnerAgency) +
-        field('languages', t('f_lang'), n.languageLevel) +
-        field('stethoscope', t('f_specs'), nurseSpecs(n).length ? nurseSpecs(n).join(' · ') : '—') +
-        (n.matchedRequestId ? field('target', t('f_match'), n.employer + (n.matchedDepartment ? ' — ' + n.matchedDepartment : '')) : '') +
-        field('hospital', t('f_employer'), n.employer) +
-        field('user-cog', t('f_hr'), n.hrReferent + (operatorByName(n.hrReferent) && operatorByName(n.hrReferent).team ? ' · ' + teamFlag(operatorByName(n.hrReferent).team) + ' ' + teamLabel(operatorByName(n.hrReferent).team) : '')) +
+        field('book-user', t('f_passport'), n.passport) +
+        expField(t('f_passport_exp'), n.passportExpiry) +
+        field('credit-card', t('f_cedula'), n.cedula || '—') +
+        expField(t('f_cedula_exp'), n.cedulaExpiry) +
         field('flag', t('f_status'), (n.currentStep >= DONE_STEP ? t('state_done') : t('step_state', { n: n.currentStep, name: stepName(n.currentStep) }))) +
         '<div class="flex items-start gap-2">' +
           '<i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0 ' + (n.privacyConsent ? 'text-emerald-500' : 'text-rose-400') + '"></i>' +
@@ -3129,10 +3203,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           '<p class="text-sm font-medium ' + (n.privacyConsent ? 'text-emerald-600' : 'text-rose-500') + '">' +
             (n.privacyConsent ? escapeHtml(t('privacy_given', { d: formatDate(n.privacyConsentDate) })) : escapeHtml(t('privacy_none'))) + '</p>' +
           '<button data-action="print-privacy" data-id="' + n.id + '" class="mt-1.5 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50"><i data-lucide="printer" class="h-3 w-3"></i>' + t('privacy_print') + '</button></div>' +
+        '</div>';
+    }
+    return '<div class="px-5 pt-4">' +
+        '<div class="flex w-max max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">' +
+          tabBtn('dati', 'id-card', t('tab_dati')) + tabBtn('contatti', 'phone', t('tab_contatti')) + tabBtn('competenze', 'briefcase', t('tab_competenze')) +
         '</div>' +
       '</div>' +
-      personalDocsStrip(n) +
-    '</div>';
+      '<div class="grid grid-cols-1 gap-4 p-5 sm:grid-cols-2 lg:grid-cols-3">' + body + '</div>';
   }
 
   // Personal documents (passport copy, Cédula, photo, CV, certificates) uploadable
@@ -3715,6 +3793,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'open-guide': openGuide(); break;
       case 'close-guide': closeGuide(); break;
       case 'print-privacy': openPrivacyForm(t.getAttribute('data-id')); break;
+      case 'profile-tab': profileTab = t.getAttribute('data-tab'); render(); break;
       case 'welcome-start': closeWelcome(); if (state.view !== 'dashboard') { state.view = 'dashboard'; render(); } startTour(); break;
       case 'welcome-explore': closeWelcome(); break;
       case 'welcome-prev': welcomeGo(welcomeIdx - 1, true); break;
