@@ -3110,11 +3110,23 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<div style="flex:5" class="rounded-lg bg-emerald-50 px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wide text-emerald-700 ring-1 ring-inset ring-emerald-200">🇮🇹 ' + escapeHtml(t('team_it')) + ' · 5–9</div>' +
       '</div>';
 
+    // Who is working: HR operator record matched to the signed-in user (or the local demo name).
+    const op = currentOperator();
+    const opName = op ? op.name : (fbEnabled && currentUser ? (currentUser.displayName || currentUser.email || '') : localOperatorName());
+    const opTeam = myTeam();
+    const opChip = opName
+      ? '<span data-tooltip="' + escapeHtml(t('operator')) + '" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 shadow-sm"><i data-lucide="user-round" class="h-3.5 w-3.5 text-indigo-500"></i>' +
+        escapeHtml(opName) + (opTeam ? ' · ' + teamFlag(opTeam) + ' ' + escapeHtml(teamLabel(opTeam)) : '') + '</span>'
+      : '';
+
     return '<main class="animate-fadeIn mx-auto max-w-[1400px] px-4 py-6 sm:px-5">' +
-      '<div class="mb-6 flex items-end justify-between gap-3">' +
+      '<div class="mb-6 flex flex-wrap items-end justify-between gap-3">' +
         '<div><h2 class="text-xl font-extrabold text-slate-900">' + t('dash_title') + '</h2>' +
         '<p class="text-sm text-slate-500">' + t('dash_subtitle') + '</p></div>' +
-        (isAdmin() ? '<button data-action="export-csv" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 shadow-sm transition hover:bg-slate-50"><i data-lucide="download" class="h-3.5 w-3.5"></i>' + t('export_csv') + '</button>' : '') +
+        '<div class="flex flex-wrap items-center gap-2">' +
+          opChip +
+          (isAdmin() ? '<button data-action="export-csv" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-white px-3 py-2 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 shadow-sm transition hover:bg-slate-50"><i data-lucide="download" class="h-3.5 w-3.5"></i>' + t('export_csv') + '</button>' : '') +
+        '</div>' +
       '</div>' +
 
       '<section data-tour="summary" class="dhl-summary mb-6 rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 to-white p-5 shadow-sm">' +
