@@ -4105,13 +4105,106 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   ];
   let welcomeTimer = null, welcomeIdx = 0;
 
+  // Lightweight inline-SVG previews of the real app screens (self-contained, no image
+  // assets → immune to caching). One per welcome slide, matched to its topic.
+  function welcomePreview(key) {
+    const frame = (inner) =>
+      '<svg viewBox="0 0 320 140" xmlns="http://www.w3.org/2000/svg" class="w-full rounded-xl">' +
+        '<rect x="1" y="1" width="318" height="138" rx="12" fill="#f8fafc" stroke="#e2e8f0"/>' +
+        '<circle cx="16" cy="15" r="3" fill="#cbd5e1"/><circle cx="26" cy="15" r="3" fill="#cbd5e1"/><circle cx="36" cy="15" r="3" fill="#cbd5e1"/>' +
+        '<rect x="250" y="10" width="58" height="10" rx="5" fill="#e2e8f0"/>' +
+        '<line x1="0" y1="28" x2="320" y2="28" stroke="#eaeff5"/>' + inner +
+      '</svg>';
+    const F = 'font-family="Inter,sans-serif"';
+    if (key === 'wl_s1') { // Dashboard: KPI tiles + risk row
+      const tile = (x, num, color) =>
+        '<rect x="' + x + '" y="38" width="90" height="52" rx="8" fill="#ffffff" stroke="#eef2f7"/>' +
+        '<rect x="' + (x + 10) + '" y="48" width="32" height="6" rx="3" fill="#cbd5e1"/>' +
+        '<text x="' + (x + 10) + '" y="80" ' + F + ' font-size="22" font-weight="800" fill="#0f172a">' + num + '</text>' +
+        '<rect x="' + (x + 62) + '" y="48" width="18" height="18" rx="5" fill="' + color + '"/>';
+      return frame(
+        tile(14, '6', '#6366f1') + tile(115, '3', '#10b981') + tile(216, '1', '#f59e0b') +
+        '<rect x="14" y="100" width="292" height="28" rx="8" fill="#fff1f2" stroke="#fecdd3"/>' +
+        '<circle cx="31" cy="114" r="7" fill="#f43f5e"/>' +
+        '<rect x="46" y="108" width="120" height="6" rx="3" fill="#fb7185"/>' +
+        '<rect x="46" y="118" width="82" height="4" rx="2" fill="#fecdd3"/>' +
+        '<text x="292" y="118" text-anchor="end" ' + F + ' font-size="12" font-weight="800" fill="#e11d48">74 gg</text>');
+    }
+    if (key === 'wl_s2') { // Workflow: two team bands + 9 phase nodes
+      const node = (x, n, kind) => {
+        const fill = kind === 'done' ? '#10b981' : (kind === 'cur' ? '#4f46e5' : '#e2e8f0');
+        const tx = kind === 'future' ? '#94a3b8' : '#ffffff';
+        return (kind === 'cur' ? '<circle cx="' + x + '" cy="98" r="13" fill="#c7d2fe"/>' : '') +
+          '<circle cx="' + x + '" cy="98" r="10" fill="' + fill + '"/>' +
+          '<text x="' + x + '" y="102" text-anchor="middle" ' + F + ' font-size="10" font-weight="700" fill="' + tx + '">' + n + '</text>';
+      };
+      const xs = [28, 60, 92, 124, 156, 188, 220, 252, 284];
+      let nodes = '<line x1="28" y1="98" x2="284" y2="98" stroke="#e2e8f0" stroke-width="2"/>';
+      xs.forEach((x, i) => { const n = i + 1; nodes += node(x, n, n < 7 ? 'done' : (n === 7 ? 'cur' : 'future')); });
+      return frame(
+        '<rect x="14" y="40" width="126" height="20" rx="6" fill="#e0f2fe" stroke="#bae6fd"/>' +
+        '<text x="77" y="54" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#0369a1">TEAM RD · 1–4</text>' +
+        '<rect x="146" y="40" width="160" height="20" rx="6" fill="#dcfce7" stroke="#bbf7d0"/>' +
+        '<text x="226" y="54" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#047857">TEAM ITALIA · 5–9</text>' +
+        nodes);
+    }
+    if (key === 'wl_s3') { // Privacy: signed consent sheet with green check
+      return frame(
+        '<rect x="108" y="38" width="104" height="92" rx="8" fill="#ffffff" stroke="#e2e8f0"/>' +
+        '<rect x="120" y="50" width="60" height="6" rx="3" fill="#cbd5e1"/>' +
+        '<rect x="120" y="64" width="80" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="120" y="74" width="80" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="120" y="84" width="64" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<path d="M120 112 q10 -10 20 0 q10 10 20 0 q8 -8 16 -2" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round"/>' +
+        '<circle cx="196" cy="46" r="13" fill="#10b981"/>' +
+        '<path d="M190 46 l4 4 l8 -9" fill="none" stroke="#ffffff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>');
+    }
+    if (key === 'wl_s4') { // Documents: rows with status pills
+      const row = (y, w, tint, stroke, dot, pillW) =>
+        '<circle cx="30" cy="' + (y + 13) + '" r="6" fill="' + dot + '"/>' +
+        '<rect x="44" y="' + (y + 7) + '" width="' + w + '" height="6" rx="3" fill="#cbd5e1"/>' +
+        '<rect x="44" y="' + (y + 17) + '" width="' + (w - 30) + '" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="' + (306 - pillW) + '" y="' + (y + 6) + '" width="' + pillW + '" height="14" rx="7" fill="' + tint + '" stroke="' + stroke + '"/>';
+      return frame(
+        row(38, 150, '#ecfdf5', '#a7f3d0', '#10b981', 54) +
+        row(72, 130, '#fffbeb', '#fde68a', '#f59e0b', 62) +
+        row(106, 140, '#fff1f2', '#fecdd3', '#f43f5e', 50));
+    }
+    if (key === 'wl_s5') { // Matching: request header + candidate shortlist
+      return frame(
+        '<rect x="14" y="36" width="292" height="24" rx="7" fill="#eef2ff" stroke="#c7d2fe"/>' +
+        '<text x="24" y="52" ' + F + ' font-size="10" font-weight="800" fill="#4338ca">Terapia Intensiva</text>' +
+        '<rect x="256" y="41" width="42" height="14" rx="7" fill="#ffffff" stroke="#c7d2fe"/>' +
+        '<text x="277" y="51" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#4f46e5">1/2</text>' +
+        '<rect x="14" y="66" width="292" height="28" rx="8" fill="#ecfdf5" stroke="#a7f3d0"/>' +
+        '<rect x="26" y="76" width="90" height="8" rx="4" fill="#94a3b8"/>' +
+        '<rect x="200" y="73" width="60" height="14" rx="7" fill="#d1fae5"/>' +
+        '<text x="230" y="83" text-anchor="middle" ' + F + ' font-size="8" font-weight="800" fill="#047857">IDONEO</text>' +
+        '<rect x="268" y="73" width="30" height="14" rx="7" fill="#4f46e5"/>' +
+        '<text x="283" y="83" text-anchor="middle" ' + F + ' font-size="8" font-weight="800" fill="#ffffff">+</text>' +
+        '<rect x="14" y="100" width="292" height="28" rx="8" fill="#ffffff" stroke="#eef2f7"/>' +
+        '<rect x="26" y="110" width="76" height="8" rx="4" fill="#cbd5e1"/>' +
+        '<rect x="196" y="107" width="64" height="14" rx="7" fill="#fef3c7"/>' +
+        '<text x="228" y="117" text-anchor="middle" ' + F + ' font-size="8" font-weight="800" fill="#b45309">PARZIALE</text>');
+    }
+    // wl_s6 — "and more": mini grid of features
+    const cell = (x, y, color) =>
+      '<rect x="' + x + '" y="' + y + '" width="88" height="40" rx="8" fill="#ffffff" stroke="#eef2f7"/>' +
+      '<rect x="' + (x + 10) + '" y="' + (y + 11) + '" width="18" height="18" rx="5" fill="' + color + '"/>' +
+      '<rect x="' + (x + 36) + '" y="' + (y + 13) + '" width="40" height="5" rx="2.5" fill="#cbd5e1"/>' +
+      '<rect x="' + (x + 36) + '" y="' + (y + 22) + '" width="28" height="4" rx="2" fill="#e2e8f0"/>';
+    return frame(
+      cell(14, 38, '#6366f1') + cell(116, 38, '#10b981') + cell(218, 38, '#f59e0b') +
+      cell(14, 86, '#0ea5e9') + cell(116, 86, '#f43f5e') + cell(218, 86, '#8b5cf6'));
+  }
+
   function welcomeSlideHtml(sl, i) {
     return '<div class="wl-slide' + (i === 0 ? ' active' : '') + '">' +
       '<div class="mx-auto flex h-full max-w-2xl flex-col items-center justify-center px-6 text-center">' +
-        '<div class="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/10 ring-1 ring-inset ring-white/20"><i data-lucide="' + sl.icon + '" class="h-8 w-8 text-indigo-300"></i></div>' +
+        '<div class="mb-3 w-full max-w-[300px] drop-shadow-xl">' + welcomePreview(sl.key) + '</div>' +
         '<p class="mb-1 text-[11px] font-bold uppercase tracking-widest text-indigo-300">' + (i + 1) + ' / ' + WELCOME_SLIDES.length + '</p>' +
-        '<h2 class="text-xl font-extrabold sm:text-2xl">' + t(sl.key + '_title') + '</h2>' +
-        '<p class="mt-3 max-w-xl text-sm leading-relaxed text-slate-300">' + t(sl.key + '_text') + '</p>' +
+        '<h2 class="text-lg font-extrabold sm:text-xl">' + t(sl.key + '_title') + '</h2>' +
+        '<p class="mt-2 max-w-xl text-xs leading-relaxed text-slate-300 sm:text-sm">' + t(sl.key + '_text') + '</p>' +
       '</div>' +
     '</div>';
   }
@@ -4132,7 +4225,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="flex flex-1 flex-col items-center justify-center px-4 py-4">' +
         '<img src="' + logoUrl + '" alt="DHL Nurses — DominicaHealthLink" class="mb-5 h-28 w-28 rounded-3xl bg-white object-contain p-1.5 shadow-2xl shadow-indigo-900/50 ring-1 ring-white/20 sm:h-36 sm:w-36" />' +
         '<h1 class="max-w-3xl px-4 text-center text-2xl font-extrabold leading-tight sm:text-4xl">' + t('wl_claim') + '</h1>' +
-        '<div class="relative mt-2 h-[250px] w-full sm:h-[230px]">' + WELCOME_SLIDES.map(welcomeSlideHtml).join('') + '</div>' +
+        '<div class="relative mt-2 h-[340px] w-full sm:h-[320px]">' + WELCOME_SLIDES.map(welcomeSlideHtml).join('') + '</div>' +
         '<div class="flex items-center gap-4">' +
           '<button data-action="welcome-prev" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-300 transition hover:bg-white/20 hover:text-white"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>' +
           '<div class="flex items-center gap-2">' + WELCOME_SLIDES.map((sl, i) => '<button data-action="welcome-dot" data-i="' + i + '" class="wl-dot' + (i === 0 ? ' active' : '') + '"></button>').join('') + '</div>' +
