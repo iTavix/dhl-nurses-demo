@@ -644,6 +644,15 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         if (isAdmin()) {
           data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true })
             .catch((err) => console.warn('Sync impostazioni fallita:', err && err.message));
+          // Access map: keeps Firestore authorization aligned with the HR operators
+          // list, so accounts work without server-side custom claims.
+          const emails = {};
+          (state.settings.operators || []).forEach((o) => {
+            const em = (o.email || '').trim().toLowerCase();
+            if (em) emails[em] = o.accessRole === 'admin' ? 'admin' : 'operator';
+          });
+          data.doc('access').set({ emails: emails, updatedAt: serverTs() })
+            .catch((err) => console.warn('Sync accessi fallita:', err && err.message));
         }
       } else {
         db.collection('nurseflow').doc(currentUser.uid)
@@ -1476,6 +1485,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             '<span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-indigo-50 text-indigo-500"><i data-lucide="' + meta.icon + '" class="h-4 w-4"></i></span>' +
             '<div class="min-w-0 flex-1"><p class="truncate text-sm font-semibold text-slate-800">' + escapeHtml(it.name || '—') + '</p>' +
               (entitySecondary(type, it) ? '<p class="truncate text-xs text-slate-400">' + escapeHtml(entitySecondary(type, it)) + '</p>' : '') + '</div>' +
+            (type === 'operators' && fbEnabled && isAdmin() && (it.email || '').trim()
+              ? '<button data-action="open-create-account" data-id="' + it.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-50" data-tooltip="' + escapeHtml(t('acct_title')) + '"><i data-lucide="key-round" class="h-3.5 w-3.5"></i></button>'
+              : '') +
             '<button data-action="open-entity" data-type="' + type + '" data-id="' + it.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + t('edit') + '</button>' +
             '<button data-action="delete-entity" data-type="' + type + '" data-id="' + it.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50">' + t('del') + '</button>' +
           '</div>'
@@ -1542,6 +1554,71 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (!confirm(t('confirm_delete', { x: it.name || '' }))) return;
     state.settings[type] = list.filter((x) => x.id !== id);
     commit();
+  }
+
+  // ---------- In-app account creation (admin only, cloud mode) ----------
+  // Creates the Firebase Auth user for an HR operator without touching the
+  // admin's own session: a throwaway secondary app instance does the signup.
+  // Authorization then comes from the access map synced in remoteSync().
+  let pendingAccountOpId = null;
+  function openCreateAccountModal(operatorId) {
+    if (!(fbEnabled && isAdmin())) return;
+    const op = (state.settings.operators || []).find((o) => o.id === operatorId);
+    if (!op) return;
+    if (!(op.email || '').trim()) { alert(t('acct_no_email')); return; }
+    pendingAccountOpId = operatorId;
+    const inner =
+      '<div class="flex items-center justify-between border-b border-slate-100 p-5">' +
+        '<div class="flex items-center gap-2"><i data-lucide="key-round" class="h-5 w-5 text-indigo-500"></i><h3 class="text-base font-bold text-slate-900">' + t('acct_title') + '</h3></div>' +
+        '<button data-action="close-modal" class="text-slate-300 transition hover:text-slate-500"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+      '</div>' +
+      '<div id="ac-msg" class="mx-5 mt-4 hidden rounded-xl px-3 py-2 text-xs font-medium ring-1 ring-inset"></div>' +
+      '<div class="space-y-3 p-5">' +
+        '<div class="rounded-xl bg-slate-50 p-3 text-sm"><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + t('login_email') + '</p>' +
+          '<p class="font-semibold text-slate-800">' + escapeHtml(op.email) + '</p>' +
+          '<p class="text-xs text-slate-500">' + escapeHtml(op.name || '') + '</p></div>' +
+        inputField('ac-pass', t('acct_pwd'), '••••••••', true, 'password') +
+        '<p class="text-xs leading-relaxed text-slate-500">' + t('acct_hint') + '</p>' +
+      '</div>' +
+      '<div class="flex justify-end gap-2 border-t border-slate-100 p-5">' +
+        '<button data-action="close-modal" class="rounded-xl px-4 py-2.5 text-sm font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50">' + t('cancel') + '</button>' +
+        '<button data-action="do-create-account" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="key-round" class="h-4 w-4"></i>' + t('acct_create') + '</button>' +
+      '</div>';
+    modalShell(inner);
+    const el = document.getElementById('ac-pass'); if (el) el.focus();
+  }
+  async function createOperatorAccount() {
+    if (!(fbEnabled && isAdmin())) return;
+    const op = (state.settings.operators || []).find((o) => o.id === pendingAccountOpId);
+    if (!op) { closeModal(); return; }
+    const pass = fieldVal('ac-pass');
+    const msg = document.getElementById('ac-msg');
+    const show = (text, ok) => {
+      if (!msg) return;
+      msg.textContent = text;
+      msg.className = 'mx-5 mt-4 rounded-xl px-3 py-2 text-xs font-medium ring-1 ring-inset ' + (ok ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-rose-50 text-rose-600 ring-rose-200');
+    };
+    if (!pass || pass.length < 6) { show(t('auth_weak_password'), false); return; }
+    let app2 = null;
+    try {
+      app2 = firebase.initializeApp(FIREBASE_CONFIG, 'acct_' + uid());
+      await app2.auth().createUserWithEmailAndPassword(op.email.trim(), pass);
+      await app2.auth().signOut();
+      show(t('acct_created', { e: op.email.trim() }), true);
+      const pf = document.getElementById('ac-pass'); if (pf) pf.value = '';
+    } catch (err) {
+      if (err && err.code === 'auth/email-already-in-use') show(t('acct_exists'), true);
+      else show(translateAuthError(err), false);
+    } finally {
+      if (app2) { try { await app2.delete(); } catch (e) { /* ignore */ } }
+    }
+  }
+  async function forgotPassword() {
+    if (!auth) return;
+    const email = ((document.getElementById('auth-email') || {}).value || '').trim();
+    if (!email) { showAuthError(t('auth_need_email')); return; }
+    try { await auth.sendPasswordResetEmail(email); alert(t('prof_reset_sent', { e: email })); }
+    catch (err) { showAuthError(translateAuthError(err)); }
   }
 
   // ------------------------------------------------------------------ MATCHING (Team Italia)
@@ -2020,10 +2097,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       <section id="accesso" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="log-in" class="h-5 w-5 text-indigo-500"></i>2. Accesso e profilo operatore</h2>
         <p class="text-sm leading-relaxed text-slate-600">All'apertura del gestionale compare la schermata di accesso. Ogni operatore lavora con il proprio account: i dati sono <b>isolati e protetti</b>.</p>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Prerequisito.</b> Per entrare, la tua email deve comparire in <b>Impostazioni → Operatori HR</b>: è quell'elenco a decidere chi accede e con quale ruolo/team. L'amministratore può anche crearti direttamente l'utenza dal pulsante <b>🔑 Crea account</b> sulla tua scheda operatore, consegnandoti una password provvisoria.</div>
         <ol class="prose-list ml-5 list-decimal text-sm text-slate-600">
-          <li><b>Primo accesso:</b> inserisci la tua email aziendale e una password (minimo 6 caratteri), poi premi <b>Registrati</b>.</li>
-          <li><b>Accessi successivi:</b> inserisci email e password e premi <b>Accedi</b>.</li>
-          <li><b>Accesso con Google:</b> in alternativa premi <b>Continua con Google</b>.</li>
+          <li><b>Account creato dall'amministratore:</b> accedi con l'email della tua scheda e la password provvisoria ricevuta, poi cambiala dal tuo profilo (avatar in alto a destra) o con «Password dimenticata?».</li>
+          <li><b>Registrazione autonoma:</b> in alternativa premi <b>Registrati</b> usando la <b>stessa email</b> della tua scheda operatore e una password a tua scelta (minimo 6 caratteri).</li>
+          <li><b>Accesso con Google:</b> premi <b>Continua con Google</b> con l'account Google che ha quella email — nessuna password da gestire.</li>
+          <li><b>Accessi successivi:</b> email e password e premi <b>Accedi</b>; se non la ricordi usa <b>«Password dimenticata?»</b> sotto il campo password.</li>
           <li><b>Uscire:</b> in alto a destra, premi <b>Esci</b> al termine del lavoro.</li>
         </ol>
         <h3 id="profilo-operatore" class="pt-2 text-base font-bold text-slate-800">2.1 · Il tuo profilo operatore</h3>
@@ -2287,10 +2366,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       <section id="accesso" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="log-in" class="h-5 w-5 text-indigo-500"></i>2. Access & operator profile</h2>
         <p class="text-sm leading-relaxed text-slate-600">When the app opens, the sign-in screen appears. Each operator works with their own account: data is <b>isolated and protected</b>.</p>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Prerequisite.</b> To get in, your email must appear in <b>Settings → HR Operators</b>: that list decides who accesses and with which role/team. The administrator can also create your account directly from the <b>🔑 Create account</b> button on your operator record, handing you a temporary password.</div>
         <ol class="prose-list ml-5 list-decimal text-sm text-slate-600">
-          <li><b>First access:</b> enter your company email and a password (min 6 characters), then press <b>Sign up</b>.</li>
-          <li><b>Later access:</b> enter email and password and press <b>Sign in</b>.</li>
-          <li><b>Google sign-in:</b> alternatively press <b>Continue with Google</b>.</li>
+          <li><b>Account created by the administrator:</b> sign in with your record's email and the temporary password you received, then change it from your profile (top-right avatar) or with "Forgot password?".</li>
+          <li><b>Self sign-up:</b> alternatively press <b>Sign up</b> using the <b>same email</b> as your operator record and a password of your choice (min 6 characters).</li>
+          <li><b>Google sign-in:</b> press <b>Continue with Google</b> with the Google account holding that email — no password to manage.</li>
+          <li><b>Later access:</b> email and password, then <b>Sign in</b>; if you forgot it use <b>"Forgot password?"</b> under the password field.</li>
           <li><b>Sign out:</b> top right, press <b>Sign out</b> when you finish.</li>
         </ol>
         <h3 id="profilo-operatore" class="pt-2 text-base font-bold text-slate-800">2.1 · Your operator profile</h3>
@@ -2547,10 +2628,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       <section id="accesso" class="space-y-4">
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="log-in" class="h-5 w-5 text-indigo-500"></i>2. Acceso y perfil del operador</h2>
         <p class="text-sm leading-relaxed text-slate-600">Al abrir la app aparece la pantalla de acceso. Cada operador trabaja con su propia cuenta: los datos están <b>aislados y protegidos</b>.</p>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Requisito previo.</b> Para entrar, tu correo debe aparecer en <b>Ajustes → Operadores RR.HH.</b>: esa lista decide quién accede y con qué rol/equipo. El administrador también puede crearte la cuenta directamente con el botón <b>🔑 Crear cuenta</b> de tu ficha de operador, entregándote una contraseña provisional.</div>
         <ol class="prose-list ml-5 list-decimal text-sm text-slate-600">
-          <li><b>Primer acceso:</b> introduce tu correo de empresa y una contraseña (mín. 6 caracteres), luego pulsa <b>Registrarse</b>.</li>
-          <li><b>Accesos posteriores:</b> introduce correo y contraseña y pulsa <b>Acceder</b>.</li>
-          <li><b>Acceso con Google:</b> como alternativa pulsa <b>Continuar con Google</b>.</li>
+          <li><b>Cuenta creada por el administrador:</b> accede con el correo de tu ficha y la contraseña provisional recibida; luego cámbiala desde tu perfil (avatar arriba a la derecha) o con «¿Contraseña olvidada?».</li>
+          <li><b>Registro autónomo:</b> como alternativa pulsa <b>Registrarse</b> usando el <b>mismo correo</b> de tu ficha de operador y una contraseña a tu elección (mín. 6 caracteres).</li>
+          <li><b>Acceso con Google:</b> pulsa <b>Continuar con Google</b> con la cuenta de Google de ese correo — sin contraseñas que gestionar.</li>
+          <li><b>Accesos posteriores:</b> correo y contraseña y pulsa <b>Acceder</b>; si no la recuerdas usa <b>«¿Contraseña olvidada?»</b> bajo el campo de contraseña.</li>
           <li><b>Salir:</b> arriba a la derecha, pulsa <b>Salir</b> al terminar.</li>
         </ol>
         <h3 id="profilo-operatore" class="pt-2 text-base font-bold text-slate-800">2.1 · Tu perfil de operador</h3>
@@ -3602,6 +3685,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             '<div>' +
               '<label class="mb-1 block text-xs font-semibold text-slate-500">' + t('login_password') + '</label>' +
               '<input id="auth-pass" type="password" autocomplete="current-password" placeholder="••••••••" class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:bg-white focus:ring-2 focus:ring-indigo-100" />' +
+              '<button type="button" data-action="forgot-password" class="mt-1.5 block w-full text-right text-xs font-medium text-indigo-500 transition hover:underline">' + t('login_forgot') + '</button>' +
             '</div>' +
             '<div class="flex gap-2 pt-1">' +
               '<button type="submit" data-intent="login" class="flex-1 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200 transition hover:bg-indigo-700">' + t('login_signin') + '</button>' +
@@ -3915,6 +3999,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'show-risk': state.statusFilter = 'risk'; state.view = 'cases'; commit(); break;
       case 'open-entity': openEntityModal(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
       case 'save-entity': saveEntity(); break;
+      case 'open-create-account': openCreateAccountModal(t.getAttribute('data-id')); break;
+      case 'do-create-account': createOperatorAccount(); break;
+      case 'forgot-password': forgotPassword(); break;
       case 'open-request': openRequestModal(t.getAttribute('data-id')); break;
       case 'save-request': saveRequestFromForm(); break;
       case 'delete-request': deleteRequest(t.getAttribute('data-id')); break;
