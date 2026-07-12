@@ -1622,7 +1622,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           ? '<button data-action="open-request" class="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm shadow-indigo-200 transition hover:bg-indigo-700"><i data-lucide="plus" class="h-4 w-4"></i>' + t('mt_new') + '</button>'
           : '<span class="inline-flex items-center gap-1.5 rounded-xl bg-sky-50 px-3 py-2 text-xs font-medium text-sky-700 ring-1 ring-inset ring-sky-200"><i data-lucide="users" class="h-4 w-4"></i>' + t('mt_ro_hint') + '</span>') +
       '</div>' +
-      '<div class="grid grid-cols-1 gap-5 lg:grid-cols-2">' + cards + '</div>' +
+      '<div data-tour="matching" class="grid grid-cols-1 gap-5 lg:grid-cols-2">' + cards + '</div>' +
     '</main>';
   }
 
@@ -2129,6 +2129,17 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <li><b>Richieste delle strutture:</b> nella vista <b>Matching</b>, con «Nuova Richiesta» si registrano reparto di destinazione, numero di infermieri richiesti, competenze minime, specializzazioni preferenziali e turno; la richiesta risulta «Abbinata» quando tutti i posti sono coperti.</li>
           <li><b>Incrocio:</b> «Trova candidati» ordina i profili per compatibilità (interrogazione → identificazione → validazione documentale) e con «Abbina» si finalizza la proposta: il datore di lavoro del candidato viene aggiornato e tutto resta tracciato nel log.</li>
         </ul>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="text-sm font-bold text-slate-800">Come viene costruita la rosa dei candidati</p>
+          <ul class="prose-list mt-2 ml-5 list-disc text-sm text-slate-600">
+            <li><b>Chi entra:</b> tutti i candidati non ancora abbinati a un'altra richiesta e non oltre la fase 7 (chi è già in Rapporto di Lavoro o ha concluso il percorso è escluso). La fase non conta come requisito: puoi "prenotare" anche chi è ancora in formazione.</li>
+            <li><b>Idoneo o parziale:</b> un profilo è <span class="font-semibold text-emerald-600">Idoneo</span> solo se possiede <b>tutte</b> le competenze minime della richiesta; altrimenti è <span class="font-semibold text-amber-600">Parziale</span>. Il sistema informa ma non impone: la scelta finale resta dell'operatore.</li>
+            <li><b>Ordinamento:</b> profilo idoneo = 100 punti base (un parziale arriva al massimo a 60, in proporzione alle minime possedute); <b>+8</b> per ogni specializzazione preferenziale; <b>+5</b> se il dossier «Italia in tasca» è validato; <b>+4</b> se tutti i documenti obbligatori sono approvati; a parità, viene prima chi è più avanti nelle fasi (operativo prima).</li>
+            <li><b>Badge di validazione:</b> sotto ogni nome vedi competenze x/y, preferenziali x/y, documenti completi/incompleti e dossier validato/mancante — la «validazione» del protocollo, a colpo d'occhio.</li>
+            <li><b>Stati della richiesta:</b> nasce <b>Aperta</b>; con gli abbinamenti il contatore sale (es. «1/3 abbinati») e a organico coperto diventa <b>Abbinata</b>; a contratti firmati la si <b>Chiude</b>. La ✕ su un singolo abbinato lo rimuove (tracciato nel log) e riapre la richiesta.</li>
+            <li><b>Cosa NON fa:</b> l'abbinamento non fa avanzare le fasi del candidato e non lo toglie dalla pipeline: il percorso prosegue normalmente con checklist e «Avanza Fase».</li>
+          </ul>
+        </div>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -2188,6 +2199,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li><b>Registra la chiamata</b> e aggiorna documenti/checklist: il contatore si azzera.</li>
           </ol>
         </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">7</span>Gestire una richiesta e abbinare i candidati (Team Italia)</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Vai nella vista <b>Matching</b> e premi <b>Nuova Richiesta</b>.</li>
+            <li>Compila struttura e reparto (obbligatori), <b>numero di infermieri richiesti</b>, competenze minime, preferenziali e turno, poi <b>Salva</b>.</li>
+            <li>Premi <b>Trova candidati</b> e leggi la rosa: «Profilo idoneo» in testa, badge di validazione sotto ogni nome.</li>
+            <li>Premi <b>Abbina</b> sul candidato scelto e conferma: datore di lavoro aggiornato e log scritto. Ripeti finché il contatore non arriva a organico pieno (es. «3/3 abbinati» → richiesta <b>Abbinata</b>).</li>
+            <li>A contratti firmati premi <b>Chiudi richiesta</b>. Per correggere un errore usa la ✕ sul singolo abbinato.</li>
+          </ol>
+        </div>
 
         <div class="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 p-4">
           <p class="text-sm font-bold text-emerald-800">Altre funzioni utili</p>
@@ -2219,6 +2240,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché "Avanza Fase" è grigio?</summary><p class="mt-2 text-slate-600">Mancano requisiti nella fase corrente: spunta la checklist e approva i documenti elencati sopra il pulsante.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Ho approvato un documento per errore.</summary><p class="mt-2 text-slate-600">Premi <b>Respingi</b> sullo stesso documento: torna "Mancante" e l'azione resta nel log.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Posso tornare a una fase precedente?</summary><p class="mt-2 text-slate-600">Il flusso è pensato per avanzare. Agisci su documenti/checklist e annota la motivazione nel log; per casi particolari contatta l'amministratore.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché un candidato non compare nella rosa del matching?</summary><p class="mt-2 text-slate-600">O è già abbinato a un'altra richiesta (rimuovi prima quell'abbinamento con la ✕), oppure è in fase 8–9 / percorso concluso, quindi non è più disponibile per nuovi abbinamenti.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché non posso spuntare la checklist o avanzare la fase?</summary><p class="mt-2 text-slate-600">La fase appartiene all'altro team (l'avviso azzurro indica quale): le fasi 1–4 le lavora il Team Rep. Dominicana, le 5–9 il Team Italia. Gli amministratori e gli operatori senza team non hanno limitazioni.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Cosa fa "Ripristina"?</summary><p class="mt-2 text-slate-600">Riporta ai 3 profili demo e cancella le modifiche locali. Usalo solo per dimostrazioni/formazione.</p></details>
         </div>
       </section>
@@ -2367,6 +2390,17 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <li><b>Facility requests:</b> in the <b>Matching</b> view, "New Request" records the destination ward, the number of nurses requested, minimum skills, preferred specialisations and shift; the request becomes "Matched" once every position is covered.</li>
           <li><b>Matching:</b> "Find candidates" ranks the profiles by compatibility (query → shortlist → document validation) and "Match" finalises the proposal: the candidate's employer is updated and everything is tracked in the log.</li>
         </ul>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="text-sm font-bold text-slate-800">How the shortlist is built</p>
+          <ul class="prose-list mt-2 ml-5 list-disc text-sm text-slate-600">
+            <li><b>Who enters:</b> every candidate not yet matched to another request and not beyond phase 7 (anyone already in Employment or completed is excluded). The phase is not a requirement: you can "reserve" someone still in training.</li>
+            <li><b>Eligible or partial:</b> a profile is <span class="font-semibold text-emerald-600">Eligible</span> only if it holds <b>all</b> the request's minimum skills; otherwise it is <span class="font-semibold text-amber-600">Partial</span>. The system informs but does not decide: the final choice stays with the operator.</li>
+            <li><b>Ranking:</b> eligible profile = 100 base points (a partial one reaches at most 60, proportional to the minimum skills held); <b>+8</b> per preferred specialisation; <b>+5</b> if the «Italia in tasca» dossier is validated; <b>+4</b> if every required document is approved; ties favour whoever is further along the phases (operational sooner).</li>
+            <li><b>Validation badges:</b> under each name you see skills x/y, preferred x/y, documents complete/incomplete and dossier validated/missing — the protocol's "validation" at a glance.</li>
+            <li><b>Request states:</b> it is born <b>Open</b>; assignments raise the counter (e.g. "1/3 matched") and at full headcount it becomes <b>Matched</b>; once contracts are signed you <b>Close</b> it. The ✕ on a single assignee removes them (logged) and reopens the request.</li>
+            <li><b>What it does NOT do:</b> matching neither advances the candidate's phases nor removes them from the pipeline: the path continues normally with checklists and "Advance Phase".</li>
+          </ul>
+        </div>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -2425,6 +2459,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li><b>Log the call</b> and update documents/checklist: the day counter resets.</li>
           </ol>
         </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">7</span>Manage a request and match candidates (Italy Team)</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Go to the <b>Matching</b> view and press <b>New Request</b>.</li>
+            <li>Fill in facility and ward (required), the <b>number of nurses requested</b>, minimum skills, preferred ones and shift, then <b>Save</b>.</li>
+            <li>Press <b>Find candidates</b> and read the shortlist: "Eligible profile" on top, validation badges under each name.</li>
+            <li>Press <b>Match</b> on the chosen candidate and confirm: employer updated and log written. Repeat until the counter reaches full headcount (e.g. "3/3 matched" → request <b>Matched</b>).</li>
+            <li>Once contracts are signed press <b>Close request</b>. To fix a mistake use the ✕ on the single assignee.</li>
+          </ol>
+        </div>
 
         <div class="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 p-4">
           <p class="text-sm font-bold text-emerald-800">Other useful features</p>
@@ -2456,6 +2500,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why is "Advance Phase" greyed out?</summary><p class="mt-2 text-slate-600">Requirements are missing in the current phase: tick the checklist and approve the documents listed above the button.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">I approved a document by mistake.</summary><p class="mt-2 text-slate-600">Press <b>Reject</b> on the same document: it returns to "Missing" and the action stays in the log.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Can I go back to a previous phase?</summary><p class="mt-2 text-slate-600">The flow is designed to advance. Act on documents/checklist and note the reason in the log; for special cases contact the administrator.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why doesn't a candidate appear in the matching shortlist?</summary><p class="mt-2 text-slate-600">Either they are already matched to another request (remove that assignment first with the ✕), or they are in phase 8–9 / completed, so no longer available for new assignments.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why can't I tick the checklist or advance the phase?</summary><p class="mt-2 text-slate-600">The phase belongs to the other team (the blue notice says which): phases 1–4 are worked by the Dominican Republic Team, 5–9 by the Italy Team. Administrators and operators without a team have no restrictions.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">What does "Reset" do?</summary><p class="mt-2 text-slate-600">Restores the 3 demo profiles and discards local changes. Use it only for demos/training.</p></details>
         </div>
       </section>
@@ -2604,6 +2650,17 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <li><b>Solicitudes de las estructuras:</b> en la vista <b>Matching</b>, «Nueva Solicitud» registra la unidad de destino, el número de enfermeros solicitados, las competencias mínimas, las especializaciones preferentes y el turno; la solicitud pasa a «Emparejada» cuando todos los puestos están cubiertos.</li>
           <li><b>Cruce:</b> «Buscar candidatos» ordena los perfiles por compatibilidad (consulta → selección → validación documental) y con «Emparejar» se finaliza la propuesta: el empleador del candidato se actualiza y todo queda registrado en el log.</li>
         </ul>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="text-sm font-bold text-slate-800">Cómo se construye la lista de candidatos</p>
+          <ul class="prose-list mt-2 ml-5 list-disc text-sm text-slate-600">
+            <li><b>Quién entra:</b> todos los candidatos aún no emparejados con otra solicitud y que no hayan superado la fase 7 (quien ya está en Relación Laboral o ha concluido queda excluido). La fase no es un requisito: puedes "reservar" a quien todavía está en formación.</li>
+            <li><b>Idóneo o parcial:</b> un perfil es <span class="font-semibold text-emerald-600">Idóneo</span> solo si posee <b>todas</b> las competencias mínimas de la solicitud; si no, es <span class="font-semibold text-amber-600">Parcial</span>. El sistema informa pero no decide: la elección final es del operador.</li>
+            <li><b>Orden:</b> perfil idóneo = 100 puntos base (uno parcial llega como máximo a 60, en proporción a las mínimas que posee); <b>+8</b> por cada especialización preferente; <b>+5</b> si el dossier «Italia in tasca» está validado; <b>+4</b> si todos los documentos obligatorios están aprobados; en caso de empate va antes quien está más avanzado en las fases (operativo antes).</li>
+            <li><b>Insignias de validación:</b> bajo cada nombre ves competencias x/y, preferentes x/y, documentos completos/incompletos y dossier validado/faltante — la «validación» del protocolo, de un vistazo.</li>
+            <li><b>Estados de la solicitud:</b> nace <b>Abierta</b>; con los emparejamientos sube el contador (p. ej. «1/3 emparejados») y con la plantilla cubierta pasa a <b>Emparejada</b>; con los contratos firmados se <b>Cierra</b>. La ✕ sobre un emparejado lo elimina (queda en el log) y reabre la solicitud.</li>
+            <li><b>Lo que NO hace:</b> el emparejamiento no avanza las fases del candidato ni lo saca de la pipeline: el recorrido continúa normalmente con checklists y «Avanzar Fase».</li>
+          </ul>
+        </div>
       </section>
 
       <section id="procedure" class="space-y-4">
@@ -2662,6 +2719,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li><b>Registra la llamada</b> y actualiza documentos/checklist: el contador de días se reinicia.</li>
           </ol>
         </div>
+        <div class="rounded-xl border border-slate-200 bg-white p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-slate-800"><span class="flex h-6 w-6 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold text-white">7</span>Gestionar una solicitud y emparejar candidatos (Equipo Italia)</p>
+          <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
+            <li>Ve a la vista <b>Matching</b> y pulsa <b>Nueva Solicitud</b>.</li>
+            <li>Rellena estructura y unidad (obligatorias), el <b>número de enfermeros solicitados</b>, las competencias mínimas, las preferentes y el turno; luego <b>Guardar</b>.</li>
+            <li>Pulsa <b>Buscar candidatos</b> y lee la lista: «Perfil idóneo» arriba, insignias de validación bajo cada nombre.</li>
+            <li>Pulsa <b>Emparejar</b> en el candidato elegido y confirma: empleador actualizado y registro escrito. Repite hasta que el contador cubra la plantilla (p. ej. «3/3 emparejados» → solicitud <b>Emparejada</b>).</li>
+            <li>Con los contratos firmados pulsa <b>Cerrar solicitud</b>. Para corregir un error usa la ✕ sobre el emparejado.</li>
+          </ol>
+        </div>
 
         <div class="rounded-xl border-l-4 border-emerald-400 bg-emerald-50 p-4">
           <p class="text-sm font-bold text-emerald-800">Otras funciones útiles</p>
@@ -2693,6 +2760,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué "Avanzar Fase" está en gris?</summary><p class="mt-2 text-slate-600">Faltan requisitos en la fase actual: marca la checklist y aprueba los documentos indicados sobre el botón.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Aprobé un documento por error.</summary><p class="mt-2 text-slate-600">Pulsa <b>Rechazar</b> en el mismo documento: vuelve a "Faltante" y la acción queda en el registro.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Puedo volver a una fase anterior?</summary><p class="mt-2 text-slate-600">El flujo está pensado para avanzar. Actúa sobre documentos/checklist y anota el motivo en el registro; para casos especiales contacta con el administrador.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué un candidato no aparece en la lista del matching?</summary><p class="mt-2 text-slate-600">O ya está emparejado con otra solicitud (quita antes ese emparejamiento con la ✕), o está en fase 8–9 / recorrido concluido, por lo que ya no está disponible para nuevos emparejamientos.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué no puedo marcar la checklist ni avanzar la fase?</summary><p class="mt-2 text-slate-600">La fase pertenece al otro equipo (el aviso azul indica cuál): las fases 1–4 las trabaja el Equipo Rep. Dominicana, las 5–9 el Equipo Italia. Los administradores y los operadores sin equipo no tienen limitaciones.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Qué hace "Restablecer"?</summary><p class="mt-2 text-slate-600">Restaura los 3 perfiles demo y descarta los cambios locales. Úsalo solo para demos/formación.</p></details>
         </div>
       </section>
@@ -3683,6 +3752,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     { view: 'cases', sel: '[data-tour="docs"]', key: 'tour7' },
     { view: 'cases', sel: '[data-tour="checklist"]', key: 'tour8' },
     { view: 'cases', sel: '[data-tour="log"]', key: 'tour9' },
+    { view: 'matching', sel: '[data-tour="matching"]', key: 'tour10' },
   ];
 
   function ensureTourDom() {
