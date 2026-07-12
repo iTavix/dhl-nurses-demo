@@ -3748,11 +3748,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     { view: 'dashboard', sel: '[data-tour="risk"]', key: 'tour3' },
     { view: 'cases', sel: '[data-tour="master"]', key: 'tour4' },
     { view: 'cases', sel: '[data-tour="stepper"]', key: 'tour5' },
+    // The matching view right after the 9-phase story: phase 7 is its natural hook.
+    { view: 'matching', sel: '[data-tour="matching"]', key: 'tour10' },
     { view: 'cases', sel: '[data-tour="advance"]', key: 'tour6' },
     { view: 'cases', sel: '[data-tour="docs"]', key: 'tour7' },
     { view: 'cases', sel: '[data-tour="checklist"]', key: 'tour8' },
     { view: 'cases', sel: '[data-tour="log"]', key: 'tour9' },
-    { view: 'matching', sel: '[data-tour="matching"]', key: 'tour10' },
   ];
 
   function ensureTourDom() {
