@@ -7,6 +7,11 @@
    plus the iOS safe-area rules at the bottom.
    =================================================================================== */
     body { font-family: 'Inter', sans-serif; }
+    /* Sticky footer: the app shell is a full-height column so the footer sits at the
+       bottom of the viewport even when a view has little content (e.g. Matching). */
+    #app { display: flex; flex-direction: column; min-height: 100vh; }
+    #app > .dhl-main { flex: 1 0 auto; }
+    #app > footer { flex-shrink: 0; }
     ::-webkit-scrollbar { width: 10px; height: 10px; }
     ::-webkit-scrollbar-track { background: transparent; }
     ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }

@@ -265,9 +265,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       specializations: ['Terapia Intensiva', 'Emergenza-Urgenza'],
       profRole: 'Infermiere', profSector: 'Terapia Intensiva', profExperience: '7 anni',
       passportExpiry: isoDaysAgo(-1800), cedulaExpiry: isoDaysAgo(-600),
-      matchedRequestId: null, matchedDepartment: '',
       specializations: ['Terapia Intensiva', 'Emergenza-Urgenza'],
-      matchedRequestId: null, matchedDepartment: '',
+      // Pre-matched (demo): fills one of the two Padova seats, so the request shows 1/2.
+      matchedRequestId: 'req_padova_ti', matchedDepartment: 'Terapia Intensiva',
       currentStep: 7,
       status: 'Visa Obtained',
       lastUpdate: isoDaysAgo(6),
@@ -453,7 +453,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Casa di Cura San Raffaele · Milano',
       hrReferent: 'Dott.ssa Giulia Ferraro',
       specializations: ['Nefrologia e Dialisi'],
-      matchedRequestId: null, matchedDepartment: '',
+      // Pre-matched (demo): fills the San Raffaele dialysis request (fully staffed example).
+      matchedRequestId: 'req_sr_dialisi', matchedDepartment: 'Nefrologia e Dialisi',
       currentStep: 6,
       status: 'In Progress',
       lastUpdate: isoDaysAgo(3),
@@ -481,7 +482,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       ],
     };
 
-    // Example hospital request (Team Italia): open, ready to be matched.
+    // Example hospital requests (Team Italia) — a lively matching board for the demo:
+    // one partially staffed (Carlos on 1 of 2 seats), one fully staffed (Rosa), two open.
     const reqPadova = {
       id: 'req_padova_ti',
       employer: 'Azienda Ospedaliera di Padova',
@@ -492,7 +494,46 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       preferredSkills: ['Emergenza-Urgenza'],
       notes: 'Potenziamento organico area critica: richiesta pervenuta dalla direzione sanitaria.',
       status: 'open',
-      createdAt: isoDaysAgo(5),
+      createdAt: isoDaysAgo(9),
+      matched: [{ id: 'nurse_carlos', name: 'Carlos Manuel Tejeda', at: isoDaysAgo(2) }],
+    };
+    const reqSrDialisi = {
+      id: 'req_sr_dialisi',
+      employer: 'Casa di Cura San Raffaele · Milano',
+      department: 'Nefrologia e Dialisi',
+      shift: 'Turni diurni (mattina/pomeriggio)',
+      quantity: 1,
+      requiredSkills: ['Nefrologia e Dialisi'],
+      preferredSkills: [],
+      notes: 'Apertura nuovi posti letto in dialisi: infermiere con esperienza specifica.',
+      status: 'matched',
+      createdAt: isoDaysAgo(14),
+      matched: [{ id: 'nurse_rosa', name: 'Rosa Altagracia Féliz', at: isoDaysAgo(4) }],
+    };
+    const reqBologna = {
+      id: 'req_bologna_so',
+      employer: 'Policlinico S.Orsola · Bologna',
+      department: 'Sala Operatoria',
+      shift: 'Turni mattina + reperibilità',
+      quantity: 1,
+      requiredSkills: ['Sala Operatoria'],
+      preferredSkills: ['Chirurgia'],
+      notes: 'Blocco operatorio: rinforzo équipe di sala.',
+      status: 'open',
+      createdAt: isoDaysAgo(3),
+      matched: [],
+    };
+    const reqFirenze = {
+      id: 'req_firenze_ped',
+      employer: 'AOU Meyer · Firenze',
+      department: 'Pediatria',
+      shift: 'Turni H24',
+      quantity: 1,
+      requiredSkills: ['Pediatria'],
+      preferredSkills: ['Medicina Generale'],
+      notes: 'Reparto pediatrico: copertura turni notturni.',
+      status: 'open',
+      createdAt: isoDaysAgo(1),
       matched: [],
     };
 
@@ -503,7 +544,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       search: '',
       statusFilter: 'all',        // 'all' | 'risk' | a status key
       nurses: [ana, marisol, jose, carlos, rosa, elena],
-      requests: [reqPadova],
+      requests: [reqPadova, reqSrDialisi, reqBologna, reqFirenze],
       settings: defaultSettings(),
     };
   }
@@ -3277,7 +3318,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       : state.view === 'documents' ? archiveView()
       : state.view === 'matching' ? matchingView()
       : casesView();
-    root.innerHTML = demoBanner() + header() + body + appFooter();
+    // #app is a min-height:100vh flex column (see styles.css): the main area grows so the
+    // footer is pushed to the bottom of the viewport even on short pages (e.g. Matching).
+    root.innerHTML = demoBanner() + header() + '<div class="dhl-main">' + body + '</div>' + appFooter();
     lucide.createIcons();
     syncHistory();
     maybeAutoStartTour();
@@ -4479,6 +4522,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
   // Close any open modal / tour with the Escape key.
   document.addEventListener('keydown', (e) => {
+    // Arrow keys drive the interactive guided tour: →/↓ next step, ←/↑ previous.
+    if (tour.active && !document.getElementById('modal-layer')) {
+      if (e.key === 'ArrowRight' || e.key === 'ArrowDown') { e.preventDefault(); tourNext(); return; }
+      if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') { e.preventDefault(); tourPrev(); return; }
+    }
     if (e.key !== 'Escape') return;
     if (document.getElementById('wl-detail')) closeWelcomeDetail();
     else if (document.getElementById('welcome-overlay')) closeWelcome();
