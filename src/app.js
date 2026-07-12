@@ -2485,7 +2485,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     '<div class="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">' +
       '<div class="mx-auto flex max-w-6xl items-center gap-3 px-4 py-3 sm:px-5">' +
         '<div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow"><i data-lucide="book-open" class="h-4 w-4"></i></div>' +
-        '<div><h1 class="text-sm font-extrabold leading-tight text-slate-900">' + t('manual_title') + '</h1><p class="text-xs text-slate-500">DHL Nurses · v1.0</p></div>' +
+        '<div><h1 class="text-sm font-extrabold leading-tight text-slate-900">' + t('manual_title') + '</h1><p class="text-xs text-slate-500">DHL Nurses · v1.1</p></div>' +
         '<div class="ml-auto flex items-center gap-2">' +
           '<button onclick="window.print()" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="printer" class="h-3.5 w-3.5"></i><span class="hidden sm:inline">' + t('manual_btn_print') + '</span></button>' +
           '<button data-action="close-manual" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="x" class="h-3.5 w-3.5"></i>' + t('manual_close') + '</button>' +
@@ -2516,7 +2516,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Gestione Pratiche</p><p class="mt-1 text-xs text-slate-500">Il lavoro sul singolo candidato.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="graduation-cap" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Guida interattiva</p><p class="mt-1 text-xs text-slate-500">Il tour a riflettore dentro l'app (pulsante "Guida").</p></div>
         </div>
-        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Suggerimento.</b> Al primo accesso parte automaticamente la <b>Guida</b> interattiva. Puoi rilanciarla in qualsiasi momento dal pulsante <span class="font-semibold">🎓 Guida</span> in alto a destra. Questo manuale la completa con le procedure dettagliate.</div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Suggerimento.</b> Al primo accesso parte automaticamente la <b>Guida</b> interattiva. Puoi rilanciarla in qualsiasi momento dal pulsante <span class="font-semibold">🎓 Guida</span> in alto a destra (ora la sfogli anche con le <b>frecce ← → della tastiera</b>). Questo manuale la completa con le procedure dettagliate.</div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-emerald-800"><i data-lucide="sparkles" class="h-4 w-4"></i>Novità di questa versione</p>
+          <ul class="prose-list mt-2 ml-5 list-disc text-sm text-emerald-900/80">
+            <li><b>Salvataggio in tempo reale con indicatore di stato</b> nell'header (☁︎ Salvato / Salvataggio… / NON salvato / Offline): con più operatori sullo stesso archivio, le modifiche di ciascuno arrivano subito agli altri e un avviso segnala quando il salvataggio sul cloud non riesce (§8).</li>
+            <li><b>Avvisi sulle richieste di matching:</b> un messaggio compare quando una richiesta viene creata e quando l'organico è al completo (§6.1).</li>
+            <li><b>Scheda candidato stampabile in PDF:</b> pulsante <b>Scheda</b> nell'intestazione del candidato (§7).</li>
+            <li><b>Backup dei dati</b> (Impostazioni, solo admin): esporta e ripristina l'intero archivio da un file (§8).</li>
+            <li><b>Scadenze di passaporto e cédula</b> ora segnalate anche in Dashboard, non solo nella scheda (§4.3).</li>
+            <li><b>Ricerca pratiche estesa</b> anche ad agenzia, referente HR, luogo di nascita e specializzazioni (§5.1).</li>
+            <li><b>Documenti bloccati</b> sulle fasi dell'altro team, come già checklist e «Avanza Fase» (§9).</li>
+          </ul>
+        </div>
       </section>
 
       <section id="accesso" class="space-y-4">
@@ -2550,8 +2562,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Dashboard / Gestione Pratiche / Matching / Documenti / Impostazioni</td><td class="px-4 py-2.5 text-slate-600">Le viste: visione d'insieme, lavoro sul candidato, richieste delle strutture e incrocio domanda–offerta, archivio documenti e (solo admin) anagrafiche di base.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Badge "a rischio"</td><td class="px-4 py-2.5 text-slate-600">Conta le pratiche ferme oltre i tempi previsti. Verde = nessun rischio.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manuale</td><td class="px-4 py-2.5 text-slate-600">Apre questo documento.</td></tr>
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Guida</td><td class="px-4 py-2.5 text-slate-600">Avvia il tour interattivo a riflettore.</td></tr>
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Ripristina</td><td class="px-4 py-2.5 text-slate-600">Riporta ai 3 profili demo. <b>Attenzione:</b> annulla le modifiche locali.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Guida</td><td class="px-4 py-2.5 text-slate-600">Avvia il tour interattivo a riflettore (navigabile con le frecce ← →).</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Stato salvataggio</td><td class="px-4 py-2.5 text-slate-600">Solo in modalità cloud: ☁︎ verde = salvato, ambra = salvataggio in corso, <b>rosso = non salvato</b> (clic per il dettaglio e nuovo tentativo), grigio = offline.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Ripristina</td><td class="px-4 py-2.5 text-slate-600">Riporta ai profili demo. <b>Solo in modalità demo locale</b> (in cloud è nascosto per non cancellare i dati del team).</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Avatar / Esci</td><td class="px-4 py-2.5 text-slate-600">Profilo operatore e chiusura sessione.</td></tr>
           </tbody>
         </table></div>
@@ -2588,7 +2601,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">Il lavoro quotidiano. A sinistra l'<b>elenco candidati</b>, a destra la <b>scheda completa</b>.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · Elenco e ricerca</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
-          <li><b>Ricerca:</b> per nome, passaporto o struttura di destinazione.</li>
+          <li><b>Ricerca:</b> per nome, passaporto, struttura di destinazione, <b>agenzia partner, referente HR, luogo di nascita e specializzazioni</b>.</li>
           <li><b>Filtri di stato:</b> Tutti, <b>Trasferiti</b>, <b>Da Trasferire</b>, A rischio, Doc. Mancanti, In corso, Fase Italia, Completati. Arrivando da un KPI (es. "In Matching") compare un filtro temporaneo evidenziato, con la ✕ per rimuoverlo.</li>
           <li><b>Filtro "Il mio team":</b> se in <b>Impostazioni → Operatori HR</b> il tuo profilo ha un Team assegnato (Rep. Dominicana o Italia), compare un filtro dedicato che mostra solo i candidati nelle fasi del tuo team. L'abbinamento avviene tramite l'email di accesso (o il nome operatore in modalità demo).</li>
           <li><b>Scheda:</b> mostra badge di stato, livello linguistico e fase. L'icona ⏰ segnala un rischio ritardo.</li>
@@ -2630,7 +2643,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">Il gestionale è la <b>fonte unica di verità</b> del progetto: il <b>Team Dominicana inserisce e qualifica</b> i dati (specializzazioni cliniche verificate del candidato, documentazione asseverata, dossier «Italia in tasca»), il <b>Team Italia interroga ed estrae</b> (riceve i fabbisogni dalle strutture, filtra il database per competenze, abbina il profilo idoneo e ne monitora la conformità).</p>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Specializzazioni del candidato:</b> si spuntano dal catalogo in <b>Modifica anagrafica</b> (sezione Competenze); il catalogo si gestisce in <b>Impostazioni → Specializzazioni</b>.</li>
-          <li><b>Richieste delle strutture:</b> nella vista <b>Matching</b>, con «Nuova Richiesta» si registrano reparto di destinazione, numero di infermieri richiesti, competenze minime, specializzazioni preferenziali e turno; la richiesta risulta «Abbinata» quando tutti i posti sono coperti.</li>
+          <li><b>Richieste delle strutture:</b> nella vista <b>Matching</b>, con «Nuova Richiesta» si registrano reparto di destinazione, numero di infermieri richiesti, competenze minime, specializzazioni preferenziali e turno; la richiesta risulta «Abbinata» quando tutti i posti sono coperti. Un <b>avviso</b> segnala automaticamente quando una richiesta viene creata e quando l'organico è al completo — anche se l'azione arriva da un altro operatore.</li>
           <li><b>Incrocio:</b> «Trova candidati» ordina i profili per compatibilità (interrogazione → identificazione → validazione documentale) e con «Abbina» si finalizza la proposta: il datore di lavoro del candidato viene aggiornato e tutto resta tracciato nel log.</li>
         </ul>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -2661,7 +2674,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
             <li>Vai sulla vista <b>Gestione Pratiche</b>.</li>
             <li>In cima all'elenco, premi <b>Nuovo Candidato</b>.</li>
-            <li>Compila i campi. <b>Nome e Passaporto</b> sono obbligatori (*); gli altri facoltativi.</li>
+            <li>Compila i campi. <b>Nome e Passaporto</b> sono obbligatori (*); gli altri facoltativi. Il sistema controlla che l'<b>email</b> sia scritta bene e che il <b>passaporto</b> non sia già registrato per un altro candidato.</li>
             <li>Premi <b>Crea candidato</b>: la pratica si apre alla fase <b>1 · Selezione e Reclutamento</b> con i documenti standard già predisposti.</li>
           </ol>
           <p class="mt-2 text-xs text-slate-400">Per chiudere senza salvare: <b>Annulla</b>, tasto <b>Esc</b> o click fuori dal riquadro.</p>
@@ -2722,8 +2735,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li><b>Scadenze:</b> i documenti con data di validità vengono segnalati con <span class="font-semibold text-amber-600">In scadenza</span> (entro 60 giorni) o <span class="font-semibold text-rose-600">Scaduto</span>. Usa il filtro <b>In scadenza</b> nell'archivio.</li>
             <li><b>Modifica anagrafica:</b> pulsante <b>Modifica anagrafica</b> nell'intestazione del candidato per correggere i dati.</li>
             <li><b>Logistica &amp; Onboarding:</b> pulsante <b>Modifica</b> per inserire volo, alloggio, tutor e stato del contratto.</li>
-            <li><b>Elimina candidato</b> (solo admin): dentro <b>Modifica anagrafica</b>, in basso a sinistra. Operazione non reversibile.</li>
-            <li><b>Esporta CSV</b> (solo admin): pulsante in alto a destra nella Dashboard, scarica l'elenco candidati (utile per report e backup).</li>
+            <li><b>Scheda candidato in PDF:</b> pulsante <b>Scheda</b> nell'intestazione del candidato → si apre la scheda completa (anagrafica, contatti, competenze, documenti e ultime voci di log). Premi <b>Stampa / PDF</b> per stamparla o salvarla come PDF (utile per consolati e strutture).</li>
+            <li><b>Elimina candidato</b> (solo admin): dentro <b>Modifica anagrafica</b>, in basso a sinistra. Operazione non reversibile; libera anche eventuali abbinamenti di matching.</li>
+            <li><b>Esporta CSV</b> (solo admin): pulsante in alto a destra nella Dashboard, scarica l'elenco candidati.</li>
+            <li><b>Backup completo</b> (solo admin, in <b>Impostazioni</b>): <b>Scarica backup</b> salva candidati, richieste e impostazioni in un file; <b>Ripristina da backup</b> li ricarica (sostituisce i dati attuali). I file già caricati restano nel cloud.</li>
           </ul>
         </div>
       </section>
@@ -2732,10 +2747,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="database" class="h-5 w-5 text-indigo-500"></i>8. Come vengono salvati i dati</h2>
         <p class="text-sm leading-relaxed text-slate-600">Ogni modifica viene salvata <b>automaticamente</b>: non esiste un pulsante "Salva".</p>
         <div class="grid gap-3 sm:grid-cols-2">
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Modalità cloud (consigliata)</p><p class="mt-1 text-xs text-slate-600">Con il login attivo, i dati sono salvati su Firebase Firestore, isolati per operatore e accessibili da qualsiasi dispositivo.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Modalità cloud (consigliata)</p><p class="mt-1 text-xs text-slate-600">Con il login attivo, i dati sono salvati su Firebase Firestore in un <b>archivio condiviso dal team</b> e accessibili da qualsiasi dispositivo.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="hard-drive" class="h-4 w-4 text-amber-500"></i>Modalità demo locale</p><p class="mt-1 text-xs text-slate-600">Senza configurazione cloud, i dati restano solo nel browser di quel computer. Utile per formazione e prove.</p></div>
         </div>
-        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Per l'amministratore.</b> La configurazione di database e autenticazione è descritta nel file <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code>.</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">8.1 · Lavoro in team e stato del salvataggio</h3>
+        <p class="text-sm leading-relaxed text-slate-600">In modalità cloud l'archivio è condiviso: le modifiche di un operatore <b>arrivano in tempo reale</b> agli altri (un breve avviso segnala «dati aggiornati da un altro operatore»). Se due persone modificano <b>candidati diversi</b>, entrambe le modifiche sopravvivono; sullo <b>stesso</b> candidato vale l'ultimo salvataggio. L'<b>indicatore di stato</b> nell'header dice sempre com'è andata: <span class="font-semibold text-emerald-600">Salvato</span>, <span class="font-semibold text-amber-600">Salvataggio…</span>, <span class="font-semibold text-rose-600">NON salvato</span> (clicca per il dettaglio dell'errore e riprovare) o <b>Offline</b> (le modifiche partono da sole al ritorno della connessione).</p>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Backup consigliato.</b> Periodicamente, da <b>Impostazioni → Scarica backup</b>, salva una copia dell'archivio: è la tua rete di sicurezza. <b>Per l'amministratore</b>, la configurazione di database e autenticazione è nel file <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code>.</div>
       </section>
 
       <section id="faq" class="space-y-4">
@@ -2745,8 +2762,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Ho approvato un documento per errore.</summary><p class="mt-2 text-slate-600">Premi <b>Respingi</b> sullo stesso documento: torna "Mancante" e l'azione resta nel log.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Posso tornare a una fase precedente?</summary><p class="mt-2 text-slate-600">Il flusso è pensato per avanzare. Agisci su documenti/checklist e annota la motivazione nel log; per casi particolari contatta l'amministratore.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché un candidato non compare nella rosa del matching?</summary><p class="mt-2 text-slate-600">O è già abbinato a un'altra richiesta (rimuovi prima quell'abbinamento con la ✕), oppure è in fase 8–9 / percorso concluso, quindi non è più disponibile per nuovi abbinamenti.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché non posso spuntare la checklist o avanzare la fase?</summary><p class="mt-2 text-slate-600">La fase appartiene all'altro team (l'avviso azzurro indica quale): le fasi 1–4 le lavora il Team Rep. Dominicana, le 5–9 il Team Italia. Gli amministratori e gli operatori senza team non hanno limitazioni.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Cosa fa "Ripristina"?</summary><p class="mt-2 text-slate-600">Riporta ai 3 profili demo e cancella le modifiche locali. Usalo solo per dimostrazioni/formazione.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Perché non posso spuntare la checklist, caricare/approvare documenti o avanzare la fase?</summary><p class="mt-2 text-slate-600">La fase appartiene all'altro team (l'avviso azzurro indica quale): le fasi 1–4 le lavora il Team Rep. Dominicana, le 5–9 il Team Italia. Su quelle fasi restano in sola lettura anche i <b>documenti</b> (niente Carica/Approva/Respingi). Gli amministratori e gli operatori senza team non hanno limitazioni.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">L'indicatore in alto è rosso «NON salvato»: cosa faccio?</summary><p class="mt-2 text-slate-600">Il salvataggio sul cloud non è riuscito (spesso è la connessione). Le modifiche restano su questo dispositivo: <b>clicca l'indicatore</b> per vedere l'errore e far ripartire subito il salvataggio. Quando torna verde è tutto sincronizzato.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Cosa fa "Ripristina"?</summary><p class="mt-2 text-slate-600">Riporta ai profili demo e cancella le modifiche locali: esiste <b>solo in modalità demo</b>. In modalità cloud è nascosto, per non cancellare i dati reali del team; per una copia di sicurezza usa <b>Impostazioni → Scarica backup</b>.</p></details>
         </div>
       </section>
 
@@ -2765,7 +2783,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         </tbody></table></div>
       </section>
 
-      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Manuale Operatore v1.0 — Documento ad uso interno del personale HR.</footer>
+      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Manuale Operatore v1.1 — Documento ad uso interno del personale HR.</footer>
     `;
   }
 
@@ -2785,7 +2803,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Case Management</p><p class="mt-1 text-xs text-slate-500">Work on a single candidate.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="graduation-cap" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Interactive guide</p><p class="mt-1 text-xs text-slate-500">The spotlight tour inside the app ("Guide" button).</p></div>
         </div>
-        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Tip.</b> On first access the interactive <b>Guide</b> starts automatically. You can relaunch it any time from the <span class="font-semibold">🎓 Guide</span> button. This manual complements it with detailed procedures.</div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Tip.</b> On first access the interactive <b>Guide</b> starts automatically. You can relaunch it any time from the <span class="font-semibold">🎓 Guide</span> button (you can now step through it with the <b>← → arrow keys</b>). This manual complements it with detailed procedures.</div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-emerald-800"><i data-lucide="sparkles" class="h-4 w-4"></i>What's new in this version</p>
+          <ul class="prose-list mt-2 ml-5 list-disc text-sm text-emerald-900/80">
+            <li><b>Real-time saving with a status indicator</b> in the header (☁︎ Saved / Saving… / NOT saved / Offline): with several operators on the same archive, everyone's changes arrive at once and an alert flags when a cloud save fails (§8).</li>
+            <li><b>Matching request alerts:</b> a message appears when a request is created and when it becomes fully staffed (§6.1).</li>
+            <li><b>Printable candidate sheet (PDF):</b> the <b>Sheet</b> button in the candidate header (§7).</li>
+            <li><b>Data backup</b> (Settings, admin only): export and restore the whole archive from a file (§8).</li>
+            <li><b>Passport and cédula expiry</b> now also flagged on the Dashboard, not just in the record (§4.3).</li>
+            <li><b>Extended case search</b> — also by agency, HR referent, birthplace and specialisations (§5.1).</li>
+            <li><b>Documents locked</b> on the other team's phases, like the checklist and "Advance Phase" (§9).</li>
+          </ul>
+        </div>
       </section>
 
       <section id="accesso" class="space-y-4">
@@ -2820,8 +2850,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">"At risk" badge</td><td class="px-4 py-2.5 text-slate-600">Counts cases stuck beyond expected times. Click it to open the at-risk list. Green = no risk.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Theme toggle</td><td class="px-4 py-2.5 text-slate-600">Switch between light and dark mode.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">IT · EN · ES</td><td class="px-4 py-2.5 text-slate-600">Change the interface language.</td></tr>
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manual / Guide</td><td class="px-4 py-2.5 text-slate-600">This document / the interactive spotlight tour.</td></tr>
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Reset</td><td class="px-4 py-2.5 text-slate-600">Restores the 3 demo profiles. <b>Warning:</b> discards local changes.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manual / Guide</td><td class="px-4 py-2.5 text-slate-600">This document / the interactive spotlight tour (navigable with the ← → arrow keys).</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Save status</td><td class="px-4 py-2.5 text-slate-600">Cloud mode only: ☁︎ green = saved, amber = saving, <b>red = not saved</b> (click for details and retry), grey = offline.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Reset</td><td class="px-4 py-2.5 text-slate-600">Restores the demo profiles. <b>Local demo mode only</b> (hidden in cloud mode so it can't wipe the team's data).</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Avatar / Sign out</td><td class="px-4 py-2.5 text-slate-600">Operator profile and session sign-out.</td></tr>
           </tbody>
         </table></div>
@@ -2851,7 +2882,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">The daily work. On the left the <b>candidate list</b>, on the right the <b>full file</b>.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · List and search</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
-          <li><b>Search:</b> by name, passport or destination facility.</li>
+          <li><b>Search:</b> by name, passport, destination facility, <b>partner agency, HR referent, birthplace and specialisations</b>.</li>
           <li><b>Status filters:</b> All, <b>Transferred</b>, <b>To transfer</b>, At risk, Missing Docs, In progress, Italy Phase, Completed. Coming from a KPI (e.g. "In Matching") a temporary highlighted filter appears, with an ✕ to clear it.</li>
           <li><b>"My team" filter:</b> if your profile in <b>Settings → HR Operators</b> has a Team assigned (Dominican Republic or Italy), a dedicated filter appears showing only candidates in your team's phases. Matching is done via the sign-in email (or the operator name in demo mode).</li>
           <li><b>Card:</b> shows the status badge, language level and phase. The ⏰ icon flags a delay risk.</li>
@@ -2893,7 +2924,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">The app is the project's <b>single source of truth</b>: the <b>Dominican team enters and qualifies</b> the data (the candidate's verified clinical specialisations, sworn documentation, «Italia in tasca» dossier), while the <b>Italy team queries and extracts</b> (receives facility needs, filters the database by skills, matches the eligible profile and monitors its compliance).</p>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Candidate specialisations:</b> ticked from the catalogue in <b>Edit details</b> (Skills section); the catalogue is managed in <b>Settings → Specialisations</b>.</li>
-          <li><b>Facility requests:</b> in the <b>Matching</b> view, "New Request" records the destination ward, the number of nurses requested, minimum skills, preferred specialisations and shift; the request becomes "Matched" once every position is covered.</li>
+          <li><b>Facility requests:</b> in the <b>Matching</b> view, "New Request" records the destination ward, the number of nurses requested, minimum skills, preferred specialisations and shift; the request becomes "Matched" once every position is covered. An <b>alert</b> automatically flags when a request is created and when it becomes fully staffed — even if the action comes from another operator.</li>
           <li><b>Matching:</b> "Find candidates" ranks the profiles by compatibility (query → shortlist → document validation) and "Match" finalises the proposal: the candidate's employer is updated and everything is tracked in the log.</li>
         </ul>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -2924,7 +2955,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
             <li>Go to the <b>Case Management</b> view.</li>
             <li>At the top of the list, press <b>New Candidate</b>.</li>
-            <li>Fill in the fields. <b>Name and Passport</b> are required (*); the agency, employer and HR contact are chosen from the lists managed in <b>Settings</b>.</li>
+            <li>Fill in the fields. <b>Name and Passport</b> are required (*); the agency, employer and HR contact are chosen from the lists managed in <b>Settings</b>. The system checks the <b>email</b> is well-formed and that the <b>passport</b> isn't already registered to another candidate.</li>
             <li>Press <b>Create candidate</b>: the case opens at phase <b>1 · Selection &amp; Recruitment</b> with the standard documents prepared.</li>
           </ol>
         </div>
@@ -2984,8 +3015,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li><b>Expiry:</b> documents with a validity date are flagged <span class="font-semibold text-amber-600">Expiring</span> (within 60 days) or <span class="font-semibold text-rose-600">Expired</span>. Use the <b>Expiring</b> filter in the archive.</li>
             <li><b>Edit details:</b> the <b>Edit details</b> button on the candidate header to correct the data.</li>
             <li><b>Logistics &amp; Onboarding:</b> the <b>Edit</b> button to enter flight, housing, tutor and contract status.</li>
-            <li><b>Delete candidate</b> (admin only): inside <b>Edit details</b>, bottom-left. This cannot be undone.</li>
-            <li><b>Export CSV</b> (admin only): button at the top-right of the Dashboard, downloads the candidate list (for reports and backup).</li>
+            <li><b>Candidate sheet (PDF):</b> the <b>Sheet</b> button in the candidate header opens the full sheet (profile, contacts, skills, documents and latest log entries). Press <b>Print / PDF</b> to print or save it as PDF (handy for consulates and facilities).</li>
+            <li><b>Delete candidate</b> (admin only): inside <b>Edit details</b>, bottom-left. This cannot be undone; it also frees any matching assignments.</li>
+            <li><b>Export CSV</b> (admin only): button at the top-right of the Dashboard, downloads the candidate list.</li>
+            <li><b>Full backup</b> (admin only, in <b>Settings</b>): <b>Download backup</b> saves candidates, requests and settings to a file; <b>Restore from backup</b> loads them back (replacing current data). Uploaded files stay in the cloud.</li>
           </ul>
         </div>
       </section>
@@ -2994,10 +3027,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="database" class="h-5 w-5 text-indigo-500"></i>8. How data is stored</h2>
         <p class="text-sm leading-relaxed text-slate-600">Every change is saved <b>automatically</b>: there is no "Save" button.</p>
         <div class="grid gap-3 sm:grid-cols-2">
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Cloud mode (recommended)</p><p class="mt-1 text-xs text-slate-600">With login active, data is stored on Firebase Firestore, isolated per operator and accessible from any device.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Cloud mode (recommended)</p><p class="mt-1 text-xs text-slate-600">With login active, data is stored on Firebase Firestore in a <b>team-shared archive</b> and accessible from any device.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="hard-drive" class="h-4 w-4 text-amber-500"></i>Local demo mode</p><p class="mt-1 text-xs text-slate-600">Without cloud setup, data stays only in that computer's browser. Useful for training and trials.</p></div>
         </div>
-        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>For the administrator.</b> Database and authentication setup is described in the <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code> file.</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">8.1 · Teamwork and save status</h3>
+        <p class="text-sm leading-relaxed text-slate-600">In cloud mode the archive is shared: one operator's changes arrive at the others <b>in real time</b> (a brief notice flags "data updated by another operator"). If two people edit <b>different candidates</b>, both changes survive; on the <b>same</b> candidate the last save wins. The <b>status indicator</b> in the header always tells you how it went: <span class="font-semibold text-emerald-600">Saved</span>, <span class="font-semibold text-amber-600">Saving…</span>, <span class="font-semibold text-rose-600">NOT saved</span> (click for the error detail and to retry) or <b>Offline</b> (changes go out on their own when the connection returns).</p>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Backup recommended.</b> Periodically, from <b>Settings → Download backup</b>, save a copy of the archive: it's your safety net. <b>For the administrator</b>, database and authentication setup is in the <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code> file.</div>
       </section>
 
       <section id="faq" class="space-y-4">
@@ -3007,8 +3042,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">I approved a document by mistake.</summary><p class="mt-2 text-slate-600">Press <b>Reject</b> on the same document: it returns to "Missing" and the action stays in the log.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Can I go back to a previous phase?</summary><p class="mt-2 text-slate-600">The flow is designed to advance. Act on documents/checklist and note the reason in the log; for special cases contact the administrator.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why doesn't a candidate appear in the matching shortlist?</summary><p class="mt-2 text-slate-600">Either they are already matched to another request (remove that assignment first with the ✕), or they are in phase 8–9 / completed, so no longer available for new assignments.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why can't I tick the checklist or advance the phase?</summary><p class="mt-2 text-slate-600">The phase belongs to the other team (the blue notice says which): phases 1–4 are worked by the Dominican Republic Team, 5–9 by the Italy Team. Administrators and operators without a team have no restrictions.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">What does "Reset" do?</summary><p class="mt-2 text-slate-600">Restores the 3 demo profiles and discards local changes. Use it only for demos/training.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Why can't I tick the checklist, upload/approve documents or advance the phase?</summary><p class="mt-2 text-slate-600">The phase belongs to the other team (the blue notice says which): phases 1–4 are worked by the Dominican Republic Team, 5–9 by the Italy Team. On those phases the <b>documents</b> are read-only too (no Upload/Approve/Reject). Administrators and operators without a team have no restrictions.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">The header indicator is red "NOT saved": what do I do?</summary><p class="mt-2 text-slate-600">The cloud save failed (often the connection). Your changes stay on this device: <b>click the indicator</b> to see the error and restart the save right away. When it turns green everything is synced.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">What does "Reset" do?</summary><p class="mt-2 text-slate-600">Restores the demo profiles and discards local changes: it exists <b>only in demo mode</b>. In cloud mode it is hidden so it can't wipe the team's real data; for a safety copy use <b>Settings → Download backup</b>.</p></details>
         </div>
       </section>
 
@@ -3027,7 +3063,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         </tbody></table></div>
       </section>
 
-      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Operator Manual v1.0 — Internal document for HR staff.</footer>
+      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Operator Manual v1.1 — Internal document for HR staff.</footer>
     `;
   }
 
@@ -3047,7 +3083,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="folder-kanban" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Gestión de Expedientes</p><p class="mt-1 text-xs text-slate-500">Trabajo sobre un candidato.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><i data-lucide="graduation-cap" class="h-5 w-5 text-indigo-500"></i><p class="mt-2 text-sm font-bold text-slate-800">Guía interactiva</p><p class="mt-1 text-xs text-slate-500">El tour con foco dentro de la app (botón "Guía").</p></div>
         </div>
-        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Sugerencia.</b> En el primer acceso la <b>Guía</b> interactiva se inicia automáticamente. Puedes relanzarla en cualquier momento desde el botón <span class="font-semibold">🎓 Guía</span>. Este manual la completa con procedimientos detallados.</div>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Sugerencia.</b> En el primer acceso la <b>Guía</b> interactiva se inicia automáticamente. Puedes relanzarla en cualquier momento desde el botón <span class="font-semibold">🎓 Guía</span> (ahora también se recorre con las <b>flechas ← → del teclado</b>). Este manual la completa con procedimientos detallados.</div>
+        <div class="rounded-xl border border-emerald-200 bg-emerald-50 p-5">
+          <p class="flex items-center gap-2 text-sm font-bold text-emerald-800"><i data-lucide="sparkles" class="h-4 w-4"></i>Novedades de esta versión</p>
+          <ul class="prose-list mt-2 ml-5 list-disc text-sm text-emerald-900/80">
+            <li><b>Guardado en tiempo real con indicador de estado</b> en la cabecera (☁︎ Guardado / Guardando… / NO guardado / Sin conexión): con varios operadores en el mismo archivo, los cambios de cada uno llegan enseguida a los demás y un aviso señala cuando el guardado en la nube falla (§8).</li>
+            <li><b>Avisos de solicitudes de matching:</b> aparece un mensaje cuando se crea una solicitud y cuando la plantilla se completa (§6.1).</li>
+            <li><b>Ficha del candidato imprimible (PDF):</b> botón <b>Ficha</b> en la cabecera del candidato (§7).</li>
+            <li><b>Copia de seguridad</b> (Ajustes, solo admin): exporta y restaura todo el archivo desde un fichero (§8).</li>
+            <li><b>Vencimientos de pasaporte y cédula</b> ahora también señalados en el Panel, no solo en la ficha (§4.3).</li>
+            <li><b>Búsqueda de expedientes ampliada</b> también por agencia, referente de RR.HH., lugar de nacimiento y especializaciones (§5.1).</li>
+            <li><b>Documentos bloqueados</b> en las fases del otro equipo, como la checklist y «Avanzar Fase» (§9).</li>
+          </ul>
+        </div>
       </section>
 
       <section id="accesso" class="space-y-4">
@@ -3082,8 +3130,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Distintivo "en riesgo"</td><td class="px-4 py-2.5 text-slate-600">Cuenta los expedientes detenidos más de lo previsto. Haz clic para abrir la lista en riesgo. Verde = sin riesgo.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Cambio de tema</td><td class="px-4 py-2.5 text-slate-600">Alterna entre modo claro y oscuro.</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">IT · EN · ES</td><td class="px-4 py-2.5 text-slate-600">Cambia el idioma de la interfaz.</td></tr>
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manual / Guía</td><td class="px-4 py-2.5 text-slate-600">Este documento / el tour interactivo con foco.</td></tr>
-            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Restablecer</td><td class="px-4 py-2.5 text-slate-600">Restaura los 3 perfiles demo. <b>Atención:</b> descarta los cambios locales.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Manual / Guía</td><td class="px-4 py-2.5 text-slate-600">Este documento / el tour interactivo con foco (se recorre con las flechas ← →).</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Estado de guardado</td><td class="px-4 py-2.5 text-slate-600">Solo en modo nube: ☁︎ verde = guardado, ámbar = guardando, <b>rojo = no guardado</b> (clic para el detalle y reintentar), gris = sin conexión.</td></tr>
+            <tr><td class="px-4 py-2.5 font-medium text-slate-700">Restablecer</td><td class="px-4 py-2.5 text-slate-600">Restaura los perfiles demo. <b>Solo en modo demo local</b> (en la nube está oculto para no borrar los datos del equipo).</td></tr>
             <tr><td class="px-4 py-2.5 font-medium text-slate-700">Avatar / Salir</td><td class="px-4 py-2.5 text-slate-600">Perfil del operador y cierre de sesión.</td></tr>
           </tbody>
         </table></div>
@@ -3113,7 +3162,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">El trabajo diario. A la izquierda la <b>lista de candidatos</b>, a la derecha la <b>ficha completa</b>.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">5.1 · Lista y búsqueda</h3>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
-          <li><b>Búsqueda:</b> por nombre, pasaporte o estructura de destino.</li>
+          <li><b>Búsqueda:</b> por nombre, pasaporte, estructura de destino, <b>agencia asociada, referente de RR.HH., lugar de nacimiento y especializaciones</b>.</li>
           <li><b>Filtros de estado:</b> Todos, <b>Trasladados</b>, <b>Por Trasladar</b>, En riesgo, Docs Faltantes, En curso, Fase Italia, Completados. Al venir de un KPI (p. ej. "En Matching") aparece un filtro temporal resaltado, con la ✕ para quitarlo.</li>
           <li><b>Filtro "Mi equipo":</b> si tu perfil en <b>Ajustes → Operadores RR.HH.</b> tiene un Equipo asignado (Rep. Dominicana o Italia), aparece un filtro dedicado que muestra solo los candidatos en las fases de tu equipo. La correspondencia se hace por el correo de acceso (o el nombre del operador en modo demo).</li>
           <li><b>Ficha:</b> muestra el estado, el nivel lingüístico y la fase. El icono ⏰ señala riesgo de retraso.</li>
@@ -3155,7 +3204,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">La app es la <b>única fuente de verdad</b> del proyecto: el <b>Equipo Dominicana introduce y cualifica</b> los datos (especializaciones clínicas verificadas del candidato, documentación jurada, dossier «Italia in tasca»), mientras el <b>Equipo Italia consulta y extrae</b> (recibe las necesidades de las estructuras, filtra la base de datos por competencias, empareja el perfil idóneo y supervisa su conformidad).</p>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Especializaciones del candidato:</b> se marcan desde el catálogo en <b>Editar datos</b> (sección Competencias); el catálogo se gestiona en <b>Ajustes → Especializaciones</b>.</li>
-          <li><b>Solicitudes de las estructuras:</b> en la vista <b>Matching</b>, «Nueva Solicitud» registra la unidad de destino, el número de enfermeros solicitados, las competencias mínimas, las especializaciones preferentes y el turno; la solicitud pasa a «Emparejada» cuando todos los puestos están cubiertos.</li>
+          <li><b>Solicitudes de las estructuras:</b> en la vista <b>Matching</b>, «Nueva Solicitud» registra la unidad de destino, el número de enfermeros solicitados, las competencias mínimas, las especializaciones preferentes y el turno; la solicitud pasa a «Emparejada» cuando todos los puestos están cubiertos. Un <b>aviso</b> señala automáticamente cuando se crea una solicitud y cuando la plantilla está completa — aunque la acción provenga de otro operador.</li>
           <li><b>Cruce:</b> «Buscar candidatos» ordena los perfiles por compatibilidad (consulta → selección → validación documental) y con «Emparejar» se finaliza la propuesta: el empleador del candidato se actualiza y todo queda registrado en el log.</li>
         </ul>
         <div class="rounded-xl border border-slate-200 bg-white p-5">
@@ -3186,7 +3235,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <ol class="prose-list mt-2 ml-5 list-decimal text-sm text-slate-600">
             <li>Ve a la vista <b>Gestión de Expedientes</b>.</li>
             <li>En la parte superior de la lista, pulsa <b>Nuevo Candidato</b>.</li>
-            <li>Rellena los campos. <b>Nombre y Pasaporte</b> son obligatorios (*); la agencia, el empleador y el referente de RR.HH. se eligen de las listas gestionadas en <b>Ajustes</b>.</li>
+            <li>Rellena los campos. <b>Nombre y Pasaporte</b> son obligatorios (*); la agencia, el empleador y el referente de RR.HH. se eligen de las listas gestionadas en <b>Ajustes</b>. El sistema comprueba que el <b>correo</b> esté bien escrito y que el <b>pasaporte</b> no esté ya registrado para otro candidato.</li>
             <li>Pulsa <b>Crear candidato</b>: el expediente se abre en la fase <b>1 · Selección y Reclutamiento</b> con los documentos estándar preparados.</li>
           </ol>
         </div>
@@ -3246,8 +3295,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             <li><b>Vencimientos:</b> los documentos con fecha de validez se marcan como <span class="font-semibold text-amber-600">Por vencer</span> (dentro de 60 días) o <span class="font-semibold text-rose-600">Vencido</span>. Usa el filtro <b>Por vencer</b> en el archivo.</li>
             <li><b>Editar datos:</b> el botón <b>Editar datos</b> en la cabecera del candidato para corregir la información.</li>
             <li><b>Logística &amp; Onboarding:</b> el botón <b>Editar</b> para introducir vuelo, alojamiento, tutor y estado del contrato.</li>
-            <li><b>Eliminar candidato</b> (solo admin): dentro de <b>Editar datos</b>, abajo a la izquierda. No se puede deshacer.</li>
-            <li><b>Exportar CSV</b> (solo admin): botón arriba a la derecha en el Panel, descarga la lista de candidatos (para informes y copias de seguridad).</li>
+            <li><b>Ficha del candidato (PDF):</b> el botón <b>Ficha</b> en la cabecera del candidato abre la ficha completa (datos, contactos, competencias, documentos y últimas entradas del registro). Pulsa <b>Imprimir / PDF</b> para imprimirla o guardarla como PDF (útil para consulados y estructuras).</li>
+            <li><b>Eliminar candidato</b> (solo admin): dentro de <b>Editar datos</b>, abajo a la izquierda. No se puede deshacer; también libera las asignaciones de matching.</li>
+            <li><b>Exportar CSV</b> (solo admin): botón arriba a la derecha en el Panel, descarga la lista de candidatos.</li>
+            <li><b>Copia de seguridad completa</b> (solo admin, en <b>Ajustes</b>): <b>Descargar copia</b> guarda candidatos, solicitudes y ajustes en un fichero; <b>Restaurar desde copia</b> los recarga (sustituye los datos actuales). Los ficheros subidos permanecen en la nube.</li>
           </ul>
         </div>
       </section>
@@ -3256,10 +3307,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="database" class="h-5 w-5 text-indigo-500"></i>8. Cómo se guardan los datos</h2>
         <p class="text-sm leading-relaxed text-slate-600">Cada cambio se guarda <b>automáticamente</b>: no hay botón "Guardar".</p>
         <div class="grid gap-3 sm:grid-cols-2">
-          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Modo nube (recomendado)</p><p class="mt-1 text-xs text-slate-600">Con el acceso activo, los datos se guardan en Firebase Firestore, aislados por operador y accesibles desde cualquier dispositivo.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="cloud" class="h-4 w-4 text-indigo-500"></i>Modo nube (recomendado)</p><p class="mt-1 text-xs text-slate-600">Con el acceso activo, los datos se guardan en Firebase Firestore en un <b>archivo compartido por el equipo</b> y accesibles desde cualquier dispositivo.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="flex items-center gap-2 text-sm font-bold text-slate-800"><i data-lucide="hard-drive" class="h-4 w-4 text-amber-500"></i>Modo demo local</p><p class="mt-1 text-xs text-slate-600">Sin configuración en la nube, los datos quedan solo en el navegador de ese ordenador. Útil para formación y pruebas.</p></div>
         </div>
-        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Para el administrador.</b> La configuración de base de datos y autenticación se describe en el archivo <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code>.</div>
+        <h3 class="pt-2 text-base font-bold text-slate-800">8.1 · Trabajo en equipo y estado de guardado</h3>
+        <p class="text-sm leading-relaxed text-slate-600">En modo nube el archivo es compartido: los cambios de un operador llegan a los demás <b>en tiempo real</b> (un breve aviso señala «datos actualizados por otro operador»). Si dos personas editan <b>candidatos distintos</b>, ambos cambios se conservan; en el <b>mismo</b> candidato prevalece el último guardado. El <b>indicador de estado</b> en la cabecera siempre dice cómo fue: <span class="font-semibold text-emerald-600">Guardado</span>, <span class="font-semibold text-amber-600">Guardando…</span>, <span class="font-semibold text-rose-600">NO guardado</span> (haz clic para el detalle del error y reintentar) o <b>Sin conexión</b> (los cambios se envían solos al volver la conexión).</p>
+        <div class="rounded-xl border-l-4 border-slate-400 bg-slate-50 p-4 text-sm text-slate-700"><b>Copia recomendada.</b> Periódicamente, desde <b>Ajustes → Descargar copia</b>, guarda una copia del archivo: es tu red de seguridad. <b>Para el administrador</b>, la configuración de base de datos y autenticación está en el archivo <code class="rounded bg-slate-200 px-1 py-0.5 font-mono text-xs">FIREBASE-SETUP.md</code>.</div>
       </section>
 
       <section id="faq" class="space-y-4">
@@ -3269,8 +3322,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">Aprobé un documento por error.</summary><p class="mt-2 text-slate-600">Pulsa <b>Rechazar</b> en el mismo documento: vuelve a "Faltante" y la acción queda en el registro.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Puedo volver a una fase anterior?</summary><p class="mt-2 text-slate-600">El flujo está pensado para avanzar. Actúa sobre documentos/checklist y anota el motivo en el registro; para casos especiales contacta con el administrador.</p></details>
           <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué un candidato no aparece en la lista del matching?</summary><p class="mt-2 text-slate-600">O ya está emparejado con otra solicitud (quita antes ese emparejamiento con la ✕), o está en fase 8–9 / recorrido concluido, por lo que ya no está disponible para nuevos emparejamientos.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué no puedo marcar la checklist ni avanzar la fase?</summary><p class="mt-2 text-slate-600">La fase pertenece al otro equipo (el aviso azul indica cuál): las fases 1–4 las trabaja el Equipo Rep. Dominicana, las 5–9 el Equipo Italia. Los administradores y los operadores sin equipo no tienen limitaciones.</p></details>
-          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Qué hace "Restablecer"?</summary><p class="mt-2 text-slate-600">Restaura los 3 perfiles demo y descarta los cambios locales. Úsalo solo para demos/formación.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Por qué no puedo marcar la checklist, subir/aprobar documentos ni avanzar la fase?</summary><p class="mt-2 text-slate-600">La fase pertenece al otro equipo (el aviso azul indica cuál): las fases 1–4 las trabaja el Equipo Rep. Dominicana, las 5–9 el Equipo Italia. En esas fases los <b>documentos</b> también quedan en solo lectura (sin Subir/Aprobar/Rechazar). Los administradores y los operadores sin equipo no tienen limitaciones.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">El indicador de arriba está en rojo «NO guardado»: ¿qué hago?</summary><p class="mt-2 text-slate-600">El guardado en la nube falló (a menudo es la conexión). Tus cambios quedan en este dispositivo: <b>haz clic en el indicador</b> para ver el error y reiniciar el guardado enseguida. Cuando vuelve a verde todo está sincronizado.</p></details>
+          <details class="rounded-xl border border-slate-200 bg-white p-4 text-sm"><summary class="cursor-pointer font-semibold text-slate-800">¿Qué hace "Restablecer"?</summary><p class="mt-2 text-slate-600">Restaura los perfiles demo y descarta los cambios locales: existe <b>solo en modo demo</b>. En modo nube está oculto para no borrar los datos reales del equipo; para una copia de seguridad usa <b>Ajustes → Descargar copia</b>.</p></details>
         </div>
       </section>
 
@@ -3289,7 +3343,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         </tbody></table></div>
       </section>
 
-      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Manual del Operador v1.0 — Documento de uso interno del personal de RR.HH.</footer>
+      <footer class="border-t border-slate-200 pt-6 text-center text-xs text-slate-400">DHL Nurses · Manual del Operador v1.1 — Documento de uso interno del personal de RR.HH.</footer>
     `;
   }
 
