@@ -473,12 +473,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       employer: 'Azienda Ospedaliera di Padova',
       department: 'Terapia Intensiva',
       shift: 'Turni H24 (mattina/pomeriggio/notte)',
+      quantity: 2,
       requiredSkills: ['Terapia Intensiva'],
       preferredSkills: ['Emergenza-Urgenza'],
       notes: 'Potenziamento organico area critica: richiesta pervenuta dalla direzione sanitaria.',
       status: 'open',
       createdAt: isoDaysAgo(5),
-      matchedNurseId: null, matchedNurseName: null, matchedAt: null,
+      matched: [],
     };
 
     return {
@@ -568,6 +569,15 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (!s.settings.specialties.length) s.settings.specialties = DEFAULT_SPECIALTIES.map((name) => ({ id: uid(), name: name }));
     // Hospital requests (Team Italia) added with the matching protocol.
     if (!Array.isArray(s.requests)) s.requests = [];
+    s.requests.forEach((r) => {
+      // Number of nurses requested (added later; legacy requests asked for one).
+      if (!(r.quantity >= 1)) r.quantity = 1;
+      // Multi-match support: migrate the legacy single matchedNurseId fields.
+      if (!Array.isArray(r.matched)) {
+        r.matched = r.matchedNurseId ? [{ id: r.matchedNurseId, name: r.matchedNurseName || '', at: r.matchedAt || null }] : [];
+        delete r.matchedNurseId; delete r.matchedNurseName; delete r.matchedAt;
+      }
+    });
     // Merge in the personal-file doc types added later (matched by name, case-insensitive).
     const typeNames = s.settings.docTypes.map((dt) => (dt.name || '').toLowerCase());
     PERSONAL_DOC_TYPES.forEach((d) => {
@@ -728,13 +738,15 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       .map((n) => ({ n: n, m: matchScore(r, n) }))
       .sort((a, b) => b.m.score - a.m.score);
   }
+  // A request is fully staffed once it has as many matched nurses as requested.
+  function requestFull(r) { return (r.matched || []).length >= (r.quantity || 1); }
   function assignMatch(reqId, nurseId) {
     if (!canManageMatching()) return;
     const r = getRequest(reqId); const n = getNurse(nurseId);
-    if (!r || !n || r.status !== 'open') return;
+    if (!r || !n || r.status !== 'open' || requestFull(r)) return;
     if (!confirm(t('mt_confirm_assign', { n: n.name, s: r.employer, r: r.department || '—' }))) return;
-    r.status = 'matched'; r.matchedNurseId = n.id; r.matchedNurseName = n.name;
-    r.matchedAt = new Date().toISOString().slice(0, 10);
+    r.matched.push({ id: n.id, name: n.name, at: new Date().toISOString().slice(0, 10) });
+    if (requestFull(r)) r.status = 'matched';
     n.matchedRequestId = r.id; n.matchedDepartment = r.department || '';
     n.employer = r.employer;
     pushLog(n, 'system', t('log_author_system'), t('log_matched', { s: r.employer, r: r.department || '—' }));
@@ -742,16 +754,18 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     closeModal();
     commit();
   }
-  function unassignMatch(reqId) {
+  function unassignMatch(reqId, nurseId) {
     if (!canManageMatching()) return;
-    const r = getRequest(reqId); if (!r || r.status !== 'matched') return;
-    const n = r.matchedNurseId ? getNurse(r.matchedNurseId) : null;
+    const r = getRequest(reqId); if (!r || r.status === 'closed') return;
+    const entry = (r.matched || []).find((m) => m.id === nurseId); if (!entry) return;
+    const n = getNurse(nurseId);
     if (n) {
       n.matchedRequestId = null; n.matchedDepartment = '';
       pushLog(n, 'alert', t('log_author_system'), t('log_unmatched', { s: r.employer, r: r.department || '—' }));
       n.lastUpdate = new Date().toISOString().slice(0, 10);
     }
-    r.status = 'open'; r.matchedNurseId = null; r.matchedNurseName = null; r.matchedAt = null;
+    r.matched = r.matched.filter((m) => m.id !== nurseId);
+    if (r.status === 'matched') r.status = 'open';
     commit();
   }
   function closeRequest(reqId) {
@@ -763,17 +777,17 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function reopenRequest(reqId) {
     if (!canManageMatching()) return;
     const r = getRequest(reqId); if (!r || r.status !== 'closed') return;
-    r.status = r.matchedNurseId ? 'matched' : 'open';
+    r.status = requestFull(r) ? 'matched' : 'open';
     commit();
   }
   function deleteRequest(reqId) {
     if (!canManageMatching()) return;
     const r = getRequest(reqId); if (!r) return;
     if (!confirm(t('mt_confirm_delete', { s: r.employer, r: r.department || '—' }))) return;
-    if (r.matchedNurseId) {
-      const n = getNurse(r.matchedNurseId);
+    (r.matched || []).forEach((m) => {
+      const n = getNurse(m.id);
       if (n) { n.matchedRequestId = null; n.matchedDepartment = ''; }
-    }
+    });
     state.requests = (state.requests || []).filter((x) => x.id !== reqId);
     commit();
   }
@@ -1550,23 +1564,34 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           btn('open-request', t('edit'), 'pencil', 'text-slate-500 ring-slate-200 hover:bg-slate-50') +
           btn('delete-request', t('del'), 'trash-2', 'text-rose-600 ring-rose-200 hover:bg-rose-50');
       } else if (r.status === 'matched') {
-        actions = btn('unassign-match', t('mt_unassign'), 'unlink', 'text-amber-600 ring-amber-200 hover:bg-amber-50') +
-          btn('close-request', t('mt_close'), 'check-circle-2', 'text-emerald-700 ring-emerald-200 hover:bg-emerald-50');
+        actions = btn('close-request', t('mt_close'), 'check-circle-2', 'text-emerald-700 ring-emerald-200 hover:bg-emerald-50');
       } else {
         actions = btn('reopen-request', t('mt_reopen'), 'rotate-ccw', 'text-slate-500 ring-slate-200 hover:bg-slate-50') +
           btn('delete-request', t('del'), 'trash-2', 'text-rose-600 ring-rose-200 hover:bg-rose-50');
       }
     }
-    const matchedLine = r.matchedNurseName
-      ? '<button data-action="open-nurse" data-id="' + (r.matchedNurseId || '') + '" class="mt-2 inline-flex items-center gap-1.5 rounded-xl bg-emerald-50 px-2.5 py-1.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200 transition hover:bg-emerald-100"><i data-lucide="user-check" class="h-3.5 w-3.5"></i>' + t('mt_matched_to') + ' ' + escapeHtml(r.matchedNurseName) + (r.matchedAt ? ' · ' + formatDate(r.matchedAt) : '') + '</button>'
+    // One chip per matched nurse; the ✕ removes that single assignment.
+    const matched = r.matched || [];
+    const matchedLine = matched.length
+      ? '<div class="mt-2 flex flex-wrap items-center gap-1.5">' +
+          '<span class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + t('mt_matched_to') + ':</span>' +
+          matched.map((m) =>
+            '<span class="inline-flex items-center gap-1 rounded-xl bg-emerald-50 py-1 pl-2.5 pr-1 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-200">' +
+              '<button data-action="open-nurse" data-id="' + m.id + '" class="inline-flex items-center gap-1.5 hover:underline"><i data-lucide="user-check" class="h-3.5 w-3.5"></i>' + escapeHtml(m.name) + (m.at ? ' · ' + formatDate(m.at) : '') + '</button>' +
+              (canIt && r.status !== 'closed' ? '<button data-action="unassign-match" data-id="' + r.id + '" data-nurse="' + m.id + '" class="rounded-full p-0.5 text-emerald-500 transition hover:bg-emerald-100 hover:text-rose-600" data-tooltip="' + escapeHtml(t('mt_unassign')) + '"><i data-lucide="x" class="h-3 w-3"></i></button>' : '') +
+            '</span>').join('') +
+        '</div>'
       : '';
+    const qtyBadge = '<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ' + (requestFull(r) ? 'bg-emerald-100 text-emerald-700 ring-emerald-200' : 'bg-slate-100 text-slate-600 ring-slate-200') + '"><i data-lucide="users" class="h-3 w-3"></i>' + t('mt_qty_badge', { a: matched.length, b: r.quantity || 1 }) + '</span>';
     return '<div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm' + (r.status === 'closed' ? ' opacity-70' : '') + '">' +
       '<div class="flex flex-wrap items-start justify-between gap-2">' +
         '<div class="min-w-0">' +
           '<p class="text-sm font-bold text-slate-900">' + escapeHtml(r.employer) + '</p>' +
-          '<p class="text-xs text-slate-500"><i data-lucide="stethoscope" class="mr-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + escapeHtml(r.department || '—') + (r.shift ? ' · <i data-lucide="clock" class="mx-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + escapeHtml(r.shift) : '') + '</p>' +
+          '<p class="text-xs text-slate-500"><i data-lucide="stethoscope" class="mr-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + escapeHtml(r.department || '—') + ' · <i data-lucide="users" class="mx-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + t('mt_qty_line', { n: r.quantity || 1 }) + (r.shift ? ' · <i data-lucide="clock" class="mx-1 inline h-3.5 w-3.5 align-[-2px]"></i>' + escapeHtml(r.shift) : '') + '</p>' +
         '</div>' +
-        '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ' + meta.cls + '">' + t(meta.key) + '</span>' +
+        '<div class="flex items-center gap-1.5">' + qtyBadge +
+          '<span class="inline-flex rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ' + meta.cls + '">' + t(meta.key) + '</span>' +
+        '</div>' +
       '</div>' +
       '<div class="mt-3 space-y-1.5 text-xs">' +
         '<p class="font-semibold uppercase tracking-wide text-slate-400">' + t('mt_required') + '</p>' +
@@ -1614,6 +1639,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="grid gap-3 p-5">' +
         selectField('rq-employer', t('mt_facility') + ' <span class="text-rose-500">*</span>', employerOptions(), r ? r.employer : '') +
         inputField('rq-department', t('mt_department'), 'Terapia Intensiva', true) +
+        inputField('rq-qty', t('mt_quantity'), '1', false, 'number') +
         inputField('rq-shift', t('mt_shift'), 'Turni H24 (mattina/pomeriggio/notte)') +
         '<div><label class="mb-1 block text-xs font-semibold text-slate-500">' + t('mt_required') + '</label>' + specChips('rq-req', r ? r.requiredSkills : []) + '</div>' +
         '<div><label class="mb-1 block text-xs font-semibold text-slate-500">' + t('mt_preferred') + '</label>' + specChips('rq-pref', r ? r.preferredSkills : []) + '</div>' +
@@ -1624,6 +1650,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<button data-action="save-request" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="check" class="h-4 w-4"></i>' + t('save') + '</button>' +
       '</div>';
     modalShell(inner, true);
+    {
+      const qtyEl = document.getElementById('rq-qty');
+      if (qtyEl) { qtyEl.min = '1'; qtyEl.value = r ? String(r.quantity || 1) : '1'; }
+    }
     if (r) {
       const set = (fid, v) => { const el = document.getElementById(fid); if (el) el.value = v || ''; };
       set('rq-department', r.department); set('rq-shift', r.shift); set('rq-notes', r.notes);
@@ -1638,18 +1668,23 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       if (err) { err.textContent = t('mt_error_required'); err.classList.remove('hidden'); }
       return;
     }
+    const qty = Math.max(1, parseInt(fieldVal('rq-qty'), 10) || 1);
     const data = {
-      employer: employer, department: department,
+      employer: employer, department: department, quantity: qty,
       shift: fieldVal('rq-shift'), notes: fieldVal('rq-notes'),
       requiredSkills: chipValues('rq-req'), preferredSkills: chipValues('rq-pref'),
     };
     if (pendingRequestId) {
       const r = getRequest(pendingRequestId);
-      if (r) Object.assign(r, data);
+      if (r) {
+        Object.assign(r, data);
+        // Changing the headcount can complete or reopen the request.
+        if (r.status !== 'closed') r.status = requestFull(r) ? 'matched' : 'open';
+      }
     } else {
       state.requests.push(Object.assign({
         id: uid(), status: 'open', createdAt: new Date().toISOString().slice(0, 10),
-        matchedNurseId: null, matchedNurseName: null, matchedAt: null,
+        matched: [],
       }, data));
     }
     pendingRequestId = null;
@@ -2089,7 +2124,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">Il gestionale è la <b>fonte unica di verità</b> del progetto: il <b>Team Dominicana inserisce e qualifica</b> i dati (specializzazioni cliniche verificate del candidato, documentazione asseverata, dossier «Italia in tasca»), il <b>Team Italia interroga ed estrae</b> (riceve i fabbisogni dalle strutture, filtra il database per competenze, abbina il profilo idoneo e ne monitora la conformità).</p>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Specializzazioni del candidato:</b> si spuntano dal catalogo in <b>Modifica anagrafica</b> (sezione Competenze); il catalogo si gestisce in <b>Impostazioni → Specializzazioni</b>.</li>
-          <li><b>Richieste delle strutture:</b> nella vista <b>Matching</b>, con «Nuova Richiesta» si registrano reparto di destinazione, competenze minime, specializzazioni preferenziali e turno.</li>
+          <li><b>Richieste delle strutture:</b> nella vista <b>Matching</b>, con «Nuova Richiesta» si registrano reparto di destinazione, numero di infermieri richiesti, competenze minime, specializzazioni preferenziali e turno; la richiesta risulta «Abbinata» quando tutti i posti sono coperti.</li>
           <li><b>Incrocio:</b> «Trova candidati» ordina i profili per compatibilità (interrogazione → identificazione → validazione documentale) e con «Abbina» si finalizza la proposta: il datore di lavoro del candidato viene aggiornato e tutto resta tracciato nel log.</li>
         </ul>
       </section>
@@ -2327,7 +2362,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">The app is the project's <b>single source of truth</b>: the <b>Dominican team enters and qualifies</b> the data (the candidate's verified clinical specialisations, sworn documentation, «Italia in tasca» dossier), while the <b>Italy team queries and extracts</b> (receives facility needs, filters the database by skills, matches the eligible profile and monitors its compliance).</p>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Candidate specialisations:</b> ticked from the catalogue in <b>Edit details</b> (Skills section); the catalogue is managed in <b>Settings → Specialisations</b>.</li>
-          <li><b>Facility requests:</b> in the <b>Matching</b> view, "New Request" records the destination ward, minimum skills, preferred specialisations and shift.</li>
+          <li><b>Facility requests:</b> in the <b>Matching</b> view, "New Request" records the destination ward, the number of nurses requested, minimum skills, preferred specialisations and shift; the request becomes "Matched" once every position is covered.</li>
           <li><b>Matching:</b> "Find candidates" ranks the profiles by compatibility (query → shortlist → document validation) and "Match" finalises the proposal: the candidate's employer is updated and everything is tracked in the log.</li>
         </ul>
       </section>
@@ -2564,7 +2599,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         <p class="text-sm leading-relaxed text-slate-600">La app es la <b>única fuente de verdad</b> del proyecto: el <b>Equipo Dominicana introduce y cualifica</b> los datos (especializaciones clínicas verificadas del candidato, documentación jurada, dossier «Italia in tasca»), mientras el <b>Equipo Italia consulta y extrae</b> (recibe las necesidades de las estructuras, filtra la base de datos por competencias, empareja el perfil idóneo y supervisa su conformidad).</p>
         <ul class="prose-list ml-5 list-disc text-sm text-slate-600">
           <li><b>Especializaciones del candidato:</b> se marcan desde el catálogo en <b>Editar datos</b> (sección Competencias); el catálogo se gestiona en <b>Ajustes → Especializaciones</b>.</li>
-          <li><b>Solicitudes de las estructuras:</b> en la vista <b>Matching</b>, «Nueva Solicitud» registra la unidad de destino, las competencias mínimas, las especializaciones preferentes y el turno.</li>
+          <li><b>Solicitudes de las estructuras:</b> en la vista <b>Matching</b>, «Nueva Solicitud» registra la unidad de destino, el número de enfermeros solicitados, las competencias mínimas, las especializaciones preferentes y el turno; la solicitud pasa a «Emparejada» cuando todos los puestos están cubiertos.</li>
           <li><b>Cruce:</b> «Buscar candidatos» ordena los perfiles por compatibilidad (consulta → selección → validación documental) y con «Emparejar» se finaliza la propuesta: el empleador del candidato se actualiza y todo queda registrado en el log.</li>
         </ul>
       </section>
@@ -3130,6 +3165,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<div class="min-w-0 flex-1">' +
           '<h2 class="text-lg font-extrabold text-slate-900">' + escapeHtml(n.name) + '</h2>' +
           '<p class="text-sm text-slate-500">' + escapeHtml([n.birthPlace, n.nationality].filter(Boolean).join(' · ') || '—') + '</p>' +
+          // Current phase + privacy consent, pinned next to the name (always visible).
+          '<div class="mt-2 flex flex-wrap items-center gap-1.5">' +
+            '<span class="inline-flex items-center gap-1 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700 ring-1 ring-inset ring-indigo-200"><i data-lucide="flag" class="h-3 w-3"></i>' +
+              escapeHtml(n.currentStep >= DONE_STEP ? t('state_done') : t('step_state', { n: n.currentStep, name: stepName(n.currentStep) })) + '</span>' +
+            '<span class="inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-semibold ring-1 ring-inset ' + (n.privacyConsent ? 'bg-emerald-50 text-emerald-700 ring-emerald-200' : 'bg-rose-50 text-rose-600 ring-rose-200') + '"><i data-lucide="shield-check" class="h-3 w-3"></i>' +
+              escapeHtml(t('f_privacy') + ': ' + (n.privacyConsent ? t('privacy_given', { d: formatDate(n.privacyConsentDate) }) : t('privacy_none'))) + '</span>' +
+            '<button data-action="print-privacy" data-id="' + n.id + '" class="inline-flex items-center justify-center rounded-full p-1 text-indigo-500 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50" data-tooltip="' + escapeHtml(t('privacy_print')) + '"><i data-lucide="printer" class="h-3.5 w-3.5"></i></button>' +
+          '</div>' +
         '</div>' +
         '<div class="flex flex-col items-start gap-2 sm:items-end">' +
           statusBadge(deriveStatus(n)) +
@@ -3195,15 +3238,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         field('book-user', t('f_passport'), n.passport) +
         expField(t('f_passport_exp'), n.passportExpiry) +
         field('credit-card', t('f_cedula'), n.cedula || '—') +
-        expField(t('f_cedula_exp'), n.cedulaExpiry) +
-        field('flag', t('f_status'), (n.currentStep >= DONE_STEP ? t('state_done') : t('step_state', { n: n.currentStep, name: stepName(n.currentStep) }))) +
-        '<div class="flex items-start gap-2">' +
-          '<i data-lucide="shield-check" class="mt-0.5 h-4 w-4 shrink-0 ' + (n.privacyConsent ? 'text-emerald-500' : 'text-rose-400') + '"></i>' +
-          '<div><p class="text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + t('f_privacy') + '</p>' +
-          '<p class="text-sm font-medium ' + (n.privacyConsent ? 'text-emerald-600' : 'text-rose-500') + '">' +
-            (n.privacyConsent ? escapeHtml(t('privacy_given', { d: formatDate(n.privacyConsentDate) })) : escapeHtml(t('privacy_none'))) + '</p>' +
-          '<button data-action="print-privacy" data-id="' + n.id + '" class="mt-1.5 inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50"><i data-lucide="printer" class="h-3 w-3"></i>' + t('privacy_print') + '</button></div>' +
-        '</div>';
+        expField(t('f_cedula_exp'), n.cedulaExpiry);
+      // Current phase and privacy consent live in the profile header, next to the name.
     }
     return '<div class="px-5 pt-4">' +
         '<div class="flex w-max max-w-full items-center gap-1 overflow-x-auto rounded-xl bg-slate-100 p-1">' +
@@ -3811,7 +3847,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'delete-request': deleteRequest(t.getAttribute('data-id')); break;
       case 'find-candidates': openMatchCandidates(t.getAttribute('data-id')); break;
       case 'assign-match': assignMatch(t.getAttribute('data-req'), t.getAttribute('data-nurse')); break;
-      case 'unassign-match': unassignMatch(t.getAttribute('data-id')); break;
+      case 'unassign-match': unassignMatch(t.getAttribute('data-id'), t.getAttribute('data-nurse')); break;
       case 'close-request': closeRequest(t.getAttribute('data-id')); break;
       case 'reopen-request': reopenRequest(t.getAttribute('data-id')); break;
       case 'delete-entity': deleteEntity(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
