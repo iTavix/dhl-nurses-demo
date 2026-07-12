@@ -6,7 +6,6 @@
 import firebase from 'firebase/compat/app';
 import 'firebase/compat/auth';
 import 'firebase/compat/firestore';
-import 'firebase/compat/storage';
 import { createIcons, icons as lucideIcons } from 'lucide';
 import { STEP_I18N, CHECKLIST_I18N, I18N } from './i18n-data.js';
 import { guideToc, guideBody } from './guide-content.js';
@@ -47,7 +46,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   const ORG_ID = 'default';
 
   // Firebase runtime handles (populated only when configured).
-  let fbEnabled = false, auth = null, db = null, storage = null, currentUser = null, userClaims = null;
+  let fbEnabled = false, auth = null, db = null, currentUser = null, userClaims = null;
   let remoteSaveTimer = null, tourAutoChecked = false;
   // True once onAuthStateChanged has fired at least once. Until then the boot splash stays on
   // screen, so a returning signed-in user never sees the login screen flash by.
@@ -55,6 +54,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   // True while the initial Firestore read is in flight. Blocks the debounced cloud sync so a
   // stale locally-cached state can never be pushed over fresher team data during startup.
   let remoteLoading = false;
+  // ---------- Realtime shared-workspace sync ----------
+  // Cloud save status surfaced in the header chip: 'idle' | 'saving' | 'saved' | 'error' | 'offline'.
+  let syncStatus = 'idle', syncErrorMsg = '';
+  // Firestore onSnapshot unsubscribe handles (attached after login, released on logout).
+  let unsubCases = null, unsubSettings = null;
+  // Canonical JSON of every record as last CONFIRMED by the cloud (id → stableJson). Records whose
+  // local JSON differs are "dirty" (edited here, not yet pushed): a remote snapshot must not
+  // overwrite them. This turns the whole-array write into a per-record last-writer-wins merge.
+  let lastSynced = { nurses: {}, requests: {}, settingsJson: '' };
+  let remoteRenderTimer = null, lastRemoteToastAt = 0, sizeWarnShown = false;
+  // Cap on per-nurse activity-log entries: keeps the single shared Firestore document
+  // (hard limit ~1 MiB) from growing unbounded as cases accumulate history.
+  const MAX_LOG_ENTRIES = 80;
 
   function firebaseConfigured() {
     return typeof firebase !== 'undefined' && FIREBASE_CONFIG.apiKey && FIREBASE_CONFIG.apiKey.trim().length > 0;
@@ -606,6 +618,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         n.checklist = makeChecklist({ __current: n.currentStep });
       }
       PERSONAL_FIELDS.forEach((k) => { if (n[k] === undefined) n[k] = ''; });
+      // Trim histories saved before the log cap existed (see MAX_LOG_ENTRIES).
+      if (Array.isArray(n.logs) && n.logs.length > MAX_LOG_ENTRIES) n.logs.length = MAX_LOG_ENTRIES;
       // Structured clinical specialisations + matching assignment (matching protocol).
       if (!Array.isArray(n.specializations)) n.specializations = [];
       if (n.matchedRequestId === undefined) n.matchedRequestId = null;
@@ -639,11 +653,20 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         // Shared team workspace: cases and settings live in SEPARATE documents with
         // different permissions (operators write cases; only admins write settings).
         const data = db.collection('organizations').doc(ORG_ID).collection('data');
-        data.doc('cases').set({ nurses: state.nurses, requests: state.requests || [], updatedAt: serverTs() }, { merge: true })
-          .catch((err) => console.warn('Sync casi fallita:', err && err.message));
+        const payload = { nurses: state.nurses, requests: state.requests || [], updatedAt: serverTs() };
+        warnIfNearSizeLimit(payload);
+        setSyncStatus('saving');
+        // Snapshot what we are writing NOW: on success it becomes the new cloud baseline.
+        const writtenNurses = snapshotMap(state.nurses);
+        const writtenRequests = snapshotMap(state.requests || []);
+        data.doc('cases').set(payload, { merge: true })
+          .then(() => { lastSynced.nurses = writtenNurses; lastSynced.requests = writtenRequests; setSyncStatus('saved'); })
+          .catch((err) => setSyncError(t('sync_ctx_cases'), err));
         if (isAdmin()) {
+          const settingsJson = stableJson(state.settings);
           data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true })
-            .catch((err) => console.warn('Sync impostazioni fallita:', err && err.message));
+            .then(() => { lastSynced.settingsJson = settingsJson; })
+            .catch((err) => setSyncError(t('sync_ctx_settings'), err));
           // Access map: keeps Firestore authorization aligned with the HR operators
           // list, so accounts work without server-side custom claims.
           const emails = {};
@@ -652,14 +675,163 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             if (em) emails[em] = o.accessRole === 'admin' ? 'admin' : 'operator';
           });
           data.doc('access').set({ emails: emails, updatedAt: serverTs() })
-            .catch((err) => console.warn('Sync accessi fallita:', err && err.message));
+            .catch((err) => setSyncError(t('sync_ctx_access'), err));
         }
       } else {
+        setSyncStatus('saving');
         db.collection('nurseflow').doc(currentUser.uid)
           .set({ state: state, updatedAt: serverTs() }, { merge: true })
-          .catch((err) => console.warn('Firestore sync fallita:', err && err.message));
+          .then(() => setSyncStatus('saved'))
+          .catch((err) => setSyncError(t('sync_ctx_cases'), err));
       }
-    } catch (e) { console.warn('Sync error:', e && e.message); }
+    } catch (e) { setSyncError(t('sync_ctx_cases'), e); }
+  }
+
+  // Canonical JSON with sorted object keys: lets two copies of the same record compare equal
+  // regardless of the property order Firestore returns.
+  function stableJson(v) {
+    if (v === null || typeof v !== 'object') return JSON.stringify(v) || 'null';
+    if (Array.isArray(v)) return '[' + v.map(stableJson).join(',') + ']';
+    return '{' + Object.keys(v).sort().filter((k) => v[k] !== undefined)
+      .map((k) => JSON.stringify(k) + ':' + stableJson(v[k])).join(',') + '}';
+  }
+  function snapshotMap(arr) {
+    const m = {};
+    (arr || []).forEach((x) => { if (x && x.id) m[x.id] = stableJson(x); });
+    return m;
+  }
+  // Per-record merge of a remote array into the local one. A record is kept LOCAL only when it
+  // was changed here after the last cloud confirmation (dirty); everything else follows the
+  // cloud. New records survive from both sides; deletions propagate unless the other side
+  // modified the record in the meantime (conservative: modified wins over deleted).
+  function mergeRecords(localArr, remoteArr, syncedMap) {
+    const localById = {};
+    (localArr || []).forEach((x) => { if (x && x.id) localById[x.id] = x; });
+    const out = [], seen = {};
+    (remoteArr || []).forEach((rx) => {
+      if (!rx || !rx.id) return;
+      seen[rx.id] = true;
+      const rJson = stableJson(rx);
+      const lx = localById[rx.id];
+      if (!lx) {
+        // Not present locally: new from another operator — unless we deleted it here and the
+        // cloud copy is unchanged (our pending delete will remove it from the cloud too).
+        if (syncedMap[rx.id] !== rJson) { out.push(rx); syncedMap[rx.id] = rJson; }
+      } else if (stableJson(lx) === syncedMap[rx.id]) {
+        out.push(rx); syncedMap[rx.id] = rJson;      // local untouched → follow the cloud
+      } else {
+        out.push(lx);                                 // local dirty → keep ours (push will follow)
+      }
+    });
+    (localArr || []).forEach((lx) => {
+      if (!lx || !lx.id || seen[lx.id]) return;
+      if (syncedMap[lx.id] === undefined || syncedMap[lx.id] !== stableJson(lx)) out.push(lx);
+      else delete syncedMap[lx.id];                   // deleted on the cloud, untouched here → drop
+    });
+    return out;
+  }
+  function attachRealtimeSync() {
+    if (!(fbEnabled && currentUser && db && SHARED_WORKSPACE)) return;
+    detachRealtimeSync();
+    const data = db.collection('organizations').doc(ORG_ID).collection('data');
+    // hasPendingWrites skips the local echo of our own writes; remoteLoading skips snapshots
+    // racing the initial full read.
+    unsubCases = data.doc('cases').onSnapshot((snap) => {
+      if (remoteLoading || !snap.exists || snap.metadata.hasPendingWrites) return;
+      const d = snap.data() || {};
+      applyRemoteCases(Array.isArray(d.nurses) ? d.nurses : [], Array.isArray(d.requests) ? d.requests : []);
+    }, (err) => setSyncError(t('sync_ctx_listen'), err));
+    unsubSettings = data.doc('settings').onSnapshot((snap) => {
+      if (remoteLoading || !snap.exists || snap.metadata.hasPendingWrites) return;
+      const d = snap.data() || {};
+      if (d.settings) applyRemoteSettings(d.settings);
+    }, () => { /* settings listener is best-effort */ });
+  }
+  function detachRealtimeSync() {
+    if (unsubCases) { try { unsubCases(); } catch (e) { /* ignore */ } unsubCases = null; }
+    if (unsubSettings) { try { unsubSettings(); } catch (e) { /* ignore */ } unsubSettings = null; }
+  }
+  function applyRemoteCases(remoteNurses, remoteRequests) {
+    // Normalize the incoming records with the same pipeline as local ones, so the
+    // stableJson comparisons in mergeRecords never trip on backfilled fields.
+    normalizeState(Object.assign({}, state, { nurses: remoteNurses, requests: remoteRequests }));
+    // Detect facility-request events from ANOTHER operator (own writes are skipped upstream by
+    // hasPendingWrites), so the matching team is alerted to new and just-filled requests.
+    alertRemoteRequestEvents(state.requests || [], remoteRequests);
+    const beforeN = stableJson(state.nurses), beforeR = stableJson(state.requests || []);
+    state.nurses = mergeRecords(state.nurses, remoteNurses, lastSynced.nurses);
+    state.requests = mergeRecords(state.requests || [], remoteRequests, lastSynced.requests);
+    state.nurses.forEach((n) => { n.status = deriveStatus(n); });
+    if (state.selectedNurseId && !getNurse(state.selectedNurseId)) {
+      state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
+    }
+    if (stableJson(state.nurses) !== beforeN || stableJson(state.requests) !== beforeR) {
+      try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* quota — ignore */ }
+      notifyRemoteUpdate();
+      safeRemoteRender();
+    }
+  }
+  // Compare the requests we hold against the incoming remote copy and toast the two events
+  // the matching team cares about: a brand-new request, and one that just became fully staffed.
+  // At most two toasts per snapshot, so a bulk change can't flood the screen.
+  function alertRemoteRequestEvents(localReqs, remoteReqs) {
+    const byId = {};
+    localReqs.forEach((r) => { if (r && r.id) byId[r.id] = r; });
+    let created = 0, filled = 0, lastCreated = null, lastFilled = null;
+    remoteReqs.forEach((rr) => {
+      if (!rr || !rr.id) return;
+      const lr = byId[rr.id];
+      if (!lr) { created++; lastCreated = rr; }
+      else if (lr.status !== 'matched' && rr.status === 'matched') { filled++; lastFilled = rr; }
+    });
+    if (lastCreated) showToast(created > 1 ? t('toast_req_created_many', { n: created }) : t('toast_req_created', { s: requestLabel(lastCreated), n: lastCreated.quantity || 1 }), 'info', 5000);
+    if (lastFilled) showToast(filled > 1 ? t('toast_req_filled_many', { n: filled }) : t('toast_req_filled', { s: requestLabel(lastFilled), n: lastFilled.quantity || 1 }), 'ok', 6000);
+  }
+  function applyRemoteSettings(remoteSettings) {
+    normalizeState(Object.assign({}, state, { settings: remoteSettings }));
+    const remoteJson = stableJson(remoteSettings);
+    const localJson = stableJson(state.settings);
+    if (remoteJson === localJson) { lastSynced.settingsJson = remoteJson; return; }
+    // An admin with unsaved local settings edits keeps them (their push will follow).
+    if (lastSynced.settingsJson && localJson !== lastSynced.settingsJson) return;
+    state.settings = remoteSettings;
+    lastSynced.settingsJson = remoteJson;
+    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* quota — ignore */ }
+    safeRemoteRender();
+  }
+  // Re-render triggered by REMOTE data: deferred while the operator is typing, has a modal
+  // open or is following the tour, so their in-progress work is never wiped by a redraw.
+  function safeRemoteRender() {
+    const ae = document.activeElement;
+    const typing = ae && (ae.tagName === 'INPUT' || ae.tagName === 'TEXTAREA' || ae.tagName === 'SELECT');
+    if (typing || tour.active || document.getElementById('modal-layer')) {
+      clearTimeout(remoteRenderTimer);
+      remoteRenderTimer = setTimeout(safeRemoteRender, 2500);
+      return;
+    }
+    render();
+  }
+  function notifyRemoteUpdate() {
+    const now = Date.now();
+    if (now - lastRemoteToastAt < 30000) return;
+    lastRemoteToastAt = now;
+    showToast(t('sync_remote_update'), 'info', 3500);
+  }
+  function setSyncStatus(s) { syncStatus = s; updateSyncChip(); }
+  function setSyncError(ctx, err) {
+    const wasError = syncStatus === 'error';
+    syncStatus = 'error';
+    syncErrorMsg = ctx + ': ' + ((err && err.message) || err || '?');
+    console.warn('[sync]', syncErrorMsg);
+    updateSyncChip();
+    if (!wasError) showToast(t('sync_error_toast'), 'error', 6000);
+  }
+  // The Firestore document hard limit is ~1 MiB: warn the team well before writes start failing.
+  function warnIfNearSizeLimit(payload) {
+    if (sizeWarnShown) return;
+    let size = 0;
+    try { size = JSON.stringify(payload).length; } catch (e) { return; }
+    if (size > 850000) { sizeWarnShown = true; showToast(t('sync_size_warn'), 'warn', 9000); }
   }
 
   // ---------- Derived / computed selectors ----------
@@ -713,6 +885,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const op = currentOperator();
     return op && (op.team === 'rd' || op.team === 'it') ? op.team : null;
   }
+  // Display name of whoever is actually using the app right now — recorded as the author of
+  // every log entry (audit trail: notes, approvals, phase advances, matches).
+  function actorName() {
+    const op = currentOperator();
+    if (op && op.name) return op.name;
+    if (fbEnabled && currentUser) return currentUser.displayName || currentUser.email || t('log_author_op');
+    return localOperatorName() || t('log_author_op');
+  }
   // Operational split between the two teams. Admins and operators WITHOUT an
   // assigned team keep full access (backward compatible); a team-assigned
   // operator works only the phases of their own team.
@@ -757,13 +937,16 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (!r || !n || r.status !== 'open' || requestFull(r)) return;
     if (!confirm(t('mt_confirm_assign', { n: n.name, s: r.employer, r: r.department || '—' }))) return;
     r.matched.push({ id: n.id, name: n.name, at: new Date().toISOString().slice(0, 10) });
-    if (requestFull(r)) r.status = 'matched';
+    // This assignment can be the one that fills the last seat: flag it for the alert below.
+    const justFilled = requestFull(r);
+    if (justFilled) r.status = 'matched';
     n.matchedRequestId = r.id; n.matchedDepartment = r.department || '';
     n.employer = r.employer;
-    pushLog(n, 'system', t('log_author_system'), t('log_matched', { s: r.employer, r: r.department || '—' }));
+    pushLog(n, 'system', actorName(), t('log_matched', { s: r.employer, r: r.department || '—' }));
     n.lastUpdate = new Date().toISOString().slice(0, 10);
     closeModal();
     commit();
+    if (justFilled) showToast(t('toast_req_filled', { s: requestLabel(r), n: r.quantity || 1 }), 'ok', 6000);
   }
   function unassignMatch(reqId, nurseId) {
     if (!canManageMatching()) return;
@@ -772,7 +955,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const n = getNurse(nurseId);
     if (n) {
       n.matchedRequestId = null; n.matchedDepartment = '';
-      pushLog(n, 'alert', t('log_author_system'), t('log_unmatched', { s: r.employer, r: r.department || '—' }));
+      pushLog(n, 'alert', actorName(), t('log_unmatched', { s: r.employer, r: r.department || '—' }));
       n.lastUpdate = new Date().toISOString().slice(0, 10);
     }
     r.matched = r.matched.filter((m) => m.id !== nurseId);
@@ -861,10 +1044,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   // Documents that are expired or expiring within 60 days, across all candidates.
   function computeExpiring() {
     const list = [];
-    state.nurses.forEach((n) => (n.documents || []).forEach((d) => {
-      const ex = docExpiry(d);
-      if (ex === 'expired' || ex === 'soon') list.push({ n: n, d: d, ex: ex });
-    }));
+    state.nurses.forEach((n) => {
+      (n.documents || []).forEach((d) => {
+        const ex = docExpiry(d);
+        if (ex === 'expired' || ex === 'soon') list.push({ n: n, d: d, ex: ex });
+      });
+      // Identity expiry dates from the personal-data sheet (passport / cédula): surfaced as
+      // virtual entries so the dashboard panel and KPI alert on them, not just on file validities.
+      [{ k: 'passportExpiry', label: t('f_passport_exp') }, { k: 'cedulaExpiry', label: t('f_cedula_exp') }].forEach((f) => {
+        if (!n[f.k]) return;
+        const ex = docExpiry({ validity: n[f.k] });
+        if (ex === 'expired' || ex === 'soon') list.push({ n: n, d: { name: f.label, validity: n[f.k] }, ex: ex });
+      });
+    });
     list.sort((a, b) => {
       if (a.ex !== b.ex) return a.ex === 'expired' ? -1 : 1;
       return String(a.d.validity).localeCompare(String(b.d.validity));
@@ -894,17 +1086,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
   function approveDoc(nurseId, docId) {
     const n = getNurse(nurseId); const d = n.documents.find((x) => x.id === docId); if (!d) return;
+    if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     d.status = 'approved';
     if (!d.uploadDate) d.uploadDate = new Date().toISOString().slice(0, 10);
-    pushLog(n, 'system', t('log_author_system'), t('log_doc_approved', { x: d.name }));
+    pushLog(n, 'system', actorName(), t('log_doc_approved', { x: d.name }));
     n.lastUpdate = new Date().toISOString().slice(0, 10);
     commit();
   }
   function rejectDoc(nurseId, docId) {
     const n = getNurse(nurseId); const d = n.documents.find((x) => x.id === docId); if (!d) return;
+    if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     d.status = 'missing'; d.uploadDate = null;
     d.fileName = null; d.fileUrl = null; d.fileSize = null; d.fileStoragePath = null;
-    pushLog(n, 'alert', t('log_author_system'), t('log_doc_rejected', { x: d.name }));
+    pushLog(n, 'alert', actorName(), t('log_doc_rejected', { x: d.name }));
     n.lastUpdate = new Date().toISOString().slice(0, 10);
     commit();
   }
@@ -912,6 +1106,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   // ---------- Real file upload for documents ----------
   let pendingUpload = null;
   function triggerUpload(nurseId, docId) {
+    const gn = getNurse(nurseId);
+    if (gn && !canOperatePhase(gn.currentStep)) return; // the other team's phase
     pendingUpload = { nurseId: nurseId, docId: docId };
     let input = document.getElementById('doc-file-input');
     if (!input) {
@@ -966,12 +1162,12 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     } catch (err) {
       console.warn('Upload fallito:', err && err.message);
     }
-    pushLog(n, 'note', t('log_author_system'), t('log_doc_uploaded', { x: d.name }));
+    pushLog(n, 'note', actorName(), t('log_doc_uploaded', { x: d.name }));
     // Uploading the signed privacy form marks the consent as acquired on the record.
     if ((d.name || '').toLowerCase().indexOf('consenso privacy') >= 0 && !n.privacyConsent) {
       n.privacyConsent = true;
       n.privacyConsentDate = new Date().toISOString().slice(0, 10);
-      pushLog(n, 'system', t('log_author_system'), t('log_privacy_acquired'));
+      pushLog(n, 'system', actorName(), t('log_privacy_acquired'));
     }
     n.lastUpdate = new Date().toISOString().slice(0, 10);
     commit();
@@ -996,23 +1192,26 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     n.currentStep += 1;
     n.lastUpdate = new Date().toISOString().slice(0, 10);
     const to = n.currentStep >= DONE_STEP ? t('state_done') : stepName(n.currentStep);
-    pushLog(n, 'system', t('log_author_system'), t('log_advanced', { from: from, to: to }));
+    pushLog(n, 'system', actorName(), t('log_advanced', { from: from, to: to }));
     commit();
   }
 
   function pushLog(nurse, type, author, text) {
     nurse.logs.unshift({ id: uid(), at: new Date().toISOString(), type, author, text });
+    // Oldest entries fall off the end: the shared Firestore document must stay under ~1 MiB.
+    if (nurse.logs.length > MAX_LOG_ENTRIES) nurse.logs.length = MAX_LOG_ENTRIES;
   }
   function addLog(nurseId, type, text) {
     const n = getNurse(nurseId);
     const clean = (text || '').trim();
     if (!clean) return;
-    pushLog(n, type, n.hrReferent || t('log_author_op'), clean);
+    pushLog(n, type, actorName(), clean);
     commit();
   }
 
   function resetData() {
-    if (!isAdmin()) return;
+    // Cloud mode: never allow seeding demo data over the team's real shared caseload.
+    if (!isAdmin() || fbEnabled) return;
     if (!confirm(t('reset_confirm'))) return;
     state = seedState();
     saveState();
@@ -1047,6 +1246,23 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     return wrap;
   }
   function closeModal() { const m = document.getElementById('modal-layer'); if (m) m.remove(); }
+
+  // ---------- Toast notifications (sync errors, remote updates, warnings) ----------
+  function showToast(msg, tone, ms) {
+    let layer = document.getElementById('toast-layer');
+    if (!layer) {
+      layer = document.createElement('div');
+      layer.id = 'toast-layer';
+      layer.className = 'pointer-events-none fixed bottom-4 left-1/2 z-[95] flex w-full max-w-md -translate-x-1/2 flex-col items-center gap-2 px-4';
+      document.body.appendChild(layer);
+    }
+    const tones = { error: 'bg-rose-600 text-white', warn: 'bg-amber-500 text-white', info: 'bg-slate-800 text-white', ok: 'bg-emerald-600 text-white' };
+    const el = document.createElement('div');
+    el.className = 'pointer-events-auto w-full rounded-xl px-4 py-3 text-center text-sm font-semibold shadow-2xl animate-fadeIn ' + (tones[tone] || tones.info);
+    el.textContent = msg;
+    layer.appendChild(el);
+    setTimeout(() => { el.remove(); const l = document.getElementById('toast-layer'); if (l && !l.children.length) l.remove(); }, ms || 4500);
+  }
   function fieldVal(id) { const e = document.getElementById(id); return e ? e.value.trim() : ''; }
   function inputField(id, label, ph, required, type) {
     return '<div>' +
@@ -1115,13 +1331,17 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const el = document.getElementById('nn-name'); if (el) el.focus();
   }
 
+  function isValidEmail(s) { return /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test((s || '').trim()); }
+  function formError(id, msg) { const err = document.getElementById(id); if (err) { err.textContent = msg; err.classList.remove('hidden'); } }
   function createNurseFromForm() {
     const name = fieldVal('nn-name'), passport = fieldVal('nn-passport');
-    if (!name || !passport) {
-      const err = document.getElementById('nn-error');
-      if (err) { err.textContent = t('nn_error'); err.classList.remove('hidden'); }
-      return;
-    }
+    if (!name || !passport) { formError('nn-error', t('nn_error')); return; }
+    // A typo'd email is worse than an empty one (it silently breaks contact data).
+    const nnEmail = fieldVal('nn-email');
+    if (nnEmail && !isValidEmail(nnEmail)) { formError('nn-error', t('err_email_invalid')); return; }
+    // The passport number is the de-facto natural key: block silent duplicates.
+    const dupe = state.nurses.find((x) => x.id !== editNurseId && (x.passport || '').trim().toLowerCase() === passport.toLowerCase());
+    if (dupe) { formError('nn-error', t('err_passport_dupe', { x: dupe.name })); return; }
     const privacyEl = document.getElementById('nn-privacy');
     const privacyChecked = !!(privacyEl && privacyEl.checked);
     if (editNurseId) {
@@ -1148,7 +1368,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         e.email = fieldVal('nn-email');
         e.address = fieldVal('nn-address');
         // Privacy consent: stamp the date the first time it's granted, clear it if revoked.
+        // GDPR: a revocation is an auditable event — it must leave a trace in the log.
         if (privacyChecked && !e.privacyConsent) e.privacyConsentDate = new Date().toISOString().slice(0, 10);
+        if (!privacyChecked && e.privacyConsent) pushLog(e, 'alert', actorName(), t('log_privacy_revoked'));
         if (!privacyChecked) e.privacyConsentDate = null;
         e.privacyConsent = privacyChecked;
         e.lastUpdate = new Date().toISOString().slice(0, 10);
@@ -1186,7 +1408,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       documents: defaultRequiredDocs(),
       checklist: makeChecklist({ __current: 1 }),
       relocation: { flight: null, housing: null, tutor: null, contractStatus: t('contract_none') },
-      logs: [{ id: uid(), at: new Date().toISOString(), type: 'system', author: t('log_author_system'), text: t('log_nurse_created') }],
+      logs: [{ id: uid(), at: new Date().toISOString(), type: 'system', author: actorName(), text: t('log_nurse_created') }],
     };
     state.nurses.unshift(nurse);
     state.selectedNurseId = nurse.id;
@@ -1240,6 +1462,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (!isAdmin()) return;
     const n = getNurse(id); if (!n) return;
     if (!confirm(t('confirm_delete_nurse', { x: n.name }))) return;
+    // Release any facility-request slot held by this candidate: the seat becomes
+    // available again and a fully-staffed request reopens.
+    (state.requests || []).forEach((r) => {
+      if (!(r.matched || []).some((m) => m.id === id)) return;
+      r.matched = r.matched.filter((m) => m.id !== id);
+      if (r.status === 'matched' && !requestFull(r)) r.status = 'open';
+    });
     state.nurses = state.nurses.filter((x) => x.id !== id);
     if (state.selectedNurseId === id) state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
     editNurseId = null;
@@ -1258,7 +1487,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   function csvCell(v) {
-    const s = (v == null ? '' : String(v));
+    let s = (v == null ? '' : String(v));
+    // Formula-injection guard: Excel executes cells starting with = + - @ as formulas.
+    if (/^[=+\-@]/.test(s)) s = "'" + s;
     return '"' + s.replace(/"/g, '""') + '"';
   }
   function exportCandidatesCsv() {
@@ -1405,6 +1636,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function createDocFromForm() {
     const n = getNurse(pendingDocNurse);
     if (!n) { closeModal(); return; }
+    if (!canOperatePhase(n.currentStep)) { closeModal(); return; } // the other team's phase
     const name = fieldVal('ad-name');
     if (!name) {
       const err = document.getElementById('ad-error');
@@ -1413,7 +1645,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     }
     const lang = (document.getElementById('ad-lang') || {}).value || 'ES';
     n.documents.push({ id: uid(), name: name, language: lang, uploadDate: null, validity: fieldVal('ad-validity') || null, status: 'missing' });
-    pushLog(n, 'system', t('log_author_system'), t('log_doc_added', { x: name }));
+    pushLog(n, 'system', actorName(), t('log_doc_added', { x: name }));
     n.lastUpdate = new Date().toISOString().slice(0, 10);
     closeModal();
     commit();
@@ -1507,6 +1739,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         settingsSection('agencies') + settingsSection('employers') + settingsSection('operators') +
       '</div>' +
       '<div class="mt-5 grid grid-cols-1 gap-5 lg:grid-cols-2">' + settingsSection('docTypes') + settingsSection('specialties') + '</div>' +
+      '<div class="mt-5 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">' +
+        '<div class="mb-1 flex items-center gap-2"><i data-lucide="archive" class="h-5 w-5 text-indigo-500"></i><h3 class="text-sm font-bold text-slate-900">' + t('backup_title') + '</h3></div>' +
+        '<p class="mb-3 text-xs text-slate-500">' + t('backup_desc') + '</p>' +
+        '<div class="flex flex-wrap gap-2">' +
+          '<button data-action="backup-export" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="download" class="h-3.5 w-3.5"></i>' + t('backup_export') + '</button>' +
+          '<button data-action="backup-import" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50"><i data-lucide="upload" class="h-3.5 w-3.5"></i>' + t('backup_import') + '</button>' +
+        '</div>' +
+      '</div>' +
     '</main>';
   }
 
@@ -1540,18 +1780,62 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const type = pendingEntity.type; if (!type) return;
     const obj = {};
     ENTITY_FIELDS[type].forEach((f) => { obj[f.key] = fieldVal('ent-' + f.key); });
-    if (!obj.name) { const err = document.getElementById('ent-error'); if (err) { err.textContent = t('name_required'); err.classList.remove('hidden'); } return; }
+    if (!obj.name) { formError('ent-error', t('name_required')); return; }
+    // A typo'd operator email ends up in the Firestore access map: that operator
+    // simply can't log in and nobody understands why. Validate it here.
+    if (type === 'operators' && obj.email && !isValidEmail(obj.email)) { formError('ent-error', t('err_email_invalid')); return; }
     const list = state.settings[type];
-    if (pendingEntity.id) { const ex = list.find((x) => x.id === pendingEntity.id); if (ex) Object.assign(ex, obj); }
+    if (pendingEntity.id) {
+      const ex = list.find((x) => x.id === pendingEntity.id);
+      if (ex) {
+        // Nurses and requests reference these records as plain-text labels (employers as
+        // "name · city"): propagate a rename so no case is left pointing to a ghost.
+        const oldLabel = entityRefLabel(type, ex), newLabel = entityRefLabel(type, obj);
+        if (oldLabel && newLabel && oldLabel !== newLabel) propagateEntityRename(type, oldLabel, newLabel);
+        Object.assign(ex, obj);
+      }
+    }
     else { list.push(Object.assign({ id: uid() }, obj)); }
     closeModal();
     commit();
+  }
+  // The exact string stored on nurses/requests for each entity (employers include the city,
+  // matching employerOptions()).
+  function entityRefLabel(type, obj) {
+    if (!obj) return '';
+    if (type === 'employers') return (obj.name || '') + (obj.city ? ' · ' + obj.city : '');
+    return obj.name || '';
+  }
+  // Fields on nurses/requests that hold each entity type's label as a plain string.
+  function entityNameRefs(type) {
+    return type === 'operators' ? { nurse: ['hrReferent'], request: [] }
+      : type === 'employers' ? { nurse: ['employer'], request: ['employer'] }
+      : type === 'agencies' ? { nurse: ['partnerAgency'], request: [] }
+      : null;
+  }
+  function propagateEntityRename(type, oldLabel, newLabel) {
+    const refs = entityNameRefs(type); if (!refs) return;
+    state.nurses.forEach((n) => refs.nurse.forEach((k) => { if (n[k] === oldLabel) n[k] = newLabel; }));
+    (state.requests || []).forEach((r) => refs.request.forEach((k) => { if (r[k] === oldLabel) r[k] = newLabel; }));
+  }
+  function entityUsageCount(type, label) {
+    const refs = entityNameRefs(type);
+    if (refs) {
+      let c = 0;
+      state.nurses.forEach((n) => refs.nurse.forEach((k) => { if (n[k] === label) c++; }));
+      (state.requests || []).forEach((r) => refs.request.forEach((k) => { if (r[k] === label) c++; }));
+      return c;
+    }
+    if (type === 'specialties') return state.nurses.filter((n) => nurseSpecs(n).indexOf(label) >= 0).length;
+    return 0;
   }
   function deleteEntity(type, id) {
     if (!isAdmin()) return;
     const list = state.settings[type] || [];
     const it = list.find((x) => x.id === id); if (!it) return;
-    if (!confirm(t('confirm_delete', { x: it.name || '' }))) return;
+    const used = entityUsageCount(type, entityRefLabel(type, it));
+    const msg = used > 0 ? t('confirm_delete_used', { x: it.name || '', n: used }) : t('confirm_delete', { x: it.name || '' });
+    if (!confirm(msg)) return;
     state.settings[type] = list.filter((x) => x.id !== id);
     commit();
   }
@@ -1753,22 +2037,29 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       shift: fieldVal('rq-shift'), notes: fieldVal('rq-notes'),
       requiredSkills: chipValues('rq-req'), preferredSkills: chipValues('rq-pref'),
     };
+    let toast = null;
     if (pendingRequestId) {
       const r = getRequest(pendingRequestId);
       if (r) {
+        const wasFull = requestFull(r);
         Object.assign(r, data);
         // Changing the headcount can complete or reopen the request.
         if (r.status !== 'closed') r.status = requestFull(r) ? 'matched' : 'open';
+        // Lowering the headcount to meet the matched count also "fills" it.
+        if (!wasFull && requestFull(r) && r.status === 'matched') toast = { msg: t('toast_req_filled', { s: requestLabel(r), n: r.quantity || 1 }), tone: 'ok' };
       }
     } else {
-      state.requests.push(Object.assign({
+      const nr = Object.assign({
         id: uid(), status: 'open', createdAt: new Date().toISOString().slice(0, 10),
         matched: [],
-      }, data));
+      }, data);
+      state.requests.push(nr);
+      toast = { msg: t('toast_req_created', { s: requestLabel(nr), n: nr.quantity || 1 }), tone: 'info' };
     }
     pendingRequestId = null;
     closeModal();
     commit();
+    if (toast) showToast(toast.msg, toast.tone, 5000);
   }
 
   // Candidate shortlist for a request: interrogazione → identificazione → validazione.
@@ -1966,6 +2257,99 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     openDocOverlay('privacy-overlay', privacyFormHtml(n));
   }
   function closePrivacyForm() { closeDocOverlay('privacy-overlay'); }
+
+  // ---------- Printable candidate sheet (browser print → paper or "save as PDF") ----------
+  function openNurseSheet(nurseId) {
+    const n = getNurse(nurseId); if (!n) return;
+    openDocOverlay('sheet-overlay', nurseSheetHtml(n));
+  }
+  function closeNurseSheet() { closeDocOverlay('sheet-overlay'); }
+  function nurseSheetHtml(n) {
+    const row = (label, val) => '<tr class="border-b border-slate-100 last:border-0"><td class="w-44 py-1.5 pr-3 align-top text-[11px] font-semibold uppercase tracking-wide text-slate-400">' + label + '</td><td class="py-1.5 text-[13px] text-slate-800">' + (val ? escapeHtml(val) : '—') + '</td></tr>';
+    const sec = (title, inner) => '<div class="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm print:border-0 print:p-0 print:shadow-none"><h3 class="mb-2 text-sm font-bold text-slate-900">' + title + '</h3>' + inner + '</div>';
+    const tbl = (inner) => '<table class="w-full">' + inner + '</table>';
+    const fase = n.currentStep >= DONE_STEP ? t('state_done') : (Math.min(n.currentStep, LAST_STEP) + '/9 — ' + stepName(n.currentStep));
+    const docRows = (n.documents || []).map((d) =>
+      '<tr class="border-b border-slate-100 last:border-0"><td class="py-1.5 pr-3 text-[13px] text-slate-800">' + escapeHtml(d.name) +
+        (d.optional ? ' <span class="text-[11px] text-slate-400">(' + escapeHtml(t('doc_optional')) + ')</span>' : '') + '</td>' +
+      '<td class="w-28 py-1.5 pr-3 text-[12px] font-semibold text-slate-600">' + docStatusLabel(d.status) + '</td>' +
+      '<td class="w-28 py-1.5 text-[12px] text-slate-500">' + (d.validity ? formatDate(d.validity) : '—') + '</td></tr>').join('');
+    const logRows = (n.logs || []).slice(0, 10).map((l) =>
+      '<tr class="border-b border-slate-100 last:border-0"><td class="w-36 py-1.5 pr-3 align-top text-[11px] text-slate-400">' + formatDateTime(l.at) + '</td>' +
+      '<td class="w-36 py-1.5 pr-3 align-top text-[12px] font-medium text-slate-600">' + escapeHtml(l.author || '') + '</td>' +
+      '<td class="py-1.5 text-[12px] text-slate-700">' + escapeHtml(l.text || '') + '</td></tr>').join('');
+    return '' +
+    '<div class="no-print sticky top-0 z-10 border-b border-slate-200 bg-white/90 backdrop-blur">' +
+      '<div class="mx-auto flex max-w-3xl items-center gap-3 px-4 py-3 sm:px-5">' +
+        '<div class="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow"><i data-lucide="id-card" class="h-4 w-4"></i></div>' +
+        '<div><h1 class="text-sm font-extrabold leading-tight text-slate-900">' + t('sheet_title') + '</h1><p class="text-xs text-slate-500">' + escapeHtml(n.name) + '</p></div>' +
+        '<div class="ml-auto flex items-center gap-2">' +
+          '<button onclick="window.print()" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700"><i data-lucide="printer" class="h-3.5 w-3.5"></i>' + t('manual_btn_print') + '</button>' +
+          '<button data-action="close-sheet" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="x" class="h-3.5 w-3.5"></i>' + t('manual_close') + '</button>' +
+        '</div>' +
+      '</div>' +
+    '</div>' +
+    '<div class="mx-auto max-w-3xl space-y-4 px-4 py-8 sm:px-5">' +
+      '<div class="text-center"><h2 class="text-lg font-extrabold text-slate-900">DHL Nurses — ' + t('sheet_title') + '</h2>' +
+        '<p class="text-xs text-slate-400">' + escapeHtml(formatDate(new Date().toISOString().slice(0, 10))) + '</p></div>' +
+      sec(t('tab_dati'), tbl(
+        row(t('f_name'), n.name) + row(t('f_birth'), [n.birthDate ? formatDate(n.birthDate) : '', n.birthPlace || ''].filter(Boolean).join(' · ')) +
+        row(t('f_nationality'), n.nationality) + row(t('f_marital'), n.maritalStatus ? t('ms_' + n.maritalStatus) : '') +
+        row(t('f_address'), n.address) + row(t('f_passport'), n.passport) + row(t('f_passport_exp'), n.passportExpiry ? formatDate(n.passportExpiry) : '') +
+        row(t('f_cedula'), n.cedula) + row(t('f_cedula_exp'), n.cedulaExpiry ? formatDate(n.cedulaExpiry) : ''))) +
+      sec(t('tab_contatti'), tbl(
+        row(t('f_phone'), n.phone) + row(t('f_email'), n.email) + row(t('f_agency'), n.partnerAgency) +
+        row(t('f_employer'), n.employer) + row(t('f_hr'), n.hrReferent))) +
+      sec(t('tab_competenze'), tbl(
+        row(t('f_role'), n.profRole) + row(t('f_sector'), n.profSector) + row(t('f_experience'), n.profExperience) +
+        row(t('f_lang'), n.languageLevel) + row(t('f_specs'), nurseSpecs(n).join(' · ')))) +
+      sec(t('f_status'), tbl(
+        row(t('sheet_phase'), fase) + row(t('f_privacy'), n.privacyConsent ? t('privacy_given', { d: n.privacyConsentDate ? formatDate(n.privacyConsentDate) : '—' }) : t('privacy_none')) +
+        row(t('f_last'), n.lastUpdate ? formatDate(n.lastUpdate) : ''))) +
+      sec(t('docs_title'), tbl('<thead><tr class="border-b border-slate-200 text-left text-[10px] font-semibold uppercase tracking-wide text-slate-400"><th class="pb-1 pr-3">' + t('th_document') + '</th><th class="pb-1 pr-3">' + t('th_status') + '</th><th class="pb-1">' + t('sheet_validity') + '</th></tr></thead><tbody>' + docRows + '</tbody>')) +
+      sec(t('log_title'), tbl('<tbody>' + (logRows || '') + '</tbody>')) +
+    '</div>';
+  }
+
+  // ---------- Full JSON backup / restore (admin) ----------
+  function exportBackup() {
+    if (!isAdmin()) return;
+    const payload = { app: 'dhl-nurses-backup', version: 1, exportedAt: new Date().toISOString(), nurses: state.nurses, requests: state.requests || [], settings: state.settings };
+    downloadFile('dhl-nurses-backup-' + new Date().toISOString().slice(0, 10) + '.json', JSON.stringify(payload), 'application/json');
+  }
+  function triggerImportBackup() {
+    if (!isAdmin()) return;
+    let input = document.getElementById('backup-file-input');
+    if (!input) {
+      input = document.createElement('input');
+      input.type = 'file';
+      input.id = 'backup-file-input';
+      input.style.display = 'none';
+      input.accept = '.json,application/json';
+      input.addEventListener('change', onBackupFileChosen);
+      document.body.appendChild(input);
+    }
+    input.value = '';
+    input.click();
+  }
+  function onBackupFileChosen(e) {
+    const file = e.target.files && e.target.files[0]; if (!file) return;
+    const r = new FileReader();
+    r.onload = () => {
+      let data = null;
+      try { data = JSON.parse(r.result); } catch (err) { alert(t('backup_invalid')); return; }
+      if (!data || data.app !== 'dhl-nurses-backup' || !Array.isArray(data.nurses)) { alert(t('backup_invalid')); return; }
+      if (!confirm(t('backup_import_confirm', { d: (data.exportedAt || '').slice(0, 10), n: data.nurses.length }))) return;
+      state.nurses = data.nurses;
+      state.requests = Array.isArray(data.requests) ? data.requests : [];
+      if (data.settings) state.settings = data.settings;
+      normalizeState(state);
+      state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
+      showToast(t('backup_done'), 'ok');
+      commit();
+    };
+    r.readAsText(file);
+  }
 
   function privacyFormHtml(n) {
     const dot = '<span class="text-slate-400">____________________________</span>';
@@ -2910,6 +3294,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     else history.pushState(entry, '', '#' + v);
     _lastHistoryView = v;
   }
+  // Surface connectivity changes in the sync chip; flush pending changes on reconnect.
+  window.addEventListener('offline', () => { if (fbEnabled && currentUser) setSyncStatus('offline'); });
+  window.addEventListener('online', () => { if (fbEnabled && currentUser) remoteSync(); });
+
   window.addEventListener('popstate', (e) => {
     let v = (e.state && e.state.dhlView) || (location.hash || '').replace('#', '') || 'dashboard';
     if (APP_VIEWS.indexOf(v) < 0) v = 'dashboard';
@@ -2941,8 +3329,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     '<header class="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">' +
       '<div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-5">' +
         '<div class="flex min-w-0 items-center gap-3">' +
-          '<div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-indigo-500 text-white shadow-lg shadow-indigo-200">' +
-            '<i data-lucide="heart-pulse" class="h-5 w-5"></i></div>' +
+          '<div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-indigo-200 ring-1 ring-slate-200">' +
+            '<img src="' + logoUrl + '" alt="DHL Nurses" class="h-9 w-9 object-contain" /></div>' +
           '<div class="min-w-0">' +
             '<h1 class="truncate text-base font-extrabold leading-tight text-slate-900">DHL Nurses</h1>' +
             '<p class="hidden truncate text-xs text-slate-500 sm:block">Trasferimento Infermieri · Rep. Dominicana → Italia</p>' +
@@ -2958,6 +3346,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           '</nav>' +
         '</div>' +
         '<div class="relative ml-auto flex flex-wrap items-center justify-end gap-2 sm:gap-2.5">' +
+          syncChipHtml() +
           (riskCount > 0
             ? '<button data-action="show-risk" class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-100"><i data-lucide="alarm-clock" class="h-3.5 w-3.5"></i>' + t('at_risk', { n: riskCount }) + '</button>'
             : '<span class="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-600 ring-1 ring-inset ring-emerald-200"><i data-lucide="shield-check" class="h-3.5 w-3.5"></i>' + t('no_risk') + '</span>') +
@@ -2968,12 +3357,43 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             '<button data-action="open-manual" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="book-open" class="h-3.5 w-3.5"></i><span>' + t('manual') + '</span></button>' +
             '<button data-action="open-guide" class="inline-flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50"><i data-lucide="scale" class="h-3.5 w-3.5"></i><span>' + t('norm_guide') + '</span></button>' +
             '<button data-action="start-tour" class="inline-flex items-center gap-1.5 rounded-xl bg-indigo-50 px-3 py-2 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="graduation-cap" class="h-3.5 w-3.5"></i><span>' + t('guide') + '</span></button>' +
-            (isAdmin() ? '<button data-action="reset" class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tip-pos="bottom" data-tooltip="' + escapeHtml(t('reset_tooltip')) + '"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i><span class="lg:hidden">' + t('reset_tooltip') + '</span></button>' : '') +
+            // "Reset demo data" is a DEMO feature: in cloud mode it would wipe the whole
+            // team's real caseload, so the button only exists in the local demo.
+            (isAdmin() && !fbEnabled ? '<button data-action="reset" class="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tip-pos="bottom" data-tooltip="' + escapeHtml(t('reset_tooltip')) + '"><i data-lucide="rotate-ccw" class="h-3.5 w-3.5"></i><span class="lg:hidden">' + t('reset_tooltip') + '</span></button>' : '') +
           '</div>' +
           userCluster() +
         '</div>' +
       '</div>' +
     '</header>';
+  }
+
+  // Cloud save status chip (cloud mode only): green = saved, amber = saving,
+  // red = NOT saved (click explains and retries), grey = offline.
+  function syncChipHtml() {
+    if (!(fbEnabled && currentUser)) return '';
+    let cls, icon, label, spin = '';
+    if (syncStatus === 'error') { cls = 'bg-rose-50 text-rose-600 ring-rose-200 hover:bg-rose-100'; icon = 'cloud-off'; label = t('sync_error'); }
+    else if (syncStatus === 'offline') { cls = 'bg-slate-100 text-slate-500 ring-slate-200'; icon = 'wifi-off'; label = t('sync_offline'); }
+    else if (syncStatus === 'saving') { cls = 'bg-amber-50 text-amber-600 ring-amber-200'; icon = 'refresh-cw'; label = t('sync_saving'); spin = ' animate-spin'; }
+    else { cls = 'bg-emerald-50 text-emerald-600 ring-emerald-200'; icon = 'cloud'; label = t('sync_saved'); }
+    return '<button id="sync-chip" data-action="sync-info" class="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ring-1 ring-inset transition ' + cls + '" data-tip-pos="bottom" data-tooltip="' + escapeHtml(t('sync_tooltip')) + '">' +
+      '<i data-lucide="' + icon + '" class="h-3.5 w-3.5' + spin + '"></i><span class="hidden md:inline">' + label + '</span></button>';
+  }
+  // Patches just the chip in place: sync completions must not trigger a full re-render.
+  function updateSyncChip() {
+    const el = document.getElementById('sync-chip');
+    if (!el) return;
+    const html = syncChipHtml();
+    if (!html) { el.remove(); return; }
+    el.outerHTML = html;
+    lucide.createIcons();
+  }
+  function syncInfo() {
+    if (syncStatus === 'error') {
+      alert(t('sync_error_detail', { x: syncErrorMsg || '—' }));
+      remoteSync(); // immediate retry
+    } else if (syncStatus === 'offline') alert(t('sync_offline_detail'));
+    else alert(t('sync_ok_detail'));
   }
 
   function userCluster() {
@@ -3219,7 +3639,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       return (
         n.name.toLowerCase().includes(q) ||
         n.passport.toLowerCase().includes(q) ||
-        (n.employer || '').toLowerCase().includes(q)
+        (n.employer || '').toLowerCase().includes(q) ||
+        (n.partnerAgency || '').toLowerCase().includes(q) ||
+        (n.hrReferent || '').toLowerCase().includes(q) ||
+        (n.birthPlace || '').toLowerCase().includes(q) ||
+        nurseSpecs(n).some((s) => s.toLowerCase().includes(q))
       );
     });
   }
@@ -3343,6 +3767,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<div class="flex flex-col items-start gap-2 sm:items-end">' +
           statusBadge(deriveStatus(n)) +
           '<span class="text-xs text-slate-400">' + t('last_update', { d: formatDate(n.lastUpdate) }) + '</span>' +
+          '<button data-action="open-sheet" data-id="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-inset ring-slate-200 transition hover:bg-white" data-tooltip="' + escapeHtml(t('sheet_tip')) + '"><i data-lucide="printer" class="h-3 w-3"></i>' + t('sheet_btn') + '</button>' +
           '<button data-action="open-edit-nurse" data-id="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-white/70 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-white"><i data-lucide="pencil" class="h-3 w-3"></i>' + t('edit_candidate') + '</button>' +
         '</div>' +
       '</div>' +
@@ -3421,6 +3846,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const personalNames = PERSONAL_DOC_TYPES.map((p) => p.name.toLowerCase());
     const docs = (n.documents || []).filter((d) => personalNames.indexOf((d.name || '').toLowerCase()) >= 0);
     if (!docs.length) return '';
+    // Phase owned by the other team: documents are read-only (same rule as checklist/advance).
+    const docsLocked = n.currentStep < DONE_STEP && !canOperatePhase(n.currentStep);
     const rows = docs.map((d) => {
       const statusIcon = d.status === 'approved' ? '<i data-lucide="check-circle-2" class="h-4 w-4 shrink-0 text-emerald-500"></i>'
         : d.status === 'pending' ? '<i data-lucide="clock" class="h-4 w-4 shrink-0 text-amber-500"></i>'
@@ -3428,7 +3855,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       const viewBtn = (d.fileName && d.fileUrl)
         ? '<button data-action="view-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="shrink-0 rounded-lg px-2 py-1 text-xs font-semibold text-slate-500 ring-1 ring-inset ring-slate-200 transition hover:bg-slate-50" data-tooltip="' + escapeHtml(t('doc_view')) + '"><i data-lucide="eye" class="h-3.5 w-3.5"></i></button>'
         : '';
-      const uploadBtn = '<button data-action="upload-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + (d.fileName ? t('act_replace') : t('act_upload')) + '</button>';
+      const uploadBtn = docsLocked ? '' : '<button data-action="upload-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="shrink-0 rounded-lg px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + (d.fileName ? t('act_replace') : t('act_upload')) + '</button>';
       return '<div class="flex items-center gap-2 rounded-xl border border-slate-100 bg-slate-50/60 px-3 py-2">' +
         statusIcon +
         '<div class="min-w-0 flex-1">' +
@@ -3528,10 +3955,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   function documentManager(n) {
+    // Same team rule as checklist/advance: the other team's phase is read-only here too.
+    const docsLocked = n.currentStep < DONE_STEP && !canOperatePhase(n.currentStep);
     const rows = n.documents.map((d) => {
       const cls = DOC_STATUS_CLS[d.status], icon = DOC_STATUS_ICON[d.status];
       const uploadBtn = '<button data-action="upload-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-50">' + (d.fileName ? t('act_replace') : t('act_upload')) + '</button>';
-      const actions = d.status === 'approved'
+      const actions = docsLocked
+        ? '<span class="text-[11px] text-slate-400">—</span>'
+        : d.status === 'approved'
         ? '<div class="flex flex-wrap justify-end gap-1.5">' + uploadBtn +
             '<button data-action="reject-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="rounded-lg px-2 py-1 text-xs font-semibold text-rose-600 ring-1 ring-inset ring-rose-200 transition hover:bg-rose-50">' + t('act_reject') + '</button></div>'
         : d.status === 'missing'
@@ -3563,8 +3994,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<i data-lucide="files" class="h-5 w-5 text-indigo-500"></i>' +
         '<h3 class="text-sm font-bold text-slate-900">' + t('docs_title') + '</h3>' +
         '<span class="ml-auto text-xs text-slate-400">' + t('docs_count', { a: approved, b: n.documents.length }) + '</span>' +
-        '<button data-action="open-add-doc" data-nurse="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="plus" class="h-3 w-3"></i>' + t('add') + '</button>' +
+        (docsLocked ? '' : '<button data-action="open-add-doc" data-nurse="' + n.id + '" class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="plus" class="h-3 w-3"></i>' + t('add') + '</button>') +
       '</div>' +
+      (docsLocked ? '<div class="mb-2 flex items-center gap-2 rounded-xl bg-sky-50 px-3 py-2 text-xs font-semibold text-sky-700 ring-1 ring-inset ring-sky-200"><i data-lucide="users" class="h-3.5 w-3.5"></i>' + t('phase_team_locked', { team: escapeHtml(teamTag(stepTeam(n.currentStep))) }) + '</div>' : '') +
       '<div class="-mx-5 overflow-x-auto px-5">' +
         '<table class="w-full min-w-[340px]">' +
           '<thead><tr class="border-b border-slate-200 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-400">' +
@@ -3683,7 +4115,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="w-full max-w-md animate-fadeIn">' +
         '<div class="mb-4 flex justify-center">' + langSwitcher(true) + '</div>' +
         '<div class="mb-6 flex flex-col items-center text-center">' +
-          '<div class="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-500 to-indigo-600 text-white shadow-xl shadow-indigo-900/40"><i data-lucide="heart-pulse" class="h-7 w-7"></i></div>' +
+          '<div class="mb-3 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-xl shadow-indigo-900/40 ring-1 ring-white/20"><img src="' + logoUrl + '" alt="DHL Nurses" class="h-full w-full object-contain" /></div>' +
           '<h1 class="text-2xl font-extrabold text-white">DHL Nurses</h1>' +
           '<p class="mt-1 text-sm text-slate-300">' + t('login_subtitle') + '</p>' +
         '</div>' +
@@ -3762,7 +4194,6 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       firebase.initializeApp(FIREBASE_CONFIG);
       auth = firebase.auth();
       db = firebase.firestore();
-      try { storage = firebase.storage(); } catch (e) { storage = null; }
       fbEnabled = true;
       auth.onAuthStateChanged(async (user) => {
         authResolved = true;
@@ -3778,12 +4209,19 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           try { hasCache = !!localStorage.getItem(STORAGE_KEY); } catch (e) { hasCache = false; }
           if (hasCache) {
             render();
-            loadRemoteState().then(() => render());
+            loadRemoteState().then(() => { render(); attachRealtimeSync(); });
           } else {
             await loadRemoteState();
             render();
+            attachRealtimeSync();
           }
-        } else { render(); }
+        } else {
+          // Signed out: stop listening and forget the cloud baseline of the previous session.
+          detachRealtimeSync();
+          lastSynced = { nurses: {}, requests: {}, settingsJson: '' };
+          syncStatus = 'idle'; syncErrorMsg = '';
+          render();
+        }
       });
       return true;
     } catch (e) {
@@ -3811,6 +4249,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     } catch (e) {
       console.warn('Lettura Firestore fallita, uso cache locale:', e && e.message);
       state = loadState();
+      setSyncError(t('sync_ctx_load'), e);
     }
     remoteLoading = false;
     state.nurses.forEach((n) => { n.status = deriveStatus(n); });
@@ -3827,6 +4266,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (casesSnap.exists) state.requests = Array.isArray(casesSnap.data().requests) ? casesSnap.data().requests : [];
     if (settingsSnap.exists && settingsSnap.data().settings) state.settings = settingsSnap.data().settings;
     normalizeState(state);
+    // Cloud baseline for the per-record merge: everything just read is, by definition, in sync.
+    lastSynced.nurses = snapshotMap(state.nurses);
+    lastSynced.requests = snapshotMap(state.requests || []);
+    lastSynced.settingsJson = stableJson(state.settings);
     state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
     // First-run initialization: seed the shared docs (writes succeed only for an admin).
     if (!casesSnap.exists) data.doc('cases').set({ nurses: state.nurses, requests: state.requests || [], updatedAt: serverTs() }, { merge: true }).catch(() => {});
@@ -3998,12 +4441,15 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'open-guide': openGuide(); break;
       case 'close-guide': closeGuide(); break;
       case 'print-privacy': openPrivacyForm(t.getAttribute('data-id')); break;
+      case 'open-sheet': openNurseSheet(t.getAttribute('data-id')); break;
+      case 'close-sheet': closeNurseSheet(); break;
+      case 'backup-export': exportBackup(); break;
+      case 'backup-import': triggerImportBackup(); break;
       case 'profile-tab': profileTab = t.getAttribute('data-tab'); render(); break;
       case 'welcome-start': closeWelcome(); if (state.view !== 'dashboard') { state.view = 'dashboard'; render(); } startTour(); break;
       case 'welcome-explore': closeWelcome(); break;
-      case 'welcome-prev': welcomeGo(welcomeIdx - 1, true); break;
-      case 'welcome-next': welcomeGo(welcomeIdx + 1, true); break;
-      case 'welcome-dot': welcomeGo(parseInt(t.getAttribute('data-i'), 10), true); break;
+      case 'welcome-detail': welcomeDetail(t.getAttribute('data-key')); break;
+      case 'welcome-detail-close': closeWelcomeDetail(); break;
       case 'welcome-lang': setLang(t.getAttribute('data-lang')); openWelcome(); break;
       case 'close-privacy': closePrivacyForm(); break;
       case 'set-lang': setLang(t.getAttribute('data-lang')); break;
@@ -4024,6 +4470,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'reopen-request': reopenRequest(t.getAttribute('data-id')); break;
       case 'delete-entity': deleteEntity(t.getAttribute('data-type'), t.getAttribute('data-id')); break;
       case 'set-demo-role': setDemoRole(t.getAttribute('data-role')); break;
+      case 'sync-info': syncInfo(); break;
     }
     // Any action selected from the mobile tools dropdown should close it.
     const _m2 = document.getElementById('hdr-tools');
@@ -4033,8 +4480,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   // Close any open modal / tour with the Escape key.
   document.addEventListener('keydown', (e) => {
     if (e.key !== 'Escape') return;
-    if (document.getElementById('welcome-overlay')) closeWelcome();
+    if (document.getElementById('wl-detail')) closeWelcomeDetail();
+    else if (document.getElementById('welcome-overlay')) closeWelcome();
     else if (document.getElementById('modal-layer')) closeModal();
+    else if (document.getElementById('sheet-overlay')) closeNurseSheet();
     else if (document.getElementById('privacy-overlay')) closePrivacyForm();
     else if (document.getElementById('guide-overlay')) closeGuide();
     else if (document.getElementById('manual-overlay')) closeManual();
@@ -4095,15 +4544,18 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
 
 
   // ---------- Demo welcome page (presentation cover with auto-playing feature tour) ----------
-  const WELCOME_SLIDES = [
-    { icon: 'layout-dashboard', key: 'wl_s1' },
-    { icon: 'folder-kanban', key: 'wl_s2' },
-    { icon: 'shield-check', key: 'wl_s3' },
-    { icon: 'files', key: 'wl_s4' },
-    { icon: 'plane', key: 'wl_s5' },
-    { icon: 'sparkles', key: 'wl_s6' },
+  // Scrolling landing: one section per feature, revealed on scroll, each with a detail popup.
+  const LANDING_SECTIONS = [
+    { icon: 'layout-dashboard', key: 'wl_s1', tint: 'indigo' },
+    { icon: 'route', key: 'wl_s2', tint: 'sky' },
+    { icon: 'files', key: 'wl_s4', tint: 'amber' },
+    { icon: 'shield-check', key: 'wl_s3', tint: 'emerald' },
+    { icon: 'target', key: 'wl_s5', tint: 'indigo' },
+    { icon: 'bell-ring', key: 'wl_s7', tint: 'rose' },
+    { icon: 'printer', key: 'wl_s8', tint: 'sky' },
+    { icon: 'sparkles', key: 'wl_s6', tint: 'violet' },
   ];
-  let welcomeTimer = null, welcomeIdx = 0;
+  let welcomeObserver = null;
 
   // Lightweight inline-SVG previews of the real app screens (self-contained, no image
   // assets → immune to caching). One per welcome slide, matched to its topic.
@@ -4187,6 +4639,28 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<rect x="196" y="107" width="64" height="14" rx="7" fill="#fef3c7"/>' +
         '<text x="228" y="117" text-anchor="middle" ' + F + ' font-size="8" font-weight="800" fill="#b45309">PARZIALE</text>');
     }
+    if (key === 'wl_s7') { // Alerts: two toast notifications (new request + fully staffed)
+      const toast = (y, fill, stroke, icon, wText) =>
+        '<rect x="40" y="' + y + '" width="240" height="30" rx="9" fill="' + fill + '" stroke="' + stroke + '"/>' +
+        '<circle cx="60" cy="' + (y + 15) + '" r="8" fill="' + icon + '"/>' +
+        '<rect x="78" y="' + (y + 9) + '" width="' + wText + '" height="6" rx="3" fill="#94a3b8"/>' +
+        '<rect x="78" y="' + (y + 19) + '" width="' + (wText - 40) + '" height="4" rx="2" fill="#cbd5e1"/>';
+      return frame(
+        toast(44, '#eef2ff', '#c7d2fe', '#6366f1', 150) +
+        toast(94, '#ecfdf5', '#a7f3d0', '#10b981', 180));
+    }
+    if (key === 'wl_s8') { // Candidate sheet as PDF: document with PDF badge
+      return frame(
+        '<rect x="112" y="38" width="96" height="94" rx="8" fill="#ffffff" stroke="#e2e8f0"/>' +
+        '<rect x="124" y="50" width="52" height="7" rx="3.5" fill="#0f172a"/>' +
+        '<rect x="124" y="66" width="72" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="124" y="76" width="72" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="124" y="86" width="56" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="124" y="100" width="72" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="124" y="110" width="44" height="4" rx="2" fill="#e2e8f0"/>' +
+        '<rect x="176" y="112" width="44" height="20" rx="6" fill="#f43f5e"/>' +
+        '<text x="198" y="126" text-anchor="middle" ' + F + ' font-size="11" font-weight="800" fill="#ffffff">PDF</text>');
+    }
     // wl_s6 — "and more": mini grid of features
     const cell = (x, y, color) =>
       '<rect x="' + x + '" y="' + y + '" width="88" height="40" rx="8" fill="#ffffff" stroke="#eef2f7"/>' +
@@ -4198,60 +4672,113 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       cell(14, 86, '#0ea5e9') + cell(116, 86, '#f43f5e') + cell(218, 86, '#8b5cf6'));
   }
 
-  function welcomeSlideHtml(sl, i) {
-    return '<div class="wl-slide' + (i === 0 ? ' active' : '') + '">' +
-      '<div class="mx-auto flex h-full max-w-2xl flex-col items-center justify-center px-6 text-center">' +
-        '<div class="mb-3 w-full max-w-[300px] drop-shadow-xl">' + welcomePreview(sl.key) + '</div>' +
-        '<p class="mb-1 text-[11px] font-bold uppercase tracking-widest text-indigo-300">' + (i + 1) + ' / ' + WELCOME_SLIDES.length + '</p>' +
-        '<h2 class="text-lg font-extrabold sm:text-xl">' + t(sl.key + '_title') + '</h2>' +
-        '<p class="mt-2 max-w-xl text-xs leading-relaxed text-slate-300 sm:text-sm">' + t(sl.key + '_text') + '</p>' +
-      '</div>' +
-    '</div>';
+  // Accent tints for the section icon badges (Tailwind full strings, never concatenated).
+  const WL_TINTS = {
+    indigo: 'bg-indigo-500/15 text-indigo-300 ring-indigo-400/30',
+    sky: 'bg-sky-500/15 text-sky-300 ring-sky-400/30',
+    amber: 'bg-amber-500/15 text-amber-300 ring-amber-400/30',
+    emerald: 'bg-emerald-500/15 text-emerald-300 ring-emerald-400/30',
+    rose: 'bg-rose-500/15 text-rose-300 ring-rose-400/30',
+    violet: 'bg-violet-500/15 text-violet-300 ring-violet-400/30',
+  };
+  function landingSectionHtml(sl, i) {
+    const flip = i % 2 === 1; // alternate the preview/text sides down the page
+    const badge = '<span class="inline-flex h-11 w-11 items-center justify-center rounded-2xl ring-1 ' + (WL_TINTS[sl.tint] || WL_TINTS.indigo) + '"><i data-lucide="' + sl.icon + '" class="h-5 w-5"></i></span>';
+    const visual = '<div class="wl-reveal ' + (flip ? '' : 'd1') + ' w-full lg:w-1/2"><div class="wl-preview mx-auto max-w-md p-3">' + welcomePreview(sl.key) + '</div></div>';
+    const text = '<div class="wl-reveal ' + (flip ? 'd1' : '') + ' w-full lg:w-1/2">' +
+        '<div class="mb-4 flex items-center gap-3">' + badge +
+          '<span class="text-[11px] font-bold uppercase tracking-widest text-slate-400">' + (i + 1) + ' / ' + LANDING_SECTIONS.length + '</span>' +
+        '</div>' +
+        '<h2 class="text-2xl font-extrabold leading-tight text-white sm:text-3xl">' + t(sl.key + '_title') + '</h2>' +
+        '<p class="mt-3 max-w-xl text-sm leading-relaxed text-slate-300 sm:text-base">' + t(sl.key + '_text') + '</p>' +
+        '<button data-action="welcome-detail" data-key="' + sl.key + '" class="mt-5 inline-flex items-center gap-1.5 rounded-xl wl-chip px-4 py-2 text-sm font-semibold text-white transition hover:bg-white/15"><i data-lucide="plus-circle" class="h-4 w-4"></i>' + t('wl_more') + '</button>' +
+      '</div>';
+    return '<section class="mx-auto flex max-w-5xl flex-col items-center gap-8 px-6 py-14 sm:py-20 ' + (flip ? 'lg:flex-row-reverse' : 'lg:flex-row') + '">' + visual + text + '</section>';
   }
 
   function openWelcome() {
     closeWelcome();
-    tourAutoChecked = true; // the interactive tour starts from the CTA, never on its own under the cover
+    tourAutoChecked = true; // the interactive tour starts from a CTA, never on its own under the cover
     const o = document.createElement('div');
     o.id = 'welcome-overlay';
+    const langBtns = ['it', 'en', 'es'].map((l) => '<button data-action="welcome-lang" data-lang="' + l + '" class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition ' + (LANG === l ? 'bg-white text-slate-900' : 'text-slate-300 hover:text-white') + '">' + l + '</button>').join('');
+    const ctaButtons =
+      '<button data-action="welcome-start" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-indigo-900/40 transition hover:bg-indigo-400 sm:w-auto"><i data-lucide="play" class="h-4 w-4"></i>' + t('wl_start') + '</button>' +
+      '<button data-action="welcome-explore" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-slate-200 ring-1 ring-inset ring-white/20 transition hover:bg-white/10 hover:text-white sm:w-auto"><i data-lucide="compass" class="h-4 w-4"></i>' + t('wl_explore') + '</button>';
     o.innerHTML =
-      '<div class="flex items-center gap-3 px-5 py-4 sm:px-8">' +
-        '<div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-indigo-900/40"><img src="' + logoUrl + '" alt="DHL Nurses" class="h-9 w-9 object-contain" /></div>' +
+      '<div class="wl-progress" id="wl-progress"></div>' +
+      // Decorative blurred blobs
+      '<div class="wl-blob" style="width:380px;height:380px;background:#6366f1;top:-80px;left:-60px"></div>' +
+      '<div class="wl-blob" style="width:420px;height:420px;background:#10b981;top:40%;right:-120px"></div>' +
+      // Sticky top bar
+      '<div class="sticky top-0 z-[3] flex items-center gap-3 border-b border-white/10 bg-slate-900/70 px-5 py-3 backdrop-blur sm:px-8">' +
+        '<div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-indigo-900/40"><img src="' + logoUrl + '" alt="DHL Nurses" class="h-8 w-8 object-contain" /></div>' +
         '<div><p class="text-sm font-extrabold leading-tight">DHL Nurses</p><p class="text-[11px] text-slate-400">' + t('wl_kicker') + '</p></div>' +
-        '<div class="ml-auto flex items-center gap-1 rounded-full bg-white/10 p-1">' +
-          ['it', 'en', 'es'].map((l) => '<button data-action="welcome-lang" data-lang="' + l + '" class="rounded-full px-2.5 py-1 text-[11px] font-bold uppercase transition ' + (LANG === l ? 'bg-white text-slate-900' : 'text-slate-300 hover:text-white') + '">' + l + '</button>').join('') +
+        '<div class="ml-auto flex items-center gap-2">' +
+          '<div class="flex items-center gap-1 rounded-full bg-white/10 p-1">' + langBtns + '</div>' +
+          '<button data-action="welcome-explore" class="hidden rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-300 ring-1 ring-inset ring-white/20 transition hover:bg-white/10 hover:text-white sm:inline-flex">' + t('wl_explore') + '</button>' +
         '</div>' +
       '</div>' +
-      '<div class="flex flex-1 flex-col items-center justify-center px-4 py-4">' +
-        '<img src="' + logoUrl + '" alt="DHL Nurses — DominicaHealthLink" class="mb-5 h-28 w-28 rounded-3xl bg-white object-contain p-1.5 shadow-2xl shadow-indigo-900/50 ring-1 ring-white/20 sm:h-36 sm:w-36" />' +
-        '<h1 class="max-w-3xl px-4 text-center text-2xl font-extrabold leading-tight sm:text-4xl">' + t('wl_claim') + '</h1>' +
-        '<div class="relative mt-2 h-[340px] w-full sm:h-[320px]">' + WELCOME_SLIDES.map(welcomeSlideHtml).join('') + '</div>' +
-        '<div class="flex items-center gap-4">' +
-          '<button data-action="welcome-prev" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-300 transition hover:bg-white/20 hover:text-white"><i data-lucide="chevron-left" class="h-5 w-5"></i></button>' +
-          '<div class="flex items-center gap-2">' + WELCOME_SLIDES.map((sl, i) => '<button data-action="welcome-dot" data-i="' + i + '" class="wl-dot' + (i === 0 ? ' active' : '') + '"></button>').join('') + '</div>' +
-          '<button data-action="welcome-next" class="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-slate-300 transition hover:bg-white/20 hover:text-white"><i data-lucide="chevron-right" class="h-5 w-5"></i></button>' +
-        '</div>' +
+      // Hero
+      '<div class="relative z-[2] flex min-h-[86vh] flex-col items-center justify-center px-6 py-10 text-center">' +
+        '<img src="' + logoUrl + '" alt="DHL Nurses — DominicaHealthLink" class="wl-reveal in mb-6 h-28 w-28 rounded-3xl bg-white object-contain p-1.5 shadow-2xl shadow-indigo-900/50 ring-1 ring-white/20 sm:h-36 sm:w-36" />' +
+        '<span class="wl-reveal in mb-4 inline-flex items-center gap-1.5 rounded-full wl-chip px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-200"><i data-lucide="flask-conical" class="h-3.5 w-3.5"></i>' + t('wl_kicker') + '</span>' +
+        '<h1 class="wl-reveal in max-w-3xl text-3xl font-extrabold leading-tight sm:text-5xl">' + t('wl_claim') + '</h1>' +
+        '<div class="wl-reveal in mt-8 flex w-full max-w-md flex-col items-center gap-3 sm:flex-row sm:justify-center">' + ctaButtons + '</div>' +
+        '<div class="wl-scrollhint mt-14 flex flex-col items-center gap-1 text-slate-400"><span class="text-[11px] font-semibold uppercase tracking-widest">' + t('wl_scroll') + '</span><i data-lucide="chevrons-down" class="h-5 w-5"></i></div>' +
       '</div>' +
-      '<div class="flex flex-col items-center gap-3 px-6 pb-8 pt-2 sm:flex-row sm:justify-center">' +
-        '<button data-action="welcome-start" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-indigo-500 px-6 py-3.5 text-sm font-bold text-white shadow-xl shadow-indigo-900/40 transition hover:bg-indigo-400 sm:w-auto"><i data-lucide="play" class="h-4 w-4"></i>' + t('wl_start') + '</button>' +
-        '<button data-action="welcome-explore" class="inline-flex w-full items-center justify-center gap-2 rounded-2xl px-6 py-3.5 text-sm font-semibold text-slate-300 ring-1 ring-inset ring-white/20 transition hover:bg-white/10 hover:text-white sm:w-auto"><i data-lucide="compass" class="h-4 w-4"></i>' + t('wl_explore') + '</button>' +
+      // Feature sections
+      '<div class="relative z-[2]">' + LANDING_SECTIONS.map(landingSectionHtml).join('') + '</div>' +
+      // Closing CTA
+      '<div class="relative z-[2] mx-auto max-w-3xl px-6 pb-20 pt-6 text-center">' +
+        '<div class="wl-reveal wl-card px-6 py-12 sm:px-12">' +
+          '<h2 class="text-2xl font-extrabold text-white sm:text-3xl">' + t('wl_cta_title') + '</h2>' +
+          '<p class="mx-auto mt-3 max-w-xl text-sm text-slate-300 sm:text-base">' + t('wl_cta_sub') + '</p>' +
+          '<div class="mt-7 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">' + ctaButtons + '</div>' +
+        '</div>' +
+        '<p class="mt-8 flex items-center justify-center gap-1.5 text-xs text-slate-500"><span>Realizzato con cura da</span><i data-lucide="heart" class="h-3.5 w-3.5 text-rose-400"></i><span class="font-semibold text-slate-400">iTavix &amp; Claude</span></p>' +
       '</div>';
     document.body.appendChild(o);
     document.documentElement.classList.add('overflow-hidden');
     lucide.createIcons();
-    welcomeIdx = 0;
-    welcomeTimer = setInterval(() => welcomeGo(welcomeIdx + 1), 5000);
+    // Reveal-on-scroll: add .in when a section enters the viewport.
+    welcomeObserver = new IntersectionObserver((entries) => {
+      entries.forEach((en) => { if (en.isIntersecting) { en.target.classList.add('in'); welcomeObserver.unobserve(en.target); } });
+    }, { root: o, threshold: 0.18 });
+    o.querySelectorAll('.wl-reveal:not(.in)').forEach((el) => welcomeObserver.observe(el));
+    // Scroll progress bar.
+    const bar = o.querySelector('#wl-progress');
+    o.addEventListener('scroll', () => {
+      const max = o.scrollHeight - o.clientHeight;
+      if (bar) bar.style.width = (max > 0 ? (o.scrollTop / max) * 100 : 0) + '%';
+    });
   }
-  function welcomeGo(i, manual) {
-    const o = document.getElementById('welcome-overlay'); if (!o) return;
-    welcomeIdx = (i + WELCOME_SLIDES.length) % WELCOME_SLIDES.length;
-    o.querySelectorAll('.wl-slide').forEach((el, k) => el.classList.toggle('active', k === welcomeIdx));
-    o.querySelectorAll('.wl-dot').forEach((el, k) => el.classList.toggle('active', k === welcomeIdx));
-    // A manual jump restarts the autoplay clock so the slide isn't cut short.
-    if (manual) { clearInterval(welcomeTimer); welcomeTimer = setInterval(() => welcomeGo(welcomeIdx + 1), 5000); }
+  // Feature detail popup — "amplifies" a section with a bigger preview + bullet points.
+  function welcomeDetail(key) {
+    closeWelcomeDetail();
+    const sl = LANDING_SECTIONS.find((s) => s.key === key); if (!sl) return;
+    const wrap = document.createElement('div');
+    wrap.id = 'wl-detail';
+    wrap.innerHTML =
+      '<div class="wl-detail-card">' +
+        '<div class="flex items-center gap-3 border-b border-white/10 p-5">' +
+          '<span class="inline-flex h-10 w-10 items-center justify-center rounded-xl ring-1 ' + (WL_TINTS[sl.tint] || WL_TINTS.indigo) + '"><i data-lucide="' + sl.icon + '" class="h-5 w-5"></i></span>' +
+          '<h3 class="min-w-0 flex-1 text-base font-bold text-white">' + t(key + '_title') + '</h3>' +
+          '<button data-action="welcome-detail-close" class="text-slate-400 transition hover:text-white"><i data-lucide="x" class="h-5 w-5"></i></button>' +
+        '</div>' +
+        '<div class="p-5">' +
+          '<div class="wl-preview mb-4 p-3">' + welcomePreview(key) + '</div>' +
+          '<div class="wl-detail-body space-y-2 text-sm leading-relaxed text-slate-300">' + t('ld_' + key.replace('wl_', '')) + '</div>' +
+        '</div>' +
+      '</div>';
+    document.body.appendChild(wrap);
+    lucide.createIcons();
+    wrap.addEventListener('mousedown', (e) => { if (e.target === wrap) closeWelcomeDetail(); });
   }
+  function closeWelcomeDetail() { const d = document.getElementById('wl-detail'); if (d) d.remove(); }
   function closeWelcome() {
-    clearInterval(welcomeTimer); welcomeTimer = null;
+    if (welcomeObserver) { try { welcomeObserver.disconnect(); } catch (e) { /* ignore */ } welcomeObserver = null; }
+    closeWelcomeDetail();
     const o = document.getElementById('welcome-overlay'); if (o) o.remove();
     document.documentElement.classList.remove('overflow-hidden');
   }

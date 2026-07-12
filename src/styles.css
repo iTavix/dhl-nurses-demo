@@ -141,6 +141,34 @@
     #welcome-overlay .wl-dot { width: 8px; height: 8px; border-radius: 9999px; background: rgba(148, 163, 184, .4); transition: all .25s ease; }
     #welcome-overlay .wl-dot.active { width: 22px; background: #818cf8; }
 
+    /* ===== Scrolling landing (demo cover v2) ===== */
+    #welcome-overlay { scroll-behavior: smooth; }
+    #welcome-overlay .wl-blob { position: absolute; border-radius: 9999px; filter: blur(70px); opacity: .35; pointer-events: none; }
+    /* Reveal-on-scroll: sections start dimmed & shifted, then animate in when observed */
+    #welcome-overlay .wl-reveal { opacity: 0; transform: translateY(34px); transition: opacity .7s cubic-bezier(.2,.7,.2,1), transform .7s cubic-bezier(.2,.7,.2,1); }
+    #welcome-overlay .wl-reveal.in { opacity: 1; transform: none; }
+    #welcome-overlay .wl-reveal.d1 { transition-delay: .08s; }
+    #welcome-overlay .wl-reveal.d2 { transition-delay: .16s; }
+    #welcome-overlay .wl-card { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.09); border-radius: 24px; }
+    #welcome-overlay .wl-preview { background: #fff; border-radius: 16px; box-shadow: 0 24px 60px rgba(2,6,23,.5); }
+    #welcome-overlay .wl-chip { background: rgba(255,255,255,.08); border: 1px solid rgba(255,255,255,.14); }
+    /* Bouncing scroll hint */
+    @keyframes wlBounce { 0%,100% { transform: translateY(0); } 50% { transform: translateY(8px); } }
+    #welcome-overlay .wl-scrollhint { animation: wlBounce 1.6s ease-in-out infinite; }
+    /* Progress bar that fills as you scroll the landing */
+    #welcome-overlay .wl-progress { position: fixed; top: 0; left: 0; height: 3px; width: 0; background: linear-gradient(90deg,#818cf8,#34d399); z-index: 4; transition: width .1s linear; }
+    /* Feature detail popup layered above the landing */
+    #wl-detail { position: fixed; inset: 0; z-index: 95; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(2,6,23,.62); backdrop-filter: blur(3px); }
+    #wl-detail .wl-detail-card { max-width: 560px; width: 100%; max-height: 92vh; overflow-y: auto; background: #0f172a; border: 1px solid rgba(255,255,255,.12); border-radius: 22px; box-shadow: 0 30px 80px rgba(0,0,0,.6); color: #e2e8f0; animation: fadeIn .28s ease-out; }
+    #wl-detail .wl-detail-body b { color: #fff; display: block; margin-bottom: 8px; }
+    #wl-detail .wl-detail-body ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+    #wl-detail .wl-detail-body li { position: relative; padding-left: 22px; }
+    #wl-detail .wl-detail-body li::before { content: ''; position: absolute; left: 4px; top: 7px; width: 7px; height: 7px; border-radius: 9999px; background: #818cf8; }
+    @media (prefers-reduced-motion: reduce) {
+      #welcome-overlay .wl-reveal { transition: none; opacity: 1; transform: none; }
+      #welcome-overlay .wl-scrollhint { animation: none; }
+    }
+
     /* ===== iOS standalone (PWA): keep UI clear of the notch / home indicator ===== */
     /* Requires viewport-fit=cover in the <meta name="viewport"> tag. */
     header.sticky { padding-top: env(safe-area-inset-top); }

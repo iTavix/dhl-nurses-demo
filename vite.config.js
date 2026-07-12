@@ -13,7 +13,7 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          firebase: ['firebase/compat/app', 'firebase/compat/auth', 'firebase/compat/firestore', 'firebase/compat/storage'],
+          firebase: ['firebase/compat/app', 'firebase/compat/auth', 'firebase/compat/firestore'],
           lucide: ['lucide'],
         },
       },
