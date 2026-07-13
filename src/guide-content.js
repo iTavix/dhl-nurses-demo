@@ -21,6 +21,12 @@ const REFS = [
   ['https://www.portaleimmigrazione.it/immigrazionenet/APR_PDS_Lavoro_CasiParticolari16.aspx', 'Permesso di soggiorno lavoro subordinato — casi particolari — Portale Immigrazione'],
   ['https://www.avvocatoleone.com/riconoscimento-titolo-estero-vittoria-per-un-infermiera-dominicana/', 'Riconoscimento titolo estero: vittoria per un’infermiera dominicana — avvocatoleone.com'],
   ['https://rivermate.com/it/guide/repubblica-dominicana/permessi-lavoro-visti', 'Permessi di lavoro e visti in Repubblica Dominicana — Rivermate'],
+  ['https://presidencia.gob.do/sites/default/files/statics/transparencia/marco-legal/leyes/Ley-172-13.pdf', 'Ley 172-13 sobre Protección de Datos de Carácter Personal — Presidencia República Dominicana'],
+  ['https://www.redipd.org/documentos/la-legislacion-dominicana-sobre-proteccion-de-datos-personales-principios-consentimiento', 'La legislación dominicana sobre Protección de Datos Personales: Principios, Consentimiento y Habeas Data — RIPD'],
+  ['https://eur-lex.europa.eu/legal-content/IT/TXT/PDF/?uri=CELEX:32016R0679', 'Regolamento (UE) 2016/679 (GDPR) — testo integrale — EUR-Lex'],
+  ['https://www.garanteprivacy.it/documents/10160/0/Codice+in+materia+di+protezione+dei+dati+personali+(Testo+coordinato).pdf', 'Codice in materia di protezione dei dati personali — D.Lgs. 196/2003 coordinato col D.Lgs. 101/2018 — Garante Privacy'],
+  ['https://www.garanteprivacy.it/temi/trasferimento-di-dati-all-estero', 'Trasferimento di dati personali all’estero — Garante Privacy'],
+  ['https://commission.europa.eu/law/law-topic/data-protection/international-dimension-data-protection/adequacy-decisions_en', 'Data protection adequacy for non-EU countries — Commissione Europea'],
 ];
 
 function refsHtml(title, note) {
@@ -46,9 +52,10 @@ const GUIDE_TOC = {
     ['g-lavoro', '7. Ingresso e lavoro in Italia'],
     ['g-documenti-rd', '8. Documenti dalla Rep. Dominicana'],
     ['g-diritto-rd', '9. Diritto dominicano'],
-    ['g-riferimenti', '10. Riferimenti operativi'],
-    ['g-conclusioni', '11. Conclusioni'],
-    ['g-fonti', '12. Fonti'],
+    ['g-privacy', '10. Protezione dei dati personali'],
+    ['g-riferimenti', '11. Riferimenti operativi'],
+    ['g-conclusioni', '12. Conclusioni'],
+    ['g-fonti', '13. Fonti'],
   ],
   en: [
     ['g-summary', '1. Executive summary'],
@@ -60,9 +67,10 @@ const GUIDE_TOC = {
     ['g-lavoro', '7. Entry and work in Italy'],
     ['g-documenti-rd', '8. Documents from the Dominican Rep.'],
     ['g-diritto-rd', '9. Dominican law aspects'],
-    ['g-riferimenti', '10. Practical references'],
-    ['g-conclusioni', '11. Conclusions'],
-    ['g-fonti', '12. Sources'],
+    ['g-privacy', '10. Personal data protection'],
+    ['g-riferimenti', '11. Practical references'],
+    ['g-conclusioni', '12. Conclusions'],
+    ['g-fonti', '13. Sources'],
   ],
   es: [
     ['g-summary', '1. Resumen ejecutivo'],
@@ -74,9 +82,10 @@ const GUIDE_TOC = {
     ['g-lavoro', '7. Entrada y trabajo en Italia'],
     ['g-documenti-rd', '8. Documentos de la Rep. Dominicana'],
     ['g-diritto-rd', '9. Derecho dominicano'],
-    ['g-riferimenti', '10. Referencias operativas'],
-    ['g-conclusioni', '11. Conclusiones'],
-    ['g-fonti', '12. Fuentes'],
+    ['g-privacy', '10. Protección de datos personales'],
+    ['g-riferimenti', '11. Referencias operativas'],
+    ['g-conclusioni', '12. Conclusiones'],
+    ['g-fonti', '13. Fuentes'],
   ],
 };
 
@@ -172,8 +181,21 @@ function guideBodyIT() {
         <p class="text-sm leading-relaxed text-slate-600">La Repubblica Dominicana fa parte del gruppo di paesi <b>ACP</b> con accordi economici con l'UE: circostanza rilevante più per l'ambito commerciale che per l'immigrazione, ma che può generare richieste di documentazione doganale particolare (documento EUR.1) per movimentazioni di beni.${fn(5)}</p>
       </section>
 
+      <section id="g-privacy" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="shield-check" class="h-5 w-5 text-indigo-500"></i>10. Protezione dei dati personali (Italia e Repubblica Dominicana)</h2>
+        <p class="text-sm leading-relaxed text-slate-600">Il gestionale raccoglie in Repubblica Dominicana i dati anagrafici, i documenti d'identità e i titoli professionali dei candidati, per poi trattarli e trasmetterli in Italia a operatori HR e strutture sanitarie: si applicano quindi, <b>cumulativamente</b>, il regime dominicano di protezione dei dati (dove i dati nascono) e quello italiano/europeo (dove vengono trattati e ricevuti).${fn(10, 12)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Repubblica Dominicana: la Ley 172-13</h3>
+        <p class="text-sm leading-relaxed text-slate-600">La <b>Ley 172-13</b> del 13 dicembre 2013 (fondata sull'art. 44 della Costituzione dominicana) tutela in modo integrale i dati personali contenuti in archivi, registri e banche dati pubbliche o private. Stabilisce i principi di <b>legalità, qualità, informazione, consenso, sicurezza e riservatezza</b> e riconosce i cosiddetti <b>diritti ARCO</b> — accesso, rettifica, cancellazione e opposizione — esercitabili in modo indipendente l'uno dall'altro, oltre all'azione giudiziale di <b>habeas data</b> per conoscere, accedere e correggere i propri dati.${fn(10, 11)}</p>
+        <p class="text-sm leading-relaxed text-slate-600">Un limite pratico rilevante: la legge <b>non istituisce un'autorità di controllo indipendente dedicata</b> (a differenza del Garante italiano). Solo per le banche dati creditizie la vigilanza spetta alla Superintendencia de Bancos; per gli altri ambiti, incluso il reclutamento sanitario, la tutela dell'interessato passa soprattutto dal consenso raccolto e, se necessario, dall'azione di habeas data davanti al giudice.${fn(11)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Italia: GDPR e Codice Privacy</h3>
+        <p class="text-sm leading-relaxed text-slate-600">In Italia si applica direttamente il <b>Regolamento (UE) 2016/679</b> (GDPR), integrato dal <b>Codice in materia di protezione dei dati personali</b> (D.Lgs. 196/2003, come modificato dal D.Lgs. 101/2018) per gli aspetti lasciati alla disciplina nazionale (sanzioni, adempimenti specifici). L'autorità di controllo è il <b>Garante per la protezione dei dati personali</b>.${fn(12, 13)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Trasferimento dei dati dalla Rep. Dominicana all'Italia</h3>
+        <p class="text-sm leading-relaxed text-slate-600">La Repubblica Dominicana <b>non rientra</b> tra i paesi terzi per cui la Commissione Europea ha adottato una decisione di adeguatezza ai sensi dell'art. 45 GDPR.${fn(15)} In assenza di adeguatezza, il trasferimento dei dati dei candidati verso l'Italia si fonda sulle garanzie/deroghe dell'<b>art. 49 GDPR</b>: in pratica, il <b>consenso esplicito e informato</b> dell'interessato e la necessità del trattamento per <b>misure precontrattuali</b> adottate su sua richiesta (l'avvio della pratica di trasferimento).${fn(14)}</p>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Nel gestionale.</b> È per questo che il modulo di <b>Consenso Privacy</b> (bilingue IT/ES, tra i Documenti personali) va raccolto fin dalla Fase 1 e ogni acquisizione o revoca resta tracciata nel log della pratica: non è solo buona prassi, è la base giuridica che rende legittimo il trasferimento dei dati dalla Repubblica Dominicana all'Italia.</div>
+      </section>
+
       <section id="g-riferimenti" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>10. Riferimenti operativi e suggerimenti pratici</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>11. Riferimenti operativi e suggerimenti pratici</h2>
         <p class="text-sm leading-relaxed text-slate-600">Per la parte italiana, le fonti primarie di riferimento operativo sono:</p>
         <ul class="prose-list ml-5 list-disc text-sm leading-relaxed text-slate-600">
           <li>Sito del <b>Ministero della Salute</b>, sezione riconoscimento titoli professionali sanitari, con modulistica D2-1 INF e istruzioni dettagliate.${fn(4)}</li>
@@ -185,12 +207,12 @@ function guideBodyIT() {
       </section>
 
       <section id="g-conclusioni" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="flag" class="h-5 w-5 text-indigo-500"></i>11. Conclusioni</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="flag" class="h-5 w-5 text-indigo-500"></i>12. Conclusioni</h2>
         <p class="text-sm leading-relaxed text-slate-600">Il trasferimento richiede il coordinamento di <b>tre piani</b>: riconoscimento del titolo presso il Ministero della Salute, procedura di nulla osta e visto per lavoro subordinato specifico per infermieri, e successivo rilascio e rinnovo del permesso di soggiorno, con attenzione alle norme speciali che tutelano questa categoria.${fn(1, 3, 2, 4)}</p>
         <p class="text-sm leading-relaxed text-slate-600">La corretta predisposizione della documentazione dominicana (traduzioni giurate, apostille, certificati penali e medici) e il rispetto dei termini amministrativi (quattro mesi per il riconoscimento, scadenze per la richiesta del permesso dopo l'ingresso) sono elementi centrali per un progetto di migrazione professionale fluido e conforme.${fn(8, 5, 4)}</p>
         <p class="text-sm leading-relaxed text-slate-600">Il ricorso a consulenti esperti in diritto dell'immigrazione italiana e dominicana, oltre al dialogo diretto con le istituzioni competenti (Ministero della Salute, Sportello Unico Immigrazione, ambasciata italiana in RD), aiuta a gestire casistiche particolari, misure compensative e controversie su tempi o dinieghi.</p>
       </section>
-${refsHtml('12. Fonti e riferimenti', 'Le note numerate nel testo rimandano a queste fonti (link esterni, si aprono in una nuova scheda).')}`;
+${refsHtml('13. Fonti e riferimenti', 'Le note numerate nel testo rimandano a queste fonti (link esterni, si aprono in una nuova scheda).')}`;
 }
 
 // =====================================================================================
@@ -285,8 +307,21 @@ function guideBodyEN() {
         <p class="text-sm leading-relaxed text-slate-600">The Dominican Republic belongs to the <b>ACP</b> group of countries with economic agreements with the EU — more relevant to trade than to nurse immigration, but it can trigger special customs paperwork (EUR.1 document) for goods movements.${fn(5)}</p>
       </section>
 
+      <section id="g-privacy" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="shield-check" class="h-5 w-5 text-indigo-500"></i>10. Personal data protection (Italy and the Dominican Republic)</h2>
+        <p class="text-sm leading-relaxed text-slate-600">The app collects candidates' personal data, identity documents and professional qualifications in the Dominican Republic, then processes and transmits them to HR staff and healthcare facilities in Italy: <b>both</b> the Dominican data-protection regime (where the data originates) and the Italian/EU one (where it is processed and received) apply <b>cumulatively</b>.${fn(10, 12)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Dominican Republic: Law 172-13</h3>
+        <p class="text-sm leading-relaxed text-slate-600"><b>Law 172-13</b> of 13 December 2013 (based on Article 44 of the Dominican Constitution) provides comprehensive protection for personal data held in files, registers and public or private databases. It sets out the principles of <b>legality, quality, information, consent, security and confidentiality</b> and recognises the so-called <b>ARCO rights</b> — access, rectification, cancellation and opposition — each exercisable independently of the others, plus the judicial <i>habeas data</i> action (constitutional remedy to know, access and correct one's own data) available under Dominican law.${fn(10, 11)}</p>
+        <p class="text-sm leading-relaxed text-slate-600">A significant practical limitation: the law <b>does not establish a dedicated independent supervisory authority</b> (unlike Italy's Garante). Only credit-reporting databases are supervised, by the Superintendency of Banks; in other areas, including healthcare recruitment, protection relies mainly on the consent collected and, where needed, on the <i>habeas data</i> judicial action.${fn(11)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Italy: GDPR and the Privacy Code</h3>
+        <p class="text-sm leading-relaxed text-slate-600">Italy directly applies <b>Regulation (EU) 2016/679</b> (GDPR), supplemented by the <b><i>Codice Privacy</i></b> (Privacy Code, Legislative Decree 196/2003 as amended by Legislative Decree 101/2018) for matters left to national law (penalties, specific requirements). The supervisory authority is the <b><i>Garante per la protezione dei dati personali</i></b> (the Italian Data Protection Authority).${fn(12, 13)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Transferring data from the Dominican Republic to Italy</h3>
+        <p class="text-sm leading-relaxed text-slate-600">The Dominican Republic is <b>not</b> among the third countries for which the European Commission has adopted an adequacy decision under Article 45 GDPR.${fn(15)} Absent an adequacy decision, transferring candidates' data to Italy relies on the safeguards/derogations of <b>Article 49 GDPR</b>: in practice, the data subject's <b>explicit, informed consent</b> and the necessity of processing for <b>pre-contractual measures</b> taken at their request (starting the transfer case).${fn(14)}</p>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>In the app.</b> This is why the <b>Privacy Consent</b> form (bilingual IT/ES, among the Personal Documents) must be collected starting from Phase 1, and every acquisition or revocation is logged on the case: it is not just good practice — it is the legal basis that makes transferring data from the Dominican Republic to Italy lawful.</div>
+      </section>
+
       <section id="g-riferimenti" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>10. Practical references and tips</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>11. Practical references and tips</h2>
         <p class="text-sm leading-relaxed text-slate-600">On the Italian side, the primary operational references are:</p>
         <ul class="prose-list ml-5 list-disc text-sm leading-relaxed text-slate-600">
           <li>The <b>Ministry of Health</b> website, healthcare qualification recognition section, with the D2-1 INF forms and detailed instructions.${fn(4)}</li>
@@ -298,12 +333,12 @@ function guideBodyEN() {
       </section>
 
       <section id="g-conclusioni" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="flag" class="h-5 w-5 text-indigo-500"></i>11. Conclusions</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="flag" class="h-5 w-5 text-indigo-500"></i>12. Conclusions</h2>
         <p class="text-sm leading-relaxed text-slate-600">The transfer requires coordinating <b>three tracks</b>: qualification recognition at the Ministry of Health, the clearance-plus-visa procedure for nurse salaried employment, and the subsequent issue and renewal of the residence permit, minding the special rules protecting this category.${fn(1, 3, 2, 4)}</p>
         <p class="text-sm leading-relaxed text-slate-600">Correctly preparing the Dominican documentation (sworn translations, apostilles, criminal and medical certificates) and meeting the administrative deadlines (four months for recognition, permit application deadlines after entry) are central to a smooth, compliant professional migration project.${fn(8, 5, 4)}</p>
         <p class="text-sm leading-relaxed text-slate-600">Working with advisors experienced in Italian and Dominican immigration law, and direct dialogue with the competent institutions (Ministry of Health, One-Stop Immigration Desk, Italian embassy in the DR), helps manage edge cases, compensatory measures and disputes over timing or refusals.</p>
       </section>
-${refsHtml('12. Sources and references', 'The numbered notes in the text point to these sources (external links, they open in a new tab; most are in Italian).')}`;
+${refsHtml('13. Sources and references', 'The numbered notes in the text point to these sources (external links, they open in a new tab; most are in Italian).')}`;
 }
 
 // =====================================================================================
@@ -398,8 +433,21 @@ function guideBodyES() {
         <p class="text-sm leading-relaxed text-slate-600">La República Dominicana pertenece al grupo de países <b>ACP</b> con acuerdos económicos con la UE: circunstancia relevante más para el comercio que para la inmigración, pero que puede generar documentación aduanera particular (documento EUR.1) para movimientos de mercancías.${fn(5)}</p>
       </section>
 
+      <section id="g-privacy" class="space-y-4">
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="shield-check" class="h-5 w-5 text-indigo-500"></i>10. Protección de datos personales (Italia y República Dominicana)</h2>
+        <p class="text-sm leading-relaxed text-slate-600">La aplicación recoge en la República Dominicana los datos personales, documentos de identidad y títulos profesionales de los candidatos, y luego los trata y transmite en Italia a personal de RR.HH. y estructuras sanitarias: se aplican, pues, <b>de forma acumulativa</b>, el régimen dominicano de protección de datos (donde los datos se originan) y el italiano/europeo (donde se tratan y reciben).${fn(10, 12)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">República Dominicana: la Ley 172-13</h3>
+        <p class="text-sm leading-relaxed text-slate-600">La <b>Ley 172-13</b> del 13 de diciembre de 2013 (fundamentada en el art. 44 de la Constitución dominicana) protege de forma integral los datos personales contenidos en archivos, registros y bancos de datos públicos o privados. Establece los principios de <b>legalidad, calidad, información, consentimiento, seguridad y confidencialidad</b> y reconoce los llamados <b>derechos ARCO</b> — acceso, rectificación, cancelación y oposición —, ejercitables de forma independiente entre sí, además de la acción judicial de <b>habeas data</b> para conocer, acceder y corregir los propios datos.${fn(10, 11)}</p>
+        <p class="text-sm leading-relaxed text-slate-600">Una limitación práctica relevante: la ley <b>no instituye una autoridad de control independiente dedicada</b> (a diferencia del Garante italiano). Solo para los bancos de datos crediticios la vigilancia corresponde a la Superintendencia de Bancos; en los demás ámbitos, incluido el reclutamiento sanitario, la tutela del interesado depende sobre todo del consentimiento recabado y, si es necesario, de la acción de habeas data ante el juez.${fn(11)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Italia: RGPD y Código de Privacidad</h3>
+        <p class="text-sm leading-relaxed text-slate-600">En Italia se aplica directamente el <b>Reglamento (UE) 2016/679</b> (RGPD), integrado por el <b>Código en materia de protección de datos personales</b> (D.Lgs. 196/2003, modificado por el D.Lgs. 101/2018) para los aspectos dejados a la normativa nacional (sanciones, obligaciones específicas). La autoridad de control es el <b>Garante per la protezione dei dati personali</b> (Autoridad de Protección de Datos italiana).${fn(12, 13)}</p>
+        <h3 class="pt-2 text-base font-bold text-slate-800">Transferencia de datos de la Rep. Dominicana a Italia</h3>
+        <p class="text-sm leading-relaxed text-slate-600">La República Dominicana <b>no figura</b> entre los países terceros para los que la Comisión Europea haya adoptado una decisión de adecuación conforme al art. 45 RGPD.${fn(15)} A falta de adecuación, la transferencia de los datos de los candidatos hacia Italia se basa en las garantías/excepciones del <b>art. 49 RGPD</b>: en la práctica, el <b>consentimiento explícito e informado</b> del interesado y la necesidad del tratamiento para <b>medidas precontractuales</b> adoptadas a petición suya (el inicio del expediente de traslado).${fn(14)}</p>
+        <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>En la aplicación.</b> Por eso el formulario de <b>Consentimiento de Privacidad</b> (bilingüe IT/ES, entre los Documentos personales) debe recogerse desde la Fase 1, y cada obtención o revocación queda registrada en el log del expediente: no es solo buena práctica, es la base jurídica que legitima la transferencia de datos de la República Dominicana a Italia.</div>
+      </section>
+
       <section id="g-riferimenti" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>10. Referencias operativas y consejos prácticos</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="list-checks" class="h-5 w-5 text-indigo-500"></i>11. Referencias operativas y consejos prácticos</h2>
         <p class="text-sm leading-relaxed text-slate-600">Para la parte italiana, las fuentes primarias de referencia operativa son:</p>
         <ul class="prose-list ml-5 list-disc text-sm leading-relaxed text-slate-600">
           <li>La web del <b>Ministerio de Salud</b>, sección de reconocimiento de títulos sanitarios, con el formulario D2-1 INF e instrucciones detalladas.${fn(4)}</li>
@@ -411,12 +459,12 @@ function guideBodyES() {
       </section>
 
       <section id="g-conclusioni" class="space-y-4">
-        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="flag" class="h-5 w-5 text-indigo-500"></i>11. Conclusiones</h2>
+        <h2 class="flex items-center gap-2 text-xl font-extrabold text-slate-900"><i data-lucide="flag" class="h-5 w-5 text-indigo-500"></i>12. Conclusiones</h2>
         <p class="text-sm leading-relaxed text-slate-600">El traslado exige coordinar <b>tres planos</b>: reconocimiento del título ante el Ministerio de Salud, procedimiento de autorización y visado de trabajo específico para enfermeros, y posterior expedición y renovación del permiso de residencia, atendiendo a las normas especiales que protegen a esta categoría.${fn(1, 3, 2, 4)}</p>
         <p class="text-sm leading-relaxed text-slate-600">La correcta preparación de la documentación dominicana (traducciones juradas, apostillas, certificados penales y médicos) y el respeto de los plazos administrativos (cuatro meses para el reconocimiento, plazos para solicitar el permiso tras la entrada) son elementos centrales de un proyecto de migración profesional fluido y conforme.${fn(8, 5, 4)}</p>
         <p class="text-sm leading-relaxed text-slate-600">Recurrir a asesores expertos en derecho de inmigración italiano y dominicano, y el diálogo directo con las instituciones competentes (Ministerio de Salud, Ventanilla Única de Inmigración, embajada italiana en RD), ayuda a gestionar casos particulares, medidas compensatorias y controversias sobre plazos o denegaciones.</p>
       </section>
-${refsHtml('12. Fuentes y referencias', 'Las notas numeradas del texto remiten a estas fuentes (enlaces externos, se abren en una pestaña nueva; en su mayoría en italiano).')}`;
+${refsHtml('13. Fuentes y referencias', 'Las notas numeradas del texto remiten a estas fuentes (enlaces externos, se abren en una pestaña nueva; en su mayoría en italiano).')}`;
 }
 
 const GUIDE_BODY = { it: guideBodyIT, en: guideBodyEN, es: guideBodyES };
