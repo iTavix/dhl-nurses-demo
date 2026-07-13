@@ -1079,7 +1079,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const treating = state.nurses.length;
     const sent = state.nurses.filter((n) => n.currentStep >= SENT_TO_ITALY_STEP).length;
     const toSend = state.nurses.filter((n) => n.currentStep < SENT_TO_ITALY_STEP).length;
-    return { active, missing, matching, completed, expiring, treating, sent, toSend };
+    // Facility requests: still to fulfil (open) vs fulfilled (fully staffed or closed),
+    // plus the seats left to cover across the open ones.
+    const reqs = state.requests || [];
+    const reqOpen = reqs.filter((r) => r.status === 'open').length;
+    const reqDone = reqs.filter((r) => r.status === 'matched' || r.status === 'closed').length;
+    const reqSeats = reqs.filter((r) => r.status === 'open')
+      .reduce((s, r) => s + Math.max(0, (r.quantity || 1) - (r.matched || []).length), 0);
+    return { active, missing, matching, completed, expiring, treating, sent, toSend, reqOpen, reqDone, reqSeats };
   }
 
   // Documents that are expired or expiring within 60 days, across all candidates.
@@ -2588,6 +2595,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Documenti Mancanti</p><p class="mt-1 text-xs text-slate-500">Con almeno un documento da caricare. → apre le pratiche con doc. mancanti.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">In Matching</p><p class="mt-1 text-xs text-slate-500">In abbinamento con le richieste delle strutture (fase 7). → apre le pratiche in matching.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Doc. in Scadenza</p><p class="mt-1 text-xs text-slate-500">Scaduti o entro 60 giorni. → apre l'Archivio Documenti filtrato.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Richieste da Evadere</p><p class="mt-1 text-xs text-slate-500">Richieste aperte delle strutture, coi posti ancora da coprire. → apre il Matching.</p></div>
+          <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Richieste Evase</p><p class="mt-1 text-xs text-slate-500">Richieste con organico al completo o chiuse. → apre il Matching.</p></div>
           <div class="rounded-xl border border-slate-200 bg-white p-4"><p class="text-xs font-semibold uppercase text-slate-400">Percorsi Completati</p><p class="mt-1 text-xs text-slate-500">Percorso concluso. → apre le pratiche completate.</p></div>
         </div>
         <h3 id="rischio" class="pt-2 text-base font-bold text-slate-800">4.3 · Semafori di Rischio e Scadenze</h3>
@@ -2870,7 +2879,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         </div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Tip.</b> Each tile is <b>clickable</b>: it opens <b>Case Management</b> already filtered (e.g. "Transferred" shows only those who departed).</div>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.2 · Key indicators (KPI)</h3>
-        <p class="text-sm leading-relaxed text-slate-600"><b>All KPIs are clickable</b> and open the corresponding section already filtered: Active Cases, Missing Documents, In Matching, Expiring Docs, Paths Completed.</p>
+        <p class="text-sm leading-relaxed text-slate-600"><b>All KPIs are clickable</b> and open the corresponding section already filtered: Active Cases, Missing Documents, In Matching, Expiring Docs, <b>Requests to Fulfil</b> (open facility requests, with the seats left to cover) and <b>Requests Fulfilled</b> (both open the Matching view), Paths Completed.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.3 · Risk alerts &amp; expiries</h3>
         <p class="text-sm leading-relaxed text-slate-600">Lists cases stuck <b>too long</b> in their current state, plus a panel of <b>expiring/expired documents</b>. <b>Action:</b> click a row to open the case; the "Expiring Docs" KPI opens the filtered archive.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.4 · Candidates per facility</h3>
@@ -3150,7 +3159,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         </div>
         <div class="rounded-xl border-l-4 border-indigo-400 bg-indigo-50 p-4 text-sm text-indigo-800"><b>Consejo.</b> Cada recuadro es <b>clicable</b>: abre <b>Gestión de Expedientes</b> ya filtrado (p. ej. "Trasladados" muestra solo quienes partieron).</div>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.2 · Indicadores clave (KPI)</h3>
-        <p class="text-sm leading-relaxed text-slate-600"><b>Todos los KPI son clicables</b> y abren la sección correspondiente ya filtrada: Expedientes Activos, Documentos Faltantes, En Matching, Docs por Vencer, Procesos Completados.</p>
+        <p class="text-sm leading-relaxed text-slate-600"><b>Todos los KPI son clicables</b> y abren la sección correspondiente ya filtrada: Expedientes Activos, Documentos Faltantes, En Matching, Docs por Vencer, <b>Solicitudes por Atender</b> (solicitudes abiertas de las estructuras, con los puestos por cubrir) y <b>Solicitudes Atendidas</b> (ambas abren el Matching), Procesos Completados.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.3 · Semáforos de riesgo y vencimientos</h3>
         <p class="text-sm leading-relaxed text-slate-600">Lista los expedientes detenidos <b>demasiado tiempo</b> en su estado actual, y un panel de <b>documentos por vencer/vencidos</b>. <b>Acción:</b> haz clic en una fila para abrir el expediente; el KPI "Docs por Vencer" abre el archivo filtrado.</p>
         <h3 class="pt-2 text-base font-bold text-slate-800">4.4 · Candidatos por estructura</h3>
@@ -3659,11 +3668,14 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '</div>' +
       '</section>' +
 
-      '<div data-tour="kpi" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">' +
+      '<div data-tour="kpi" class="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">' +
         kpiCard('users-round', t('kpi_active'), k.active, 'indigo', t('kpi_active_sub'), 'goto-cases', 'active') +
         kpiCard('file-warning', t('kpi_missing'), k.missing, 'rose', t('kpi_missing_sub'), 'goto-cases', 'Missing Docs') +
         kpiCard('target', t('kpi_matching'), k.matching, 'amber', t('kpi_matching_sub'), 'goto-cases', 'matching') +
         kpiCard('calendar-clock', t('kpi_expiring'), k.expiring, k.expiring ? 'rose' : 'emerald', t('kpi_expiring_sub'), 'show-expiring') +
+        // Facility requests at a glance: still to fulfil (with seats left) and fulfilled.
+        kpiCard('inbox', t('kpi_req_open'), k.reqOpen, k.reqOpen ? 'amber' : 'emerald', t('kpi_req_open_sub', { n: k.reqSeats }), 'open-matching') +
+        kpiCard('clipboard-check', t('kpi_req_done'), k.reqDone, 'indigo', t('kpi_req_done_sub'), 'open-matching') +
         kpiCard('badge-check', t('kpi_done'), k.completed, 'emerald', t('kpi_done_sub'), 'goto-cases', 'Onboarding Completed') +
       '</div>' +
 
@@ -4517,6 +4529,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       case 'delete-nurse': deleteNurse(t.getAttribute('data-id')); break;
       case 'export-csv': exportCandidatesCsv(); break;
       case 'show-expiring': state.view = 'documents'; state.docFilter = 'expiring'; commit(); break;
+      case 'open-matching': state.view = 'matching'; commit(); break;
       case 'goto-cases': state.statusFilter = t.getAttribute('data-filter') || 'all'; state.selectedNurseId = null; state.view = 'cases'; commit(); break;
       case 'reset': resetData(); break;
       case 'start-tour': startTour(); break;
