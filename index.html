@@ -80,7 +80,7 @@ header.nav.scrolled{
 .brand .logo img{width:100%;height:100%;object-fit:contain;display:block}
 .brand small{display:block; font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.02em; margin-top:1px; white-space:nowrap}
 .nav-links{display:flex; align-items:center; gap:2px; flex:none}
-.nav-links a{padding:8px 10px; border-radius:9px; font-size:13.5px; font-weight:600; color:var(--ink-2); transition:.18s; white-space:nowrap}
+.nav-links a{padding:8px 8px; border-radius:9px; font-size:13.5px; font-weight:600; color:var(--ink-2); transition:.18s; white-space:nowrap}
 .nav-links a:hover{background:var(--surface); color:var(--ink)}
 .nav-actions{display:flex; align-items:center; gap:10px; flex:none}
 .iconbtn{
@@ -92,7 +92,7 @@ header.nav.scrolled{
 .lang{display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:3px; flex:none}
 .lang button{
   border:0; background:transparent; color:var(--muted); font-family:inherit; font-weight:800; font-size:12px;
-  padding:6px 9px; border-radius:8px; cursor:pointer; transition:.18s;
+  padding:6px 7px; border-radius:8px; cursor:pointer; transition:.18s;
 }
 .lang button:hover{color:var(--ink)}
 .lang button.active{background:var(--grad-brand); color:#fff}
@@ -338,8 +338,8 @@ footer.ft .links a:hover{color:var(--indigo-500)}
   .prob-grid{grid-template-columns:1fr}
   .pipe{grid-template-columns:repeat(4,1fr)}
 }
-/* 7 nav items + brand + lang switcher + CTA stop fitting on one line below this width */
-@media(max-width:1160px){
+/* 7 nav items + brand + 3-way lang switcher + CTA stop fitting on one line below this width */
+@media(max-width:1200px){
   .nav-links{display:none}
   .menu-toggle{display:grid}
 }
@@ -382,6 +382,7 @@ footer.ft .links a:hover{color:var(--indigo-500)}
     <div class="nav-actions">
       <div class="lang" id="langSw">
         <button type="button" data-lang="it">IT</button>
+        <button type="button" data-lang="en">EN</button>
         <button type="button" data-lang="es">ES</button>
       </div>
       <button class="iconbtn" id="themeBtn" aria-label="Tema"></button>
@@ -794,6 +795,84 @@ const I18N = {
     footCopy:'© 2026 DominicaHealthLink · DHL Nurses è la piattaforma operativa del progetto',
     keyPhase:'★ fase chiave', badgeRD:'Team RD', badgeIT:'Team IT', badgeUT:'Una Tantum', badgeOP:'Oper',
   },
+  en: {
+    docTitle:'DominicaHealthLink · Precision healthcare mobility — Dominican Republic → Italy',
+    brandSub:'Precision healthcare mobility',
+    navProblema:'Problem', navSoluzione:'Solution', navPercorso:'Journey', navCronologia:'Timeline',
+    navMatching:'Matching', navPiattaforma:'Platform', navValore:'Value',
+    ctaDemo:'Enter the demo', ctaModello:'Explore the model',
+    heroEyebrow:'Dominican Republic → Italy',
+    heroH1:'We don\'t recruit nurses.<br><span class="hl">We do precision</span> clinical matching.',
+    heroLead:'<b>DominicaHealthLink</b> turns international healthcare mobility from a logistics exercise into an <b>investment in clinical efficiency</b>. Two teams, twelve phases and a single digital source of truth — the <b>DHL Nurses</b> platform — connecting every certified skill to the right ward.',
+    statFasi:'Operational phases', statTeam:'Geographic teams', statTitoli:'Sworn-translated degrees', statSot:'Single source of truth',
+    console:'DHLNurses · Console', realtime:'Real-time',
+    teamRD:'Team DR · Phases 1–5', teamIT:'Team IT · Phases 6–12',
+    chipRd1:'Association agreements', chipRd2:'Selection', chipRd3:'Sworn documents', chipRd4:'Training', chipRd5:'Travel',
+    chipIt1:'Hospital agreements', chipIt2:'Housing & services', chipIt3:'Clinical matching', chipIt4:'Employment', chipIt5:'Arrival & tutoring',
+    matchBar:'Profile → ward compatibility',
+    probEyebrow:'The problem',
+    probH2:'Italian healthcare doesn\'t need more headcount. It needs the right skills.',
+    probP:'Traditional recruitment is generic, slow and bureaucratically fragile. The result is staff allocated as a stopgap, ineffective placements and high turnover.',
+    prob1T:'Generic matching',
+    prob1D:'The nurse arrives with no alignment between their specialisations and the ward\'s real needs. Valuable skills go unused.',
+    prob2T:'Bureaucratic bottlenecks',
+    prob2D:'Degrees that are not properly translated and sworn block the ministerial process, stretching the time to placement.',
+    prob3T:'Turnover and hidden costs',
+    prob3D:'Without legal, tax and housing stability the professional leaves: every replacement wipes out the investment made in onboarding.',
+    solEyebrow:'The solution',
+    solH2:'From generic recruitment to <span style="color:var(--indigo-500)">technical matching</span>',
+    solP:'We analyse ward needs upfront and map profiles with scientific granularity. Every nurse is placed where their specialisations generate immediate value.',
+    solBadTag:'Traditional model', solBadH3:'Filling headcount',
+    solBad1:'Profile chosen on availability, not on skills',
+    solBad2:'Paperwork verified late, causing delays',
+    solBad3:'Long onboarding and ineffective placement',
+    solBad4:'No post-arrival support → turnover',
+    solGoodTag:'DominicaHealthLink model', solGoodH3:'Surgical precision',
+    solGood1:'Profile chosen on certified clinical specialisation',
+    solGood2:'Degrees sworn and translated <b>before</b> departure',
+    solGood3:'Reduced lead time: a "ready-to-work" professional',
+    solGood4:'Legal, tax and housing tutoring → long-term ROI',
+    pipeEyebrow:'End-to-end journey',
+    pipeH2:'12 phases, 2 teams, zero blind handovers',
+    pipeP:'Every phase is tracked in DHLNurses. Pick a step to see what happens — and how the two teams hand over without losing information.',
+    cronEyebrow:'Operational timeline',
+    cronH2:'From T.0 to T.7: what happens when',
+    cronP:'The 12 phases run in parallel across the two teams. <b>Matching (T.3) comes before travel and contract</b>: the candidate only departs with a clinical placement already assigned.',
+    matchEyebrow:'★ The heart of the protocol',
+    matchH2:'Technical matching, in action',
+    matchP:'The hospital specifies the ward and the skills required. DHLNurses queries the database of profiles certified by Team DR and extracts the ideal candidate. Try it:',
+    matchLeftH4:'Healthcare provider request', matchQ:'Which ward do you need?',
+    matchDb:'DHLNurses · Database query',
+    step1:'Query', step2:'Identification', step3:'Validation', step4:'Proposal',
+    matchEmpty:'Select a ward to start the matching',
+    metaTitoli:'Sworn-translated degrees', metaDossier:'"Italia in tasca" dossier',
+    platEyebrow:'The platform',
+    platH2:'DHLNurses: <span style="color:var(--indigo-500)">the single source of truth</span>',
+    platP:'CVs, degrees and experience fully digitised. Team DR enters, Team IT queries — real-time data, zero information lag.',
+    sotRdT:'Data entry — Team DR',
+    sotRd1:'Uploading and updating professional profiles',
+    sotRd2:'Entering verified clinical specialisations',
+    sotRd3:'Uploading sworn and translated documentation',
+    sotRd4:'Validating the "Italia in tasca" training dossier',
+    sotItT:'Query and extraction — Team IT',
+    sotIt1:'Receiving and analysing provider requirements',
+    sotIt2:'Querying the database through skill filters',
+    sotIt3:'Extracting eligible profiles for the contract offer',
+    sotIt4:'Monitoring compliance for ward placement',
+    valEyebrow:'Why invest', valH2:'Four levers of measurable value',
+    valP:'We don\'t sell a recruitment service: we build an asset of clinical efficiency for healthcare providers, with a long-term return on investment.',
+    val1T:'Operational efficiency', val1D:'Minimising lead time between the hospital\'s need and the professional going operational.',
+    val2T:'Legal certainty', val2D:'Sworn document validation and full regulatory compliance across the whole chain.',
+    val3T:'Clinical specialisation', val3D:'Technical alignment between certified experience and the ward: Critical Care, Nephrology, Surgery.',
+    val4T:'Long-term ROI', val4D:'Welfare and support reduce turnover and the cost of replacing staff.',
+    met1:'Phases covered end-to-end', met2:'Documents sworn before departure', met3:'Single source of truth', met4:'Clinical areas mapped',
+    ctaEyebrow:'The platform, live', ctaH2:'Enter the DHLNurses demo',
+    ctaP:'You\'ve seen the model. Now explore the system that runs it: candidate pipeline, document management, technical matching and coordination between the two teams — with demo data.',
+    ctaOpen:'Open the DHLNurses demo', ctaTalk:'Talk to us',
+    ctaNote:'Demo environment · fictional data · no login required',
+    footCopy:'© 2026 DominicaHealthLink · DHL Nurses is the project\'s operating platform',
+    keyPhase:'★ key phase', badgeRD:'Team DR', badgeIT:'Team IT', badgeUT:'One-off', badgeOP:'Oper',
+  },
   es: {
     docTitle:'DominicaHealthLink · Movilidad sanitaria de precisión — República Dominicana → Italia',
     brandSub:'Movilidad sanitaria de precisión',
@@ -882,115 +961,151 @@ const PHASES = [
      tantum:['UNA TANTUM · Accordi quadro']},
    es:{name:'Acuerdos marco con asociaciones',
      desc:'Selección exclusiva de estructuras (cooperativas o agencias) reconocidas por el gobierno dominicano. Es el nivel estructural del proyecto: se establecen los acuerdos marco en los que operará toda la cadena dominicana.',
-     tantum:['UNA TANTUM · Acuerdos marco']}},
+     tantum:['UNA TANTUM · Acuerdos marco']},
+   en:{name:'Association framework agreements',
+     desc:'Exclusive selection of organisations (cooperatives or agencies) recognised by the Dominican government. This is the structural layer of the project: the framework agreements within which the whole Dominican chain will operate.',
+     tantum:['ONE-OFF · Framework agreements']}},
   {n:2,team:'rd',emoji:'🔎',
    it:{name:'Selezione e Reclutamento',
      desc:'Verifica delle competenze e delle specializzazioni infermieristiche dei candidati proposti dalle associazioni selezionate. È la fase transazionale che qualifica il singolo profilo.',
      tantum:['OPER · Verifica competenze']},
    es:{name:'Selección y Reclutamiento',
      desc:'Verificación de las competencias y especializaciones de enfermería de los candidatos propuestos por las asociaciones seleccionadas. Es la fase transaccional que cualifica el perfil individual.',
-     tantum:['OPER · Verificación de competencias']}},
+     tantum:['OPER · Verificación de competencias']},
+   en:{name:'Selection and Recruitment',
+     desc:'Verification of the nursing skills and specialisations of the candidates put forward by the selected associations. This is the transactional phase that qualifies the individual profile.',
+     tantum:['OPER · Skills verification']}},
   {n:3,team:'rd',emoji:'📑',
    it:{name:'Gestione Documentale',
      desc:'La fase cruciale, gestita su DHLNurses. Titoli di studio tradotti e asseverati legalmente, apostille per la validità internazionale e raccolta della documentazione per l\'espatrio. Nessun collo di bottiglia ministeriale.',
      tantum:['OPER · Asseverazione titoli','OPER · Documenti espatrio']},
    es:{name:'Gestión Documental',
      desc:'La fase crucial, gestionada en DHLNurses. Títulos de estudio traducidos y legalizados, apostilla para la validez internacional y recogida de la documentación para la expatriación. Ningún cuello de botella ministerial.',
-     tantum:['OPER · Legalización de títulos','OPER · Documentos de expatriación']}},
+     tantum:['OPER · Legalización de títulos','OPER · Documentos de expatriación']},
+   en:{name:'Document Management',
+     desc:'The crucial phase, run in DHLNurses. Degrees translated and legally sworn, apostilles for international validity, and collection of the paperwork for expatriation. No ministerial bottlenecks.',
+     tantum:['OPER · Sworn translation of degrees','OPER · Expatriation documents']}},
   {n:4,team:'rd',emoji:'🎓',
    it:{name:'Formazione',
      desc:'Preparazione del candidato con contenuti digitali e incontri online o in presenza, sul modello "Italia in tasca": formazione culturale, linguistica e tecnica, con assistenza diretta lungo il percorso.',
      tantum:['OPER · Dossier "Italia in tasca"']},
    es:{name:'Formación',
      desc:'Preparación del candidato con contenidos digitales y encuentros online o presenciales, según el modelo "Italia in tasca": formación cultural, lingüística y técnica, con asistencia directa durante todo el recorrido.',
-     tantum:['OPER · Dossier "Italia in tasca"']}},
+     tantum:['OPER · Dossier "Italia in tasca"']},
+   en:{name:'Training',
+     desc:'Preparing the candidate with digital content and online or in-person sessions, based on the "Italia in tasca" model: cultural, linguistic and technical training, with direct support throughout.',
+     tantum:['OPER · "Italia in tasca" dossier']}},
   {n:5,team:'rd',emoji:'✈️',
    it:{name:'Organizzazione Viaggio',
      desc:'Chiusura della fase dominicana con l\'acquisto del biglietto aereo e il trasferimento del professionista all\'aeroporto in territorio dominicano. Il profilo è ora "ready-to-work".',
      tantum:['OPER · Biglietto e transfer']},
    es:{name:'Organización del Viaje',
      desc:'Cierre de la fase dominicana con la compra del billete de avión y el traslado del profesional al aeropuerto en territorio dominicano. El perfil ya está "ready-to-work".',
-     tantum:['OPER · Billete y traslado']}},
+     tantum:['OPER · Billete y traslado']},
+   en:{name:'Travel Arrangements',
+     desc:'Closing the Dominican phase with the purchase of the flight ticket and the professional\'s transfer to the airport on Dominican soil. The profile is now "ready-to-work".',
+     tantum:['OPER · Ticket and transfer']}},
   {n:6,team:'it',emoji:'🏥',
    it:{name:'Accordi quadro aziende',
      desc:'Contrattualizzazione preventiva delle aziende ospedaliere richiedenti: assicura che esistano già sbocchi lavorativi certi e regolamentati una volta completato l\'iter documentale e formativo.',
      tantum:['UNA TANTUM · Contratti aziende']},
    es:{name:'Acuerdos marco con empresas',
      desc:'Contractualización previa de las empresas hospitalarias solicitantes: asegura que ya existan salidas laborales ciertas y reguladas una vez completado el trámite documental y formativo.',
-     tantum:['UNA TANTUM · Contratos con empresas']}},
+     tantum:['UNA TANTUM · Contratos con empresas']},
+   en:{name:'Hospital framework agreements',
+     desc:'Contracting the requesting hospital organisations upfront: this guarantees that certain, regulated job openings already exist once the document and training process is complete.',
+     tantum:['ONE-OFF · Hospital contracts']}},
   {n:7,team:'it',emoji:'🏠',
    it:{name:'Accordi alloggi e servizi',
      desc:'Accordi quadro per la fornitura di alloggi e utenze ai candidati in arrivo, almeno per un primo periodo, e accordi preventivi con professionisti legali, fiscali, assicurativi e finanziari a condizioni agevolate.',
      tantum:['UNA TANTUM · Alloggi e utenze','UNA TANTUM · Servizi professionali']},
    es:{name:'Acuerdos alojamiento y servicios',
      desc:'Acuerdos marco para el suministro de alojamiento y servicios a los candidatos que llegan, al menos durante un primer periodo, y acuerdos previos con profesionales legales, fiscales, de seguros y financieros en condiciones ventajosas.',
-     tantum:['UNA TANTUM · Alojamiento y suministros','UNA TANTUM · Servicios profesionales']}},
+     tantum:['UNA TANTUM · Alojamiento y suministros','UNA TANTUM · Servicios profesionales']},
+   en:{name:'Housing and services agreements',
+     desc:'Framework agreements for housing and utilities for arriving candidates, at least for an initial period, plus upfront agreements with legal, tax, insurance and financial professionals on preferential terms.',
+     tantum:['ONE-OFF · Housing and utilities','ONE-OFF · Professional services']}},
   {n:8,team:'it',emoji:'🎯',star:true,
    it:{name:'Matching',
      desc:'Il cuore del protocollo. Il Team IT inserisce in DHLNurses le richieste delle strutture sanitarie (competenze e specializzazioni per reparto) e gestisce l\'incrocio: interroga il database dei profili caricati dal Team RD per individuare quello che meglio risponde alle competenze richieste. L\'inserimento non è generico, ma mirato all\'efficienza operativa.',
      tantum:['OPER · Inserimento richieste','OPER · Incrocio domanda/offerta']},
    es:{name:'Matching',
      desc:'El corazón del protocolo. El Equipo IT introduce en DHLNurses las solicitudes de los centros sanitarios (competencias y especializaciones por unidad) y gestiona el cruce: consulta la base de datos de perfiles cargados por el Equipo RD para identificar el que mejor responde a las competencias requeridas. La incorporación no es genérica, sino orientada a la eficiencia operativa.',
-     tantum:['OPER · Introducción de solicitudes','OPER · Cruce oferta/demanda']}},
+     tantum:['OPER · Introducción de solicitudes','OPER · Cruce oferta/demanda']},
+   en:{name:'Matching',
+     desc:'The heart of the protocol. Team IT enters the healthcare providers\' requests into DHLNurses (skills and specialisations per ward) and runs the match: it queries the database of profiles uploaded by Team DR to find the one that best fits the skills required. The placement is not generic, but targeted at operational efficiency.',
+     tantum:['OPER · Request intake','OPER · Supply/demand match']}},
   {n:9,team:'it',emoji:'📝',
    it:{name:'Rapporto di Lavoro',
      desc:'In base ai singoli contratti si identifica il datore di lavoro (agenzia interinale, cooperativa o azienda ospedaliera) e si gestisce con continuità la relazione lavorativa, incluse eventuali controversie e il welfare aziendale.',
      tantum:['OPER · Gestione rapporto']},
    es:{name:'Relación Laboral',
      desc:'En función de cada contrato se identifica al empleador (empresa de trabajo temporal, cooperativa o la propia empresa hospitalaria) y se gestiona de forma continua la relación laboral, incluidas posibles controversias y el bienestar corporativo.',
-     tantum:['OPER · Gestión de la relación']}},
+     tantum:['OPER · Gestión de la relación']},
+   en:{name:'Employment Relationship',
+     desc:'Based on each contract, the employer is identified (temp agency, cooperative or the hospital organisation itself) and the employment relationship is managed on an ongoing basis, including any disputes and corporate welfare.',
+     tantum:['OPER · Relationship management']}},
   {n:10,team:'it',emoji:'🛬',
    it:{name:'Arrivo in Italia',
      desc:'Gestione operativa dell\'accoglienza in aeroporto e del trasferimento verso l\'alloggio prestabilito. La logistica è già pronta quando il professionista atterra.',
      tantum:['OPER · Accoglienza & transfer']},
    es:{name:'Llegada a Italia',
      desc:'Gestión operativa de la acogida en el aeropuerto y del traslado al alojamiento previsto. La logística ya está lista cuando el profesional aterriza.',
-     tantum:['OPER · Acogida y traslado']}},
+     tantum:['OPER · Acogida y traslado']},
+   en:{name:'Arrival in Italy',
+     desc:'Operational management of the welcome at the airport and the transfer to the arranged accommodation. The logistics are already in place when the professional lands.',
+     tantum:['OPER · Welcome & transfer']}},
   {n:11,team:'it',emoji:'🔑',
    it:{name:'Domicilio e Servizi',
      desc:'Gestione operativa dei contratti di alloggio e servizi in corso, attivati sugli accordi quadro stipulati preventivamente. Stabilità abitativa dal primo giorno.',
      tantum:['OPER · Contratti in corso']},
    es:{name:'Domicilio y Servicios',
      desc:'Gestión operativa de los contratos de alojamiento y servicios en curso, activados sobre los acuerdos marco firmados previamente. Estabilidad habitacional desde el primer día.',
-     tantum:['OPER · Contratos en curso']}},
+     tantum:['OPER · Contratos en curso']},
+   en:{name:'Housing and Services',
+     desc:'Operational management of the ongoing housing and service contracts, activated on the framework agreements signed upfront. Housing stability from day one.',
+     tantum:['OPER · Ongoing contracts']}},
   {n:12,team:'it',emoji:'🧭',
    it:{name:'Tutor e Assistenza',
      desc:'Organizzazione di servizi socio-culturali, corsi di formazione e attività ricreative per coltivare un sentiment di community, oltre all\'assistenza del lavoratore per le problematiche extra-lavorative: meno turnover, più fidelizzazione.',
      tantum:['OPER · Community & welfare']},
    es:{name:'Tutoría y Asistencia',
      desc:'Organización de servicios socioculturales, cursos de formación y actividades recreativas para cultivar un sentimiento de comunidad, además de la asistencia al trabajador en cuestiones extralaborales: menos rotación, más fidelización.',
-     tantum:['OPER · Comunidad y bienestar']}},
+     tantum:['OPER · Comunidad y bienestar']},
+   en:{name:'Tutoring and Support',
+     desc:'Organising socio-cultural services, training courses and recreational activities to build a sense of community, plus support for the worker on non-work matters: less turnover, greater retention.',
+     tantum:['OPER · Community & welfare']}},
 ];
 
 const TIMELINE=[
   {t:'T.0',items:[
-    {team:'rd',type:'ut',it:'Accordi quadro con associazioni',es:'Acuerdos marco con asociaciones'},
-    {team:'it',type:'ut',it:'Accordi quadro con aziende ospedaliere',es:'Acuerdos marco con empresas hospitalarias'},
-    {team:'it',type:'ut',it:'Accordi alloggi, servizi e professionisti legali/fiscali',es:'Acuerdos de alojamiento, servicios y profesionales legales/fiscales'},
+    {team:'rd',type:'ut',it:'Accordi quadro con associazioni',es:'Acuerdos marco con asociaciones',en:'Framework agreements with associations'},
+    {team:'it',type:'ut',it:'Accordi quadro con aziende ospedaliere',es:'Acuerdos marco con empresas hospitalarias',en:'Framework agreements with hospitals'},
+    {team:'it',type:'ut',it:'Accordi alloggi, servizi e professionisti legali/fiscali',es:'Acuerdos de alojamiento, servicios y profesionales legales/fiscales',en:'Housing, services and legal/tax professional agreements'},
   ]},
   {t:'T.1',items:[
-    {team:'rd',type:'op',it:'Selezione e reclutamento',es:'Selección y reclutamiento'},
-    {team:'it',type:'op',it:'Inserimento richieste',es:'Introducción de solicitudes'},
+    {team:'rd',type:'op',it:'Selezione e reclutamento',es:'Selección y reclutamiento',en:'Selection and recruitment'},
+    {team:'it',type:'op',it:'Inserimento richieste',es:'Introducción de solicitudes',en:'Request intake'},
   ]},
   {t:'T.2',items:[
-    {team:'rd',type:'op',it:'Gestione documentale',es:'Gestión documental'},
-    {team:'rd',type:'op',it:'Formazione',es:'Formación'},
+    {team:'rd',type:'op',it:'Gestione documentale',es:'Gestión documental',en:'Document management'},
+    {team:'rd',type:'op',it:'Formazione',es:'Formación',en:'Training'},
   ]},
   {t:'T.3',items:[
-    {team:'it',type:'op',star:true,it:'Matching',es:'Matching'},
+    {team:'it',type:'op',star:true,it:'Matching',es:'Matching',en:'Matching'},
   ]},
   {t:'T.4',items:[
-    {team:'rd',type:'op',it:'Organizzazione viaggio',es:'Organización del viaje'},
+    {team:'rd',type:'op',it:'Organizzazione viaggio',es:'Organización del viaje',en:'Travel arrangements'},
   ]},
   {t:'T.5',items:[
-    {team:'it',type:'op',it:'Stipula contratto di lavoro',es:'Firma del contrato de trabajo'},
+    {team:'it',type:'op',it:'Stipula contratto di lavoro',es:'Firma del contrato de trabajo',en:'Employment contract signing'},
   ]},
   {t:'T.6',items:[
-    {team:'it',type:'op',it:'Arrivo in Italia',es:'Llegada a Italia'},
+    {team:'it',type:'op',it:'Arrivo in Italia',es:'Llegada a Italia',en:'Arrival in Italy'},
   ]},
   {t:'T.7',items:[
-    {team:'it',type:'op',it:'Gestione alloggio e servizi',es:'Gestión de alojamiento y servicios'},
-    {team:'it',type:'op',it:'Tutor e assistenza',es:'Tutoría y asistencia'},
+    {team:'it',type:'op',it:'Gestione alloggio e servizi',es:'Gestión de alojamiento y servicios',en:'Housing and services management'},
+    {team:'it',type:'op',it:'Tutor e assistenza',es:'Tutoría y asistencia',en:'Tutoring and support'},
   ]},
 ];
 
@@ -999,34 +1114,47 @@ const REPARTI=[
    it:{t:'Nefrologia',s:'Dialisi · gestione cronica',role:'Infermiera · 8 anni',exp:'Ospedale Santo Domingo',spec:'Dialisi certificata',
      skills:[['Dialisi',1],['Emodialisi',1],['Gestione CVC',1],['Area cronica',0]]},
    es:{t:'Nefrología',s:'Diálisis · gestión de crónicos',role:'Enfermera · 8 años',exp:'Hospital Santo Domingo',spec:'Diálisis certificada',
-     skills:[['Diálisis',1],['Hemodiálisis',1],['Gestión CVC',1],['Área de crónicos',0]]}},
+     skills:[['Diálisis',1],['Hemodiálisis',1],['Gestión CVC',1],['Área de crónicos',0]]},
+   en:{t:'Nephrology',s:'Dialysis · chronic care',role:'Nurse · 8 years',exp:'Santo Domingo Hospital',spec:'Certified in dialysis',
+     skills:[['Dialysis',1],['Haemodialysis',1],['CVC management',1],['Chronic care',0]]}},
   {id:'critica',ic:'🚨',init:'JR',name:'José Ramírez',fit:95,
    it:{t:'Area Critica / Rianimazione',s:'Terapia intensiva',role:'Infermiere · 10 anni',exp:'UCI · Santiago',spec:'Area Critica certificata',
      skills:[['Terapia intensiva',1],['Ventilazione',1],['ACLS',1],['Emergenza',0]]},
    es:{t:'Área Crítica / Reanimación',s:'Cuidados intensivos',role:'Enfermero · 10 años',exp:'UCI · Santiago',spec:'Área Crítica certificada',
-     skills:[['Cuidados intensivos',1],['Ventilación',1],['ACLS',1],['Emergencias',0]]}},
+     skills:[['Cuidados intensivos',1],['Ventilación',1],['ACLS',1],['Emergencias',0]]},
+   en:{t:'Critical Care / ICU',s:'Intensive care',role:'Nurse · 10 years',exp:'ICU · Santiago',spec:'Certified in critical care',
+     skills:[['Intensive care',1],['Ventilation',1],['ACLS',1],['Emergency',0]]}},
   {id:'pediatria',ic:'🧸',init:'AG',name:'Ana Gómez',fit:94,
    it:{t:'Pediatria',s:'Neonatologia · TIN',role:'Infermiera · 6 anni',exp:'Hospital Infantil',spec:'Pediatria certificata',
      skills:[['Pediatria',1],['Neonatologia',1],['TIN',1],['Vaccinazioni',0]]},
    es:{t:'Pediatría',s:'Neonatología · UCIN',role:'Enfermera · 6 años',exp:'Hospital Infantil',spec:'Pediatría certificada',
-     skills:[['Pediatría',1],['Neonatología',1],['UCIN',1],['Vacunación',0]]}},
+     skills:[['Pediatría',1],['Neonatología',1],['UCIN',1],['Vacunación',0]]},
+   en:{t:'Paediatrics',s:'Neonatology · NICU',role:'Nurse · 6 years',exp:'Children\'s Hospital',spec:'Certified in paediatrics',
+     skills:[['Paediatrics',1],['Neonatology',1],['NICU',1],['Immunisation',0]]}},
   {id:'chirurgia',ic:'🔪',init:'LP',name:'Luis Peña',fit:96,
    it:{t:'Chirurgia / Sala Operatoria',s:'Strumentista',role:'Infermiere · 9 anni',exp:'Blocco operatorio · SD',spec:'Ferrista certificato',
      skills:[['Sala operatoria',1],['Strumentista',1],['Sterilità',1],['Post-op',0]]},
    es:{t:'Cirugía / Quirófano',s:'Instrumentista',role:'Enfermero · 9 años',exp:'Bloque quirúrgico · SD',spec:'Instrumentista certificado',
-     skills:[['Quirófano',1],['Instrumentista',1],['Esterilidad',1],['Post-op',0]]}},
+     skills:[['Quirófano',1],['Instrumentista',1],['Esterilidad',1],['Post-op',0]]},
+   en:{t:'Surgery / Operating Theatre',s:'Scrub nurse',role:'Nurse · 9 years',exp:'Operating theatre · SD',spec:'Certified scrub nurse',
+     skills:[['Operating theatre',1],['Scrub nurse',1],['Sterility',1],['Post-op',0]]}},
   {id:'emergenza',ic:'🚑',init:'CN',name:'Carla Núñez',fit:93,
    it:{t:'Pronto Soccorso',s:'Triage · emergenza',role:'Infermiera · 7 anni',exp:'Emergencias · SD',spec:'Emergenza certificata',
      skills:[['Triage',1],['Emergenza',1],['BLSD',1],['Traumi',0]]},
    es:{t:'Urgencias',s:'Triaje · emergencias',role:'Enfermera · 7 años',exp:'Emergencias · SD',spec:'Emergencias certificada',
-     skills:[['Triaje',1],['Emergencias',1],['BLSD',1],['Traumatismos',0]]}},
+     skills:[['Triaje',1],['Emergencias',1],['BLSD',1],['Traumatismos',0]]},
+   en:{t:'Emergency Department',s:'Triage · emergency',role:'Nurse · 7 years',exp:'Emergency dept · SD',spec:'Certified in emergency care',
+     skills:[['Triage',1],['Emergency',1],['BLS-D',1],['Trauma',0]]}},
 ];
 
 /* ---------- language state ---------- */
-const SUPPORTED = ['it','es'];
+const SUPPORTED = ['it','en','es'];
 let lang = (function(){
   try { const s = localStorage.getItem('dhl.lang'); if (SUPPORTED.indexOf(s) >= 0) return s; } catch(e){}
-  return (navigator.language || 'it').toLowerCase().indexOf('es') === 0 ? 'es' : 'it';
+  const nav = (navigator.language || 'it').toLowerCase();
+  if (nav.indexOf('es') === 0) return 'es';
+  if (nav.indexOf('en') === 0) return 'en';
+  return 'it';
 })();
 const t = k => (I18N[lang] && I18N[lang][k]) || I18N.it[k] || '';
 
