@@ -10,7 +10,8 @@ import { createIcons, icons as lucideIcons } from 'lucide';
 import { STEP_I18N, CHECKLIST_I18N, I18N } from './i18n-data.js';
 import { guideToc, guideBody } from './guide-content.js';
 // Hashed by Vite: replacing the logo file changes the URL, so no cache (SW or browser) can serve a stale copy.
-import logoUrl from './logo_dhl_nurses.png';
+// The SVG is itself a rounded indigo tile, so it renders directly without a white backing box.
+import logoUrl from './logo_dhl_nurses_cuore.svg';
 
 // Shim with the same shape as the old lucide UMD global: lucide.createIcons().
 const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(opts || {}) }) };
@@ -3435,8 +3436,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     '<header class="sticky top-0 z-30 border-b border-slate-200 bg-white/85 backdrop-blur">' +
       '<div class="mx-auto flex max-w-[1400px] flex-wrap items-center gap-x-3 gap-y-2.5 px-4 py-3 sm:px-5">' +
         '<div class="flex min-w-0 items-center gap-3">' +
-          '<div class="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-indigo-200 ring-1 ring-slate-200">' +
-            '<img src="' + logoUrl + '" alt="DHL Nurses" class="h-9 w-9 object-contain" /></div>' +
+          '<img src="' + logoUrl + '" alt="DHL Nurses" class="h-10 w-10 shrink-0 rounded-xl shadow-lg shadow-indigo-200" />' +
           '<div class="min-w-0">' +
             '<h1 class="truncate text-base font-extrabold leading-tight text-slate-900">DHL Nurses</h1>' +
             '<p class="hidden truncate text-xs text-slate-500 sm:block">Trasferimento Infermieri · Rep. Dominicana → Italia</p>' +
@@ -4224,7 +4224,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="w-full max-w-md animate-fadeIn">' +
         '<div class="mb-4 flex justify-center">' + langSwitcher(true) + '</div>' +
         '<div class="mb-6 flex flex-col items-center text-center">' +
-          '<div class="mb-3 flex h-14 w-14 items-center justify-center overflow-hidden rounded-2xl bg-white p-1 shadow-xl shadow-indigo-900/40 ring-1 ring-white/20"><img src="' + logoUrl + '" alt="DHL Nurses" class="h-full w-full object-contain" /></div>' +
+          '<img src="' + logoUrl + '" alt="DHL Nurses" class="mb-3 h-14 w-14 rounded-2xl shadow-xl shadow-indigo-900/40 ring-1 ring-white/20" />' +
           '<h1 class="text-2xl font-extrabold text-white">DHL Nurses</h1>' +
           '<p class="mt-1 text-sm text-slate-300">' + t('login_subtitle') + '</p>' +
         '</div>' +
@@ -4827,7 +4827,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '<div class="wl-blob" style="width:420px;height:420px;background:#10b981;top:40%;right:-120px"></div>' +
       // Sticky top bar
       '<div class="sticky top-0 z-[3] flex items-center gap-3 border-b border-white/10 bg-slate-900/70 px-5 py-3 backdrop-blur sm:px-8">' +
-        '<div class="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white shadow-lg shadow-indigo-900/40"><img src="' + logoUrl + '" alt="DHL Nurses" class="h-8 w-8 object-contain" /></div>' +
+        '<img src="' + logoUrl + '" alt="DHL Nurses" class="h-9 w-9 shrink-0 rounded-xl shadow-lg shadow-indigo-900/40" />' +
         '<div><p class="text-sm font-extrabold leading-tight">DHL Nurses</p><p class="text-[11px] text-slate-400">' + t('wl_kicker') + '</p></div>' +
         '<div class="ml-auto flex items-center gap-2">' +
           '<div class="flex items-center gap-1 rounded-full bg-white/10 p-1">' + langBtns + '</div>' +
@@ -4836,7 +4836,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       '</div>' +
       // Hero
       '<div class="relative z-[2] flex min-h-[86vh] flex-col items-center justify-center px-6 py-10 text-center">' +
-        '<img src="' + logoUrl + '" alt="DHL Nurses — DominicaHealthLink" class="wl-reveal in mb-6 h-28 w-28 rounded-3xl bg-white object-contain p-1.5 shadow-2xl shadow-indigo-900/50 ring-1 ring-white/20 sm:h-36 sm:w-36" />' +
+        '<img src="' + logoUrl + '" alt="DHL Nurses — DominicaHealthLink" class="wl-reveal in mb-6 h-28 w-28 rounded-3xl shadow-2xl shadow-indigo-900/50 ring-1 ring-white/20 sm:h-36 sm:w-36" />' +
         '<span class="wl-reveal in mb-4 inline-flex items-center gap-1.5 rounded-full wl-chip px-3 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-200"><i data-lucide="flask-conical" class="h-3.5 w-3.5"></i>' + t('wl_kicker') + '</span>' +
         '<h1 class="wl-reveal in max-w-3xl text-3xl font-extrabold leading-tight sm:text-5xl">' + t('wl_claim') + '</h1>' +
         '<div class="wl-reveal in mt-8 flex w-full max-w-md flex-col items-center gap-3 sm:flex-row sm:justify-center">' + ctaButtons + '</div>' +
