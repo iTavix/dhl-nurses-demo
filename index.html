@@ -88,6 +88,14 @@ header.nav.scrolled{
   display:grid;place-items:center;cursor:pointer;color:var(--ink-2);transition:.18s;flex:none
 }
 .iconbtn:hover{color:var(--indigo-500); border-color:var(--indigo-400)}
+/* Language switcher: same key (dhl.lang) the gestionale uses, so the choice carries into the demo */
+.lang{display:flex; gap:2px; background:var(--surface); border:1px solid var(--line); border-radius:11px; padding:3px; flex:none}
+.lang button{
+  border:0; background:transparent; color:var(--muted); font-family:inherit; font-weight:800; font-size:12px;
+  padding:6px 9px; border-radius:8px; cursor:pointer; transition:.18s;
+}
+.lang button:hover{color:var(--ink)}
+.lang button.active{background:var(--grad-brand); color:#fff}
 .btn{
   display:inline-flex;align-items:center;gap:8px;justify-content:center;
   padding:11px 20px;border-radius:12px;font-weight:700;font-size:14.5px;cursor:pointer;border:1px solid transparent;transition:.2s;
@@ -281,7 +289,7 @@ html.dark .tbadge.rd{color:#7dd3fc}html.dark .tbadge.it{color:#6ee7b7}
 .plat{display:grid;grid-template-columns:1fr 1fr;gap:22px}
 .sot{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:var(--shadow-sm)}
 .sot h3{font-size:15px;font-weight:800;margin-bottom:18px;display:flex;align-items:center;gap:10px}
-.sot h3 .d{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#fff}
+.sot h3 .d{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;color:#fff;flex:none}
 .sot.rd h3 .d{background:linear-gradient(135deg,#38bdf8,#0284c7)}
 .sot.it h3 .d{background:linear-gradient(135deg,#34d399,#059669)}
 .sot ul{list-style:none;margin:0;padding:0}
@@ -330,8 +338,8 @@ footer.ft .links a:hover{color:var(--indigo-500)}
   .prob-grid{grid-template-columns:1fr}
   .pipe{grid-template-columns:repeat(4,1fr)}
 }
-/* 7 nav items + brand + CTA stop fitting on one line below this width: switch to the hamburger */
-@media(max-width:1080px){
+/* 7 nav items + brand + lang switcher + CTA stop fitting on one line below this width */
+@media(max-width:1160px){
   .nav-links{display:none}
   .menu-toggle{display:grid}
 }
@@ -360,36 +368,38 @@ footer.ft .links a:hover{color:var(--indigo-500)}
       <span class="logo">
         <img src="/src/logo_dhl_nurses.png" alt="DominicaHealthLink" />
       </span>
-      <span>DominicaHealthLink<small>Mobilità sanitaria di precisione</small></span>
+      <span>DominicaHealthLink<small data-i18n="brandSub">Mobilità sanitaria di precisione</small></span>
     </a>
     <nav class="nav-links">
-      <a href="#problema">Problema</a>
-      <a href="#soluzione">Soluzione</a>
-      <a href="#pipeline">Percorso</a>
-      <a href="#cronologia">Cronologia</a>
-      <a href="#matching">Matching</a>
-      <a href="#piattaforma">Piattaforma</a>
-      <a href="#valore">Valore</a>
+      <a href="#problema" data-i18n="navProblema">Problema</a>
+      <a href="#soluzione" data-i18n="navSoluzione">Soluzione</a>
+      <a href="#pipeline" data-i18n="navPercorso">Percorso</a>
+      <a href="#cronologia" data-i18n="navCronologia">Cronologia</a>
+      <a href="#matching" data-i18n="navMatching">Matching</a>
+      <a href="#piattaforma" data-i18n="navPiattaforma">Piattaforma</a>
+      <a href="#valore" data-i18n="navValore">Valore</a>
     </nav>
     <div class="nav-actions">
-      <button class="iconbtn" id="themeBtn" aria-label="Cambia tema">
-        <svg class="sun" width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
-      </button>
-      <a href="./app.html" class="btn btn-primary">Entra nella demo</a>
+      <div class="lang" id="langSw">
+        <button type="button" data-lang="it">IT</button>
+        <button type="button" data-lang="es">ES</button>
+      </div>
+      <button class="iconbtn" id="themeBtn" aria-label="Tema"></button>
+      <a href="./app.html" class="btn btn-primary" data-i18n="ctaDemo">Entra nella demo</a>
       <button class="iconbtn menu-toggle" id="menuBtn" aria-label="Menu">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
       </button>
     </div>
   </div>
   <div class="mobile-menu" id="mobileMenu">
-    <a href="#problema">Problema</a>
-    <a href="#soluzione">Soluzione</a>
-    <a href="#pipeline">Percorso</a>
-    <a href="#cronologia">Cronologia</a>
-    <a href="#matching">Matching</a>
-    <a href="#piattaforma">Piattaforma</a>
-    <a href="#valore">Valore</a>
-    <a href="./app.html" class="btn btn-primary" style="margin-top:8px">Entra nella demo</a>
+    <a href="#problema" data-i18n="navProblema">Problema</a>
+    <a href="#soluzione" data-i18n="navSoluzione">Soluzione</a>
+    <a href="#pipeline" data-i18n="navPercorso">Percorso</a>
+    <a href="#cronologia" data-i18n="navCronologia">Cronologia</a>
+    <a href="#matching" data-i18n="navMatching">Matching</a>
+    <a href="#piattaforma" data-i18n="navPiattaforma">Piattaforma</a>
+    <a href="#valore" data-i18n="navValore">Valore</a>
+    <a href="./app.html" class="btn btn-primary" style="margin-top:8px" data-i18n="ctaDemo">Entra nella demo</a>
   </div>
 </header>
 
@@ -401,20 +411,20 @@ footer.ft .links a:hover{color:var(--indigo-500)}
   <div class="wrap">
     <div class="hero-inner">
       <div>
-        <span class="eyebrow"><span class="pulse-dot"></span> Repubblica Dominicana &rarr; Italia</span>
-        <h1>Non reclutiamo infermieri.<br><span class="hl">Facciamo matching clinico</span> di precisione.</h1>
-        <p class="lead"><b>DominicaHealthLink</b> trasforma la mobilità sanitaria internazionale da operazione logistica a <b>investimento in efficienza clinica</b>. Due team, dodici fasi e un'unica fonte di verità digitale — la piattaforma <b>DHL Nurses</b> — che collega ogni competenza certificata al reparto giusto.</p>
+        <span class="eyebrow"><span class="pulse-dot"></span> <span data-i18n="heroEyebrow">Repubblica Dominicana &rarr; Italia</span></span>
+        <h1 data-i18n-html="heroH1">Non reclutiamo infermieri.<br><span class="hl">Facciamo matching clinico</span> di precisione.</h1>
+        <p class="lead" data-i18n-html="heroLead"><b>DominicaHealthLink</b> trasforma la mobilità sanitaria internazionale da operazione logistica a <b>investimento in efficienza clinica</b>. Due team, dodici fasi e un'unica fonte di verità digitale — la piattaforma <b>DHL Nurses</b> — che collega ogni competenza certificata al reparto giusto.</p>
         <div class="cta">
-          <a href="./app.html" class="btn btn-primary">Entra nella demo
+          <a href="./app.html" class="btn btn-primary"><span data-i18n="ctaDemo">Entra nella demo</span>
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </a>
-          <a href="#pipeline" class="btn btn-ghost">Esplora il modello</a>
+          <a href="#pipeline" class="btn btn-ghost" data-i18n="ctaModello">Esplora il modello</a>
         </div>
         <div class="hero-stats">
-          <div class="s"><b data-count="12" data-suffix="">0</b><span>Fasi operative</span></div>
-          <div class="s"><b data-count="2" data-suffix="">0</b><span>Team geografici</span></div>
-          <div class="s"><b data-count="100" data-suffix="%">0</b><span>Titoli asseverati</span></div>
-          <div class="s"><b data-count="1" data-suffix="">0</b><span>Single source of truth</span></div>
+          <div class="s"><b data-count="12">0</b><span data-i18n="statFasi">Fasi operative</span></div>
+          <div class="s"><b data-count="2">0</b><span data-i18n="statTeam">Team geografici</span></div>
+          <div class="s"><b data-count="100" data-suffix="%">0</b><span data-i18n="statTitoli">Titoli asseverati</span></div>
+          <div class="s"><b data-count="1">0</b><span data-i18n="statSot">Single source of truth</span></div>
         </div>
       </div>
 
@@ -422,33 +432,33 @@ footer.ft .links a:hover{color:var(--indigo-500)}
         <div class="hc-top">
           <div class="t">
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#818cf8" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="14" rx="2"/><path d="M8 21h8M12 18v3"/></svg>
-            DHLNurses · Console
+            <span data-i18n="console">DHLNurses · Console</span>
           </div>
-          <div class="live"><span class="pulse-dot"></span> Real-time</div>
+          <div class="live"><span class="pulse-dot"></span> <span data-i18n="realtime">Real-time</span></div>
         </div>
         <div class="corridor">
           <div class="col rd">
-            <h5>Team RD · Fasi 1–5</h5>
-            <div class="chip"><span class="n">1</span> Accordi associazioni</div>
-            <div class="chip"><span class="n">2</span> Selezione</div>
-            <div class="chip"><span class="n">3</span> Documenti asseverati</div>
-            <div class="chip"><span class="n">4</span> Formazione</div>
-            <div class="chip"><span class="n">5</span> Viaggio</div>
+            <h5 data-i18n="teamRD">Team RD · Fasi 1–5</h5>
+            <div class="chip"><span class="n">1</span> <span data-i18n="chipRd1">Accordi associazioni</span></div>
+            <div class="chip"><span class="n">2</span> <span data-i18n="chipRd2">Selezione</span></div>
+            <div class="chip"><span class="n">3</span> <span data-i18n="chipRd3">Documenti asseverati</span></div>
+            <div class="chip"><span class="n">4</span> <span data-i18n="chipRd4">Formazione</span></div>
+            <div class="chip"><span class="n">5</span> <span data-i18n="chipRd5">Viaggio</span></div>
           </div>
           <div class="flow-arrow">
             <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
           </div>
           <div class="col it">
-            <h5>Team IT · Fasi 6–12</h5>
-            <div class="chip"><span class="n">6</span> Accordi aziende</div>
-            <div class="chip"><span class="n">7</span> Alloggi e servizi</div>
-            <div class="chip"><span class="n">8</span> Matching clinico</div>
-            <div class="chip"><span class="n">9</span> Rapporto di lavoro</div>
-            <div class="chip"><span class="n">10</span> Arrivo & tutor</div>
+            <h5 data-i18n="teamIT">Team IT · Fasi 6–12</h5>
+            <div class="chip"><span class="n">6</span> <span data-i18n="chipIt1">Accordi aziende</span></div>
+            <div class="chip"><span class="n">7</span> <span data-i18n="chipIt2">Alloggi e servizi</span></div>
+            <div class="chip"><span class="n">8</span> <span data-i18n="chipIt3">Matching clinico</span></div>
+            <div class="chip"><span class="n">9</span> <span data-i18n="chipIt4">Rapporto di lavoro</span></div>
+            <div class="chip"><span class="n">10</span> <span data-i18n="chipIt5">Arrivo &amp; tutor</span></div>
           </div>
         </div>
         <div class="match-bar">
-          <span class="lbl">Compatibilità profilo &rarr; reparto</span>
+          <span class="lbl" data-i18n="matchBar">Compatibilità profilo &rarr; reparto</span>
           <span class="track"><i></i></span>
           <span class="pct">96%</span>
         </div>
@@ -461,31 +471,31 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="problema">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">Il problema</span>
-      <h2>La sanità italiana non ha bisogno di più numeri. Ha bisogno delle competenze giuste.</h2>
-      <p>Il reclutamento tradizionale è generico, lento e burocraticamente fragile. Il risultato è personale allocato "a tamponamento", inserimenti inefficaci e turnover elevato.</p>
+      <span class="eyebrow" data-i18n="probEyebrow">Il problema</span>
+      <h2 data-i18n="probH2">La sanità italiana non ha bisogno di più numeri. Ha bisogno delle competenze giuste.</h2>
+      <p data-i18n="probP">Il reclutamento tradizionale è generico, lento e burocraticamente fragile. Il risultato è personale allocato "a tamponamento", inserimenti inefficaci e turnover elevato.</p>
     </div>
     <div class="prob-grid">
       <div class="card reveal" data-d="1">
         <div class="ic ic-rose">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0Z"/></svg>
         </div>
-        <h3>Matching generico</h3>
-        <p>L'infermiere arriva senza allineamento tra le sue specializzazioni e le reali necessità del reparto. Competenze pregiate restano inutilizzate.</p>
+        <h3 data-i18n="prob1T">Matching generico</h3>
+        <p data-i18n="prob1D">L'infermiere arriva senza allineamento tra le sue specializzazioni e le reali necessità del reparto. Competenze pregiate restano inutilizzate.</p>
       </div>
       <div class="card reveal" data-d="2">
         <div class="ic ic-amber">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 3"/></svg>
         </div>
-        <h3>Colli di bottiglia burocratici</h3>
-        <p>Titoli non tradotti né asseverati correttamente bloccano l'iter ministeriale, dilatando i tempi di inserimento in reparto.</p>
+        <h3 data-i18n="prob2T">Colli di bottiglia burocratici</h3>
+        <p data-i18n="prob2D">Titoli non tradotti né asseverati correttamente bloccano l'iter ministeriale, dilatando i tempi di inserimento in reparto.</p>
       </div>
       <div class="card reveal" data-d="3">
         <div class="ic ic-indigo">
           <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m22 21-3-3m0 0-3-3m3 3 3-3m-3 3-3 3"/></svg>
         </div>
-        <h3>Turnover e costi nascosti</h3>
-        <p>Senza stabilità legale, fiscale e abitativa, il professionista abbandona: ogni sostituzione azzera l'investimento fatto sull'inserimento.</p>
+        <h3 data-i18n="prob3T">Turnover e costi nascosti</h3>
+        <p data-i18n="prob3D">Senza stabilità legale, fiscale e abitativa, il professionista abbandona: ogni sostituzione azzera l'investimento fatto sull'inserimento.</p>
       </div>
     </div>
   </div>
@@ -495,26 +505,26 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="soluzione" style="background:var(--bg-soft)">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">La soluzione</span>
-      <h2>Dal reclutamento generico al <span style="color:var(--indigo-500)">matching tecnico</span></h2>
-      <p>Analizziamo preventivamente i bisogni dei reparti e mappiamo i profili con granularità scientifica. Ogni infermiere è allocato dove le sue specializzazioni generano valore immediato.</p>
+      <span class="eyebrow" data-i18n="solEyebrow">La soluzione</span>
+      <h2 data-i18n-html="solH2">Dal reclutamento generico al <span style="color:var(--indigo-500)">matching tecnico</span></h2>
+      <p data-i18n="solP">Analizziamo preventivamente i bisogni dei reparti e mappiamo i profili con granularità scientifica. Ogni infermiere è allocato dove le sue specializzazioni generano valore immediato.</p>
     </div>
     <div class="split">
       <div class="panel bad reveal" data-d="1">
-        <span class="tag">Modello tradizionale</span>
-        <h3>Tamponamento numerico</h3>
-        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> Profilo scelto sulla disponibilità, non sulle competenze</div>
-        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> Documentazione verificata a valle, con ritardi</div>
-        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> Onboarding lungo e inserimento inefficace</div>
-        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> Nessun supporto post-arrivo &rarr; turnover</div>
+        <span class="tag" data-i18n="solBadTag">Modello tradizionale</span>
+        <h3 data-i18n="solBadH3">Tamponamento numerico</h3>
+        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> <span data-i18n="solBad1">Profilo scelto sulla disponibilità, non sulle competenze</span></div>
+        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> <span data-i18n="solBad2">Documentazione verificata a valle, con ritardi</span></div>
+        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> <span data-i18n="solBad3">Onboarding lungo e inserimento inefficace</span></div>
+        <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> <span data-i18n="solBad4">Nessun supporto post-arrivo &rarr; turnover</span></div>
       </div>
       <div class="panel good reveal" data-d="2">
-        <span class="tag">Modello DominicaHealthLink</span>
-        <h3>Precisione chirurgica</h3>
-        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Profilo scelto per specializzazione clinica certificata</div>
-        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Titoli asseverati e tradotti <b>prima</b> della partenza</div>
-        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Lead-time ridotto: professionista "ready-to-work"</div>
-        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Tutoraggio legale, fiscale e abitativo &rarr; ROI a lungo termine</div>
+        <span class="tag" data-i18n="solGoodTag">Modello DominicaHealthLink</span>
+        <h3 data-i18n="solGoodH3">Precisione chirurgica</h3>
+        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> <span data-i18n-html="solGood1">Profilo scelto per specializzazione clinica certificata</span></div>
+        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> <span data-i18n-html="solGood2">Titoli asseverati e tradotti <b>prima</b> della partenza</span></div>
+        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> <span data-i18n-html="solGood3">Lead-time ridotto: professionista "ready-to-work"</span></div>
+        <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> <span data-i18n-html="solGood4">Tutoraggio legale, fiscale e abitativo &rarr; ROI a lungo termine</span></div>
       </div>
     </div>
   </div>
@@ -524,13 +534,13 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="pipeline">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">Percorso end-to-end</span>
-      <h2>12 fasi, 2 team, zero passaggi ciechi</h2>
-      <p>Ogni fase è tracciata su DHLNurses. Seleziona una tappa per vedere cosa accade — e come i due team si passano il testimone senza perdere informazioni.</p>
+      <span class="eyebrow" data-i18n="pipeEyebrow">Percorso end-to-end</span>
+      <h2 data-i18n="pipeH2">12 fasi, 2 team, zero passaggi ciechi</h2>
+      <p data-i18n="pipeP">Ogni fase è tracciata su DHLNurses. Seleziona una tappa per vedere cosa accade — e come i due team si passano il testimone senza perdere informazioni.</p>
     </div>
     <div class="pipe-teams reveal">
-      <span class="team-toggle active" data-team="rd" id="tgRd"><span class="dot"></span> Team RD · Fasi 1–5</span>
-      <span class="team-toggle active" data-team="it" id="tgIt"><span class="dot"></span> Team IT · Fasi 6–12</span>
+      <span class="team-toggle active" data-team="rd" id="tgRd"><span class="dot"></span> <span data-i18n="teamRD">Team RD · Fasi 1–5</span></span>
+      <span class="team-toggle active" data-team="it" id="tgIt"><span class="dot"></span> <span data-i18n="teamIT">Team IT · Fasi 6–12</span></span>
     </div>
     <div class="pipe reveal" id="pipe"></div>
     <div class="detail reveal" id="detail"></div>
@@ -541,9 +551,9 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="cronologia" style="background:var(--bg-soft)">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">Cronologia operativa</span>
-      <h2>Da T.0 a T.7: quando accade cosa</h2>
-      <p>Le 12 fasi si eseguono in parallelo tra i due team. Il <b>Matching (T.3) precede il viaggio e il contratto</b>: il candidato parte solo con uno sbocco clinico già assegnato.</p>
+      <span class="eyebrow" data-i18n="cronEyebrow">Cronologia operativa</span>
+      <h2 data-i18n="cronH2">Da T.0 a T.7: quando accade cosa</h2>
+      <p data-i18n-html="cronP">Le 12 fasi si eseguono in parallelo tra i due team. Il <b>Matching (T.3) precede il viaggio e il contratto</b>: il candidato parte solo con uno sbocco clinico già assegnato.</p>
     </div>
     <div class="tl-scroll reveal">
       <div class="tl" id="timeline"></div>
@@ -555,14 +565,14 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="matching">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">★ Il cuore del protocollo</span>
-      <h2>Matching tecnico, in azione</h2>
-      <p>L'ospedale specifica il reparto e le competenze necessarie. DHLNurses interroga il database dei profili certificati dal Team RD ed estrae il candidato ideale. Prova tu:</p>
+      <span class="eyebrow" data-i18n="matchEyebrow">★ Il cuore del protocollo</span>
+      <h2 data-i18n="matchH2">Matching tecnico, in azione</h2>
+      <p data-i18n="matchP">L'ospedale specifica il reparto e le competenze necessarie. DHLNurses interroga il database dei profili certificati dal Team RD ed estrae il candidato ideale. Prova tu:</p>
     </div>
     <div class="match-wrap reveal">
       <div class="match-left">
-        <h4>Richiesta struttura sanitaria</h4>
-        <div class="q">Di quale reparto hai bisogno?</div>
+        <h4 data-i18n="matchLeftH4">Richiesta struttura sanitaria</h4>
+        <div class="q" data-i18n="matchQ">Di quale reparto hai bisogno?</div>
         <div class="reparti" id="reparti"></div>
       </div>
       <div class="match-right">
@@ -570,21 +580,16 @@ footer.ft .links a:hover{color:var(--indigo-500)}
           <div class="mr-head">
             <div class="db">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#a5b4fc" stroke-width="2"><ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v6c0 1.7 3.6 3 8 3s8-1.3 8-3V5M4 11v6c0 1.7 3.6 3 8 3s8-1.3 8-3v-6"/></svg>
-              DHLNurses · Query database
+              <span data-i18n="matchDb">DHLNurses · Query database</span>
             </div>
           </div>
           <div class="mr-steps" id="mrSteps">
-            <div class="st">Interrogazione</div>
-            <div class="st">Identificazione</div>
-            <div class="st">Validazione</div>
-            <div class="st">Proposta</div>
+            <div class="st" data-i18n="step1">Interrogazione</div>
+            <div class="st" data-i18n="step2">Identificazione</div>
+            <div class="st" data-i18n="step3">Validazione</div>
+            <div class="st" data-i18n="step4">Proposta</div>
           </div>
-          <div id="matchOut">
-            <div class="match-empty">
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
-              Seleziona un reparto per avviare il matching
-            </div>
-          </div>
+          <div id="matchOut"></div>
         </div>
       </div>
     </div>
@@ -595,27 +600,27 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="piattaforma" style="background:var(--bg-soft)">
   <div class="wrap">
     <div class="sec-head reveal">
-      <span class="eyebrow">La piattaforma</span>
-      <h2>DHLNurses: <span style="color:var(--indigo-500)">l'unica fonte di verità</span></h2>
-      <p>Curricula, titoli ed esperienze digitalizzati integralmente. Il Team RD inserisce, il Team IT interroga — dati in tempo reale, zero asincronie informative.</p>
+      <span class="eyebrow" data-i18n="platEyebrow">La piattaforma</span>
+      <h2 data-i18n-html="platH2">DHLNurses: <span style="color:var(--indigo-500)">l'unica fonte di verità</span></h2>
+      <p data-i18n="platP">Curricula, titoli ed esperienze digitalizzati integralmente. Il Team RD inserisce, il Team IT interroga — dati in tempo reale, zero asincronie informative.</p>
     </div>
     <div class="plat reveal">
       <div class="sot rd">
-        <h3><span class="d"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 3v14M5 10l7 7 7-7"/><path d="M5 21h14"/></svg></span> Inserimento dati — Team RD</h3>
+        <h3><span class="d"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><path d="M12 3v14M5 10l7 7 7-7"/><path d="M5 21h14"/></svg></span> <span data-i18n="sotRdT">Inserimento dati — Team RD</span></h3>
         <ul>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Caricamento e aggiornamento dei profili professionali</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Inserimento delle specialità cliniche verificate</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Upload della documentazione asseverata e tradotta</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Validazione del dossier formativo "Italia in tasca"</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotRd1">Caricamento e aggiornamento dei profili professionali</span></li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotRd2">Inserimento delle specialità cliniche verificate</span></li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotRd3">Upload della documentazione asseverata e tradotta</span></li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotRd4">Validazione del dossier formativo "Italia in tasca"</span></li>
         </ul>
       </div>
       <div class="sot it">
-        <h3><span class="d"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span> Interrogazione ed estrazione — Team IT</h3>
+        <h3><span class="d"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg></span> <span data-i18n="sotItT">Interrogazione ed estrazione — Team IT</span></h3>
         <ul>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Ricezione e analisi dei fabbisogni dalle strutture</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Interrogazione del database tramite filtri di competenza</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Estrazione dei profili idonei per la proposta contrattuale</li>
-          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> Monitoraggio della conformità per l'inserimento in reparto</li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotIt1">Ricezione e analisi dei fabbisogni dalle strutture</span></li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotIt2">Interrogazione del database tramite filtri di competenza</span></li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotIt3">Estrazione dei profili idonei per la proposta contrattuale</span></li>
+          <li><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><path d="m5 12 4 4 10-10"/></svg> <span data-i18n="sotIt4">Monitoraggio della conformità per l'inserimento in reparto</span></li>
         </ul>
       </div>
     </div>
@@ -628,37 +633,37 @@ footer.ft .links a:hover{color:var(--indigo-500)}
     <div class="band reveal">
       <div class="inner">
         <div style="max-width:640px">
-          <span class="eyebrow" style="color:#c7d2fe;background:rgba(129,140,248,.16)">Perché investire</span>
-          <h2 style="color:#fff;font-size:clamp(26px,3.4vw,38px);margin-top:16px">Quattro leve di valore misurabile</h2>
-          <p style="color:#c3cee0;font-size:17px;margin-top:14px">Non vendiamo un servizio di reclutamento: costruiamo un asset di efficienza clinica per le strutture sanitarie, con un ritorno sull'investimento a lungo termine.</p>
+          <span class="eyebrow" style="color:#c7d2fe;background:rgba(129,140,248,.16)" data-i18n="valEyebrow">Perché investire</span>
+          <h2 style="color:#fff;font-size:clamp(26px,3.4vw,38px);margin-top:16px" data-i18n="valH2">Quattro leve di valore misurabile</h2>
+          <p style="color:#c3cee0;font-size:17px;margin-top:14px" data-i18n="valP">Non vendiamo un servizio di reclutamento: costruiamo un asset di efficienza clinica per le strutture sanitarie, con un ritorno sull'investimento a lungo termine.</p>
         </div>
         <div class="value-grid">
           <div class="vcard reveal" data-d="1">
             <div class="vi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg></div>
-            <h4>Efficienza operativa</h4>
-            <p>Minimizzazione del lead-time tra fabbisogno ospedaliero e operatività del professionista.</p>
+            <h4 data-i18n="val1T">Efficienza operativa</h4>
+            <p data-i18n="val1D">Minimizzazione del lead-time tra fabbisogno ospedaliero e operatività del professionista.</p>
           </div>
           <div class="vcard reveal" data-d="2">
             <div class="vi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 3 4 6v6c0 5 3.4 7.7 8 9 4.6-1.3 8-4 8-9V6z"/><path d="m9 12 2 2 4-4"/></svg></div>
-            <h4>Certezza del diritto</h4>
-            <p>Validazione documentale asseverata e conformità normativa totale lungo tutta la filiera.</p>
+            <h4 data-i18n="val2T">Certezza del diritto</h4>
+            <p data-i18n="val2D">Validazione documentale asseverata e conformità normativa totale lungo tutta la filiera.</p>
           </div>
           <div class="vcard reveal" data-d="3">
             <div class="vi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/><circle cx="12" cy="12" r="4"/></svg></div>
-            <h4>Specializzazione clinica</h4>
-            <p>Allineamento tecnico tra esperienza certificata e unità operativa: Area Critica, Nefrologia, Chirurgia.</p>
+            <h4 data-i18n="val3T">Specializzazione clinica</h4>
+            <p data-i18n="val3D">Allineamento tecnico tra esperienza certificata e unità operativa: Area Critica, Nefrologia, Chirurgia.</p>
           </div>
           <div class="vcard reveal" data-d="4">
             <div class="vi"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M3 3v18h18"/><path d="m7 14 4-4 3 3 6-6"/></svg></div>
-            <h4>ROI a lungo termine</h4>
-            <p>Welfare e assistenza riducono il turnover e i costi di sostituzione del personale.</p>
+            <h4 data-i18n="val4T">ROI a lungo termine</h4>
+            <p data-i18n="val4D">Welfare e assistenza riducono il turnover e i costi di sostituzione del personale.</p>
           </div>
         </div>
         <div class="metrics">
-          <div class="metric reveal"><b data-count="12">0</b><span>Fasi presidiate end-to-end</span></div>
-          <div class="metric reveal" data-d="1"><b data-count="100" data-suffix="%">0</b><span>Documenti asseverati pre-partenza</span></div>
-          <div class="metric reveal" data-d="2"><b data-count="1">0</b><span>Single source of truth</span></div>
-          <div class="metric reveal" data-d="3"><b data-count="5" data-suffix="+">0</b><span>Aree cliniche mappate</span></div>
+          <div class="metric reveal"><b data-count="12">0</b><span data-i18n="met1">Fasi presidiate end-to-end</span></div>
+          <div class="metric reveal" data-d="1"><b data-count="100" data-suffix="%">0</b><span data-i18n="met2">Documenti asseverati pre-partenza</span></div>
+          <div class="metric reveal" data-d="2"><b data-count="1">0</b><span data-i18n="met3">Single source of truth</span></div>
+          <div class="metric reveal" data-d="3"><b data-count="5" data-suffix="+">0</b><span data-i18n="met4">Aree cliniche mappate</span></div>
         </div>
       </div>
     </div>
@@ -669,20 +674,20 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <section id="contatti" style="background:var(--bg-soft)">
   <div class="wrap">
     <div class="cta-final reveal">
-      <span class="eyebrow">La piattaforma, dal vivo</span>
-      <h2 style="margin-top:16px">Entra nella demo di DHLNurses</h2>
-      <p>Hai visto il modello. Ora esplora il gestionale che lo rende operativo: pipeline dei candidati, gestione documentale, matching tecnico e coordinamento tra i due team — con dati dimostrativi.</p>
+      <span class="eyebrow" data-i18n="ctaEyebrow">La piattaforma, dal vivo</span>
+      <h2 style="margin-top:16px" data-i18n="ctaH2">Entra nella demo di DHLNurses</h2>
+      <p data-i18n="ctaP">Hai visto il modello. Ora esplora il gestionale che lo rende operativo: pipeline dei candidati, gestione documentale, matching tecnico e coordinamento tra i due team — con dati dimostrativi.</p>
       <div class="btns">
         <a href="./app.html" class="btn btn-primary">
-          Apri la demo DHLNurses
+          <span data-i18n="ctaOpen">Apri la demo DHLNurses</span>
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
         </a>
-        <a href="mailto:clauditavi@gmail.com?subject=Investimento%20DHL%20Nurses" class="btn btn-ghost">
+        <a href="mailto:clauditavi@gmail.com?subject=DominicaHealthLink" class="btn btn-ghost">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
-          Parla con noi
+          <span data-i18n="ctaTalk">Parla con noi</span>
         </a>
       </div>
-      <p class="cta-note">Ambiente dimostrativo · dati fittizi · nessun login richiesto</p>
+      <p class="cta-note" data-i18n="ctaNote">Ambiente dimostrativo · dati fittizi · nessun login richiesto</p>
     </div>
   </div>
 </section>
@@ -696,200 +701,423 @@ footer.ft .links a:hover{color:var(--indigo-500)}
       DominicaHealthLink
     </div>
     <div class="links">
-      <a href="#pipeline">Percorso</a>
-      <a href="#cronologia">Cronologia</a>
-      <a href="#matching">Matching</a>
+      <a href="#pipeline" data-i18n="navPercorso">Percorso</a>
+      <a href="#cronologia" data-i18n="navCronologia">Cronologia</a>
+      <a href="#matching" data-i18n="navMatching">Matching</a>
       <a href="./app.html">Demo</a>
     </div>
-    <div class="muted">© 2026 DominicaHealthLink · DHL Nurses è la piattaforma operativa del progetto</div>
+    <div class="muted" data-i18n="footCopy">© 2026 DominicaHealthLink · DHL Nurses è la piattaforma operativa del progetto</div>
   </div>
 </footer>
 
 <script>
-/* ---------- DATA: 12 phases (RD 1–5, IT 6–12) ---------- */
+/* =====================================================================================
+   i18n — IT / ES. Uses the same localStorage key (dhl.lang) as the gestionale, so the
+   language picked here carries over when the visitor enters the demo.
+   ===================================================================================== */
+const I18N = {
+  it: {
+    docTitle:'DominicaHealthLink · Mobilità sanitaria di precisione — Repubblica Dominicana → Italia',
+    brandSub:'Mobilità sanitaria di precisione',
+    navProblema:'Problema', navSoluzione:'Soluzione', navPercorso:'Percorso', navCronologia:'Cronologia',
+    navMatching:'Matching', navPiattaforma:'Piattaforma', navValore:'Valore',
+    ctaDemo:'Entra nella demo', ctaModello:'Esplora il modello',
+    heroEyebrow:'Repubblica Dominicana → Italia',
+    heroH1:'Non reclutiamo infermieri.<br><span class="hl">Facciamo matching clinico</span> di precisione.',
+    heroLead:'<b>DominicaHealthLink</b> trasforma la mobilità sanitaria internazionale da operazione logistica a <b>investimento in efficienza clinica</b>. Due team, dodici fasi e un\'unica fonte di verità digitale — la piattaforma <b>DHL Nurses</b> — che collega ogni competenza certificata al reparto giusto.',
+    statFasi:'Fasi operative', statTeam:'Team geografici', statTitoli:'Titoli asseverati', statSot:'Single source of truth',
+    console:'DHLNurses · Console', realtime:'Real-time',
+    teamRD:'Team RD · Fasi 1–5', teamIT:'Team IT · Fasi 6–12',
+    chipRd1:'Accordi associazioni', chipRd2:'Selezione', chipRd3:'Documenti asseverati', chipRd4:'Formazione', chipRd5:'Viaggio',
+    chipIt1:'Accordi aziende', chipIt2:'Alloggi e servizi', chipIt3:'Matching clinico', chipIt4:'Rapporto di lavoro', chipIt5:'Arrivo & tutor',
+    matchBar:'Compatibilità profilo → reparto',
+    probEyebrow:'Il problema',
+    probH2:'La sanità italiana non ha bisogno di più numeri. Ha bisogno delle competenze giuste.',
+    probP:'Il reclutamento tradizionale è generico, lento e burocraticamente fragile. Il risultato è personale allocato "a tamponamento", inserimenti inefficaci e turnover elevato.',
+    prob1T:'Matching generico',
+    prob1D:'L\'infermiere arriva senza allineamento tra le sue specializzazioni e le reali necessità del reparto. Competenze pregiate restano inutilizzate.',
+    prob2T:'Colli di bottiglia burocratici',
+    prob2D:'Titoli non tradotti né asseverati correttamente bloccano l\'iter ministeriale, dilatando i tempi di inserimento in reparto.',
+    prob3T:'Turnover e costi nascosti',
+    prob3D:'Senza stabilità legale, fiscale e abitativa, il professionista abbandona: ogni sostituzione azzera l\'investimento fatto sull\'inserimento.',
+    solEyebrow:'La soluzione',
+    solH2:'Dal reclutamento generico al <span style="color:var(--indigo-500)">matching tecnico</span>',
+    solP:'Analizziamo preventivamente i bisogni dei reparti e mappiamo i profili con granularità scientifica. Ogni infermiere è allocato dove le sue specializzazioni generano valore immediato.',
+    solBadTag:'Modello tradizionale', solBadH3:'Tamponamento numerico',
+    solBad1:'Profilo scelto sulla disponibilità, non sulle competenze',
+    solBad2:'Documentazione verificata a valle, con ritardi',
+    solBad3:'Onboarding lungo e inserimento inefficace',
+    solBad4:'Nessun supporto post-arrivo → turnover',
+    solGoodTag:'Modello DominicaHealthLink', solGoodH3:'Precisione chirurgica',
+    solGood1:'Profilo scelto per specializzazione clinica certificata',
+    solGood2:'Titoli asseverati e tradotti <b>prima</b> della partenza',
+    solGood3:'Lead-time ridotto: professionista "ready-to-work"',
+    solGood4:'Tutoraggio legale, fiscale e abitativo → ROI a lungo termine',
+    pipeEyebrow:'Percorso end-to-end',
+    pipeH2:'12 fasi, 2 team, zero passaggi ciechi',
+    pipeP:'Ogni fase è tracciata su DHLNurses. Seleziona una tappa per vedere cosa accade — e come i due team si passano il testimone senza perdere informazioni.',
+    cronEyebrow:'Cronologia operativa',
+    cronH2:'Da T.0 a T.7: quando accade cosa',
+    cronP:'Le 12 fasi si eseguono in parallelo tra i due team. Il <b>Matching (T.3) precede il viaggio e il contratto</b>: il candidato parte solo con uno sbocco clinico già assegnato.',
+    matchEyebrow:'★ Il cuore del protocollo',
+    matchH2:'Matching tecnico, in azione',
+    matchP:'L\'ospedale specifica il reparto e le competenze necessarie. DHLNurses interroga il database dei profili certificati dal Team RD ed estrae il candidato ideale. Prova tu:',
+    matchLeftH4:'Richiesta struttura sanitaria', matchQ:'Di quale reparto hai bisogno?',
+    matchDb:'DHLNurses · Query database',
+    step1:'Interrogazione', step2:'Identificazione', step3:'Validazione', step4:'Proposta',
+    matchEmpty:'Seleziona un reparto per avviare il matching',
+    metaTitoli:'Titoli asseverati', metaDossier:'Dossier "Italia in tasca"',
+    platEyebrow:'La piattaforma',
+    platH2:'DHLNurses: <span style="color:var(--indigo-500)">l\'unica fonte di verità</span>',
+    platP:'Curricula, titoli ed esperienze digitalizzati integralmente. Il Team RD inserisce, il Team IT interroga — dati in tempo reale, zero asincronie informative.',
+    sotRdT:'Inserimento dati — Team RD',
+    sotRd1:'Caricamento e aggiornamento dei profili professionali',
+    sotRd2:'Inserimento delle specialità cliniche verificate',
+    sotRd3:'Upload della documentazione asseverata e tradotta',
+    sotRd4:'Validazione del dossier formativo "Italia in tasca"',
+    sotItT:'Interrogazione ed estrazione — Team IT',
+    sotIt1:'Ricezione e analisi dei fabbisogni dalle strutture',
+    sotIt2:'Interrogazione del database tramite filtri di competenza',
+    sotIt3:'Estrazione dei profili idonei per la proposta contrattuale',
+    sotIt4:'Monitoraggio della conformità per l\'inserimento in reparto',
+    valEyebrow:'Perché investire', valH2:'Quattro leve di valore misurabile',
+    valP:'Non vendiamo un servizio di reclutamento: costruiamo un asset di efficienza clinica per le strutture sanitarie, con un ritorno sull\'investimento a lungo termine.',
+    val1T:'Efficienza operativa', val1D:'Minimizzazione del lead-time tra fabbisogno ospedaliero e operatività del professionista.',
+    val2T:'Certezza del diritto', val2D:'Validazione documentale asseverata e conformità normativa totale lungo tutta la filiera.',
+    val3T:'Specializzazione clinica', val3D:'Allineamento tecnico tra esperienza certificata e unità operativa: Area Critica, Nefrologia, Chirurgia.',
+    val4T:'ROI a lungo termine', val4D:'Welfare e assistenza riducono il turnover e i costi di sostituzione del personale.',
+    met1:'Fasi presidiate end-to-end', met2:'Documenti asseverati pre-partenza', met3:'Single source of truth', met4:'Aree cliniche mappate',
+    ctaEyebrow:'La piattaforma, dal vivo', ctaH2:'Entra nella demo di DHLNurses',
+    ctaP:'Hai visto il modello. Ora esplora il gestionale che lo rende operativo: pipeline dei candidati, gestione documentale, matching tecnico e coordinamento tra i due team — con dati dimostrativi.',
+    ctaOpen:'Apri la demo DHLNurses', ctaTalk:'Parla con noi',
+    ctaNote:'Ambiente dimostrativo · dati fittizi · nessun login richiesto',
+    footCopy:'© 2026 DominicaHealthLink · DHL Nurses è la piattaforma operativa del progetto',
+    keyPhase:'★ fase chiave', badgeRD:'Team RD', badgeIT:'Team IT', badgeUT:'Una Tantum', badgeOP:'Oper',
+  },
+  es: {
+    docTitle:'DominicaHealthLink · Movilidad sanitaria de precisión — República Dominicana → Italia',
+    brandSub:'Movilidad sanitaria de precisión',
+    navProblema:'Problema', navSoluzione:'Solución', navPercorso:'Recorrido', navCronologia:'Cronología',
+    navMatching:'Matching', navPiattaforma:'Plataforma', navValore:'Valor',
+    ctaDemo:'Entrar en la demo', ctaModello:'Explora el modelo',
+    heroEyebrow:'República Dominicana → Italia',
+    heroH1:'No reclutamos enfermeros.<br><span class="hl">Hacemos matching clínico</span> de precisión.',
+    heroLead:'<b>DominicaHealthLink</b> transforma la movilidad sanitaria internacional de operación logística a <b>inversión en eficiencia clínica</b>. Dos equipos, doce fases y una única fuente de verdad digital — la plataforma <b>DHL Nurses</b> — que conecta cada competencia certificada con la unidad adecuada.',
+    statFasi:'Fases operativas', statTeam:'Equipos geográficos', statTitoli:'Títulos legalizados', statSot:'Single source of truth',
+    console:'DHLNurses · Consola', realtime:'Tiempo real',
+    teamRD:'Equipo RD · Fases 1–5', teamIT:'Equipo IT · Fases 6–12',
+    chipRd1:'Acuerdos asociaciones', chipRd2:'Selección', chipRd3:'Documentos legalizados', chipRd4:'Formación', chipRd5:'Viaje',
+    chipIt1:'Acuerdos empresas', chipIt2:'Alojamiento y servicios', chipIt3:'Matching clínico', chipIt4:'Relación laboral', chipIt5:'Llegada y tutor',
+    matchBar:'Compatibilidad perfil → unidad',
+    probEyebrow:'El problema',
+    probH2:'La sanidad italiana no necesita más números. Necesita las competencias adecuadas.',
+    probP:'La contratación tradicional es genérica, lenta y burocráticamente frágil. El resultado es personal asignado "para tapar huecos", incorporaciones ineficaces y alta rotación.',
+    prob1T:'Matching genérico',
+    prob1D:'El enfermero llega sin alineación entre sus especializaciones y las necesidades reales de la unidad. Competencias valiosas quedan sin utilizar.',
+    prob2T:'Cuellos de botella burocráticos',
+    prob2D:'Títulos no traducidos ni legalizados correctamente bloquean el trámite ministerial, dilatando los tiempos de incorporación.',
+    prob3T:'Rotación y costes ocultos',
+    prob3D:'Sin estabilidad legal, fiscal y de vivienda, el profesional abandona: cada sustitución anula la inversión realizada en la incorporación.',
+    solEyebrow:'La solución',
+    solH2:'De la contratación genérica al <span style="color:var(--indigo-500)">matching técnico</span>',
+    solP:'Analizamos previamente las necesidades de las unidades y mapeamos los perfiles con granularidad científica. Cada enfermero se asigna donde sus especializaciones generan valor inmediato.',
+    solBadTag:'Modelo tradicional', solBadH3:'Relleno numérico',
+    solBad1:'Perfil elegido por disponibilidad, no por competencias',
+    solBad2:'Documentación verificada al final, con retrasos',
+    solBad3:'Onboarding largo e incorporación ineficaz',
+    solBad4:'Sin apoyo tras la llegada → rotación',
+    solGoodTag:'Modelo DominicaHealthLink', solGoodH3:'Precisión quirúrgica',
+    solGood1:'Perfil elegido por especialización clínica certificada',
+    solGood2:'Títulos legalizados y traducidos <b>antes</b> de la salida',
+    solGood3:'Lead-time reducido: profesional "ready-to-work"',
+    solGood4:'Tutoría legal, fiscal y de vivienda → ROI a largo plazo',
+    pipeEyebrow:'Recorrido end-to-end',
+    pipeH2:'12 fases, 2 equipos, cero pasos a ciegas',
+    pipeP:'Cada fase se registra en DHLNurses. Selecciona una etapa para ver qué ocurre — y cómo los dos equipos se pasan el testigo sin perder información.',
+    cronEyebrow:'Cronología operativa',
+    cronH2:'De T.0 a T.7: qué ocurre y cuándo',
+    cronP:'Las 12 fases se ejecutan en paralelo entre los dos equipos. El <b>Matching (T.3) precede al viaje y al contrato</b>: el candidato parte solo con un destino clínico ya asignado.',
+    matchEyebrow:'★ El corazón del protocolo',
+    matchH2:'Matching técnico, en acción',
+    matchP:'El hospital especifica la unidad y las competencias necesarias. DHLNurses consulta la base de datos de perfiles certificados por el Equipo RD y extrae el candidato ideal. Pruébalo:',
+    matchLeftH4:'Solicitud del centro sanitario', matchQ:'¿Qué unidad necesitas?',
+    matchDb:'DHLNurses · Consulta base de datos',
+    step1:'Consulta', step2:'Identificación', step3:'Validación', step4:'Propuesta',
+    matchEmpty:'Selecciona una unidad para iniciar el matching',
+    metaTitoli:'Títulos legalizados', metaDossier:'Dossier "Italia in tasca"',
+    platEyebrow:'La plataforma',
+    platH2:'DHLNurses: <span style="color:var(--indigo-500)">la única fuente de verdad</span>',
+    platP:'Currículos, títulos y experiencias digitalizados íntegramente. El Equipo RD introduce, el Equipo IT consulta — datos en tiempo real, cero asincronías informativas.',
+    sotRdT:'Introducción de datos — Equipo RD',
+    sotRd1:'Carga y actualización de los perfiles profesionales',
+    sotRd2:'Introducción de las especialidades clínicas verificadas',
+    sotRd3:'Subida de la documentación legalizada y traducida',
+    sotRd4:'Validación del dossier formativo "Italia in tasca"',
+    sotItT:'Consulta y extracción — Equipo IT',
+    sotIt1:'Recepción y análisis de las necesidades de los centros',
+    sotIt2:'Consulta de la base de datos mediante filtros de competencia',
+    sotIt3:'Extracción de los perfiles idóneos para la propuesta contractual',
+    sotIt4:'Seguimiento del cumplimiento para la incorporación',
+    valEyebrow:'Por qué invertir', valH2:'Cuatro palancas de valor medible',
+    valP:'No vendemos un servicio de contratación: construimos un activo de eficiencia clínica para los centros sanitarios, con un retorno de la inversión a largo plazo.',
+    val1T:'Eficiencia operativa', val1D:'Minimización del lead-time entre la necesidad hospitalaria y la operatividad del profesional.',
+    val2T:'Seguridad jurídica', val2D:'Validación documental legalizada y conformidad normativa total en toda la cadena.',
+    val3T:'Especialización clínica', val3D:'Alineación técnica entre experiencia certificada y unidad operativa: Área Crítica, Nefrología, Cirugía.',
+    val4T:'ROI a largo plazo', val4D:'El bienestar y la asistencia reducen la rotación y los costes de sustitución del personal.',
+    met1:'Fases cubiertas end-to-end', met2:'Documentos legalizados antes de la salida', met3:'Single source of truth', met4:'Áreas clínicas mapeadas',
+    ctaEyebrow:'La plataforma, en vivo', ctaH2:'Entra en la demo de DHLNurses',
+    ctaP:'Has visto el modelo. Ahora explora el sistema de gestión que lo hace operativo: pipeline de candidatos, gestión documental, matching técnico y coordinación entre los dos equipos — con datos de demostración.',
+    ctaOpen:'Abrir la demo DHLNurses', ctaTalk:'Habla con nosotros',
+    ctaNote:'Entorno de demostración · datos ficticios · sin necesidad de login',
+    footCopy:'© 2026 DominicaHealthLink · DHL Nurses es la plataforma operativa del proyecto',
+    keyPhase:'★ fase clave', badgeRD:'Equipo RD', badgeIT:'Equipo IT', badgeUT:'Una Tantum', badgeOP:'Oper',
+  },
+};
+
+/* ---------- DATA: 12 phases (RD 1–5, IT 6–12), bilingual ---------- */
 const PHASES = [
-  {n:1,team:'rd',name:'Accordi quadro associazioni',emoji:'🤝',
-   desc:'Selezione esclusiva di strutture (cooperative o agenzie) riconosciute dal governo dominicano. È il livello strutturale del progetto: si stabiliscono gli accordi quadro entro cui opererà tutta la filiera dominicana.',
-   tantum:['UNA TANTUM · Accordi quadro']},
-  {n:2,team:'rd',name:'Selezione e Reclutamento',emoji:'🔎',
-   desc:'Verifica delle competenze e delle specializzazioni infermieristiche dei candidati proposti dalle associazioni selezionate. È la fase transazionale che qualifica il singolo profilo.',
-   tantum:['OPER · Verifica competenze']},
-  {n:3,team:'rd',name:'Gestione Documentale',emoji:'📑',
-   desc:'La fase cruciale, gestita su DHLNurses. Titoli di studio tradotti e asseverati legalmente, apostille per la validità internazionale e raccolta della documentazione per l\'espatrio. Nessun collo di bottiglia ministeriale.',
-   tantum:['OPER · Asseverazione titoli','OPER · Documenti espatrio']},
-  {n:4,team:'rd',name:'Formazione',emoji:'🎓',
-   desc:'Preparazione del candidato con contenuti digitali e incontri online o in presenza, sul modello "Italia in tasca": formazione culturale, linguistica e tecnica, con assistenza diretta lungo il percorso.',
-   tantum:['OPER · Dossier "Italia in tasca"']},
-  {n:5,team:'rd',name:'Organizzazione Viaggio',emoji:'✈️',
-   desc:'Chiusura della fase dominicana con l\'acquisto del biglietto aereo e il trasferimento del professionista all\'aeroporto in territorio dominicano. Il profilo è ora "ready-to-work".',
-   tantum:['OPER · Biglietto e transfer']},
-  {n:6,team:'it',name:'Accordi quadro aziende',emoji:'🏥',
-   desc:'Contrattualizzazione preventiva delle aziende ospedaliere richiedenti: assicura che esistano già sbocchi lavorativi certi e regolamentati una volta completato l\'iter documentale e formativo.',
-   tantum:['UNA TANTUM · Contratti aziende']},
-  {n:7,team:'it',name:'Accordi alloggi e servizi',emoji:'🏠',
-   desc:'Accordi quadro per la fornitura di alloggi e utenze ai candidati in arrivo, almeno per un primo periodo, e accordi preventivi con professionisti legali, fiscali, assicurativi e finanziari a condizioni agevolate.',
-   tantum:['UNA TANTUM · Alloggi e utenze','UNA TANTUM · Servizi professionali']},
-  {n:8,team:'it',name:'Matching',emoji:'🎯',star:true,
-   desc:'Il cuore del protocollo. Il Team IT inserisce in DHLNurses le richieste delle strutture sanitarie (competenze e specializzazioni per reparto) e gestisce l\'incrocio: interroga il database dei profili caricati dal Team RD per individuare quello che meglio risponde alle competenze richieste. L\'inserimento non è generico, ma mirato all\'efficienza operativa.',
-   tantum:['OPER · Inserimento richieste','OPER · Incrocio domanda/offerta']},
-  {n:9,team:'it',name:'Rapporto di Lavoro',emoji:'📝',
-   desc:'In base ai singoli contratti si identifica il datore di lavoro (agenzia interinale, cooperativa o azienda ospedaliera) e si gestisce con continuità la relazione lavorativa, incluse eventuali controversie e il welfare aziendale.',
-   tantum:['OPER · Gestione rapporto']},
-  {n:10,team:'it',name:'Arrivo in Italia',emoji:'🛬',
-   desc:'Gestione operativa dell\'accoglienza in aeroporto e del trasferimento verso l\'alloggio prestabilito. La logistica è già pronta quando il professionista atterra.',
-   tantum:['OPER · Accoglienza & transfer']},
-  {n:11,team:'it',name:'Domicilio e Servizi',emoji:'🔑',
-   desc:'Gestione operativa dei contratti di alloggio e servizi in corso, attivati sugli accordi quadro stipulati preventivamente. Stabilità abitativa dal primo giorno.',
-   tantum:['OPER · Contratti in corso']},
-  {n:12,team:'it',name:'Tutor e Assistenza',emoji:'🧭',
-   desc:'Organizzazione di servizi socio-culturali, corsi di formazione e attività ricreative per coltivare un sentiment di community, oltre all\'assistenza del lavoratore per le problematiche extra-lavorative: meno turnover, più fidelizzazione.',
-   tantum:['OPER · Community & welfare']},
+  {n:1,team:'rd',emoji:'🤝',
+   it:{name:'Accordi quadro associazioni',
+     desc:'Selezione esclusiva di strutture (cooperative o agenzie) riconosciute dal governo dominicano. È il livello strutturale del progetto: si stabiliscono gli accordi quadro entro cui opererà tutta la filiera dominicana.',
+     tantum:['UNA TANTUM · Accordi quadro']},
+   es:{name:'Acuerdos marco con asociaciones',
+     desc:'Selección exclusiva de estructuras (cooperativas o agencias) reconocidas por el gobierno dominicano. Es el nivel estructural del proyecto: se establecen los acuerdos marco en los que operará toda la cadena dominicana.',
+     tantum:['UNA TANTUM · Acuerdos marco']}},
+  {n:2,team:'rd',emoji:'🔎',
+   it:{name:'Selezione e Reclutamento',
+     desc:'Verifica delle competenze e delle specializzazioni infermieristiche dei candidati proposti dalle associazioni selezionate. È la fase transazionale che qualifica il singolo profilo.',
+     tantum:['OPER · Verifica competenze']},
+   es:{name:'Selección y Reclutamiento',
+     desc:'Verificación de las competencias y especializaciones de enfermería de los candidatos propuestos por las asociaciones seleccionadas. Es la fase transaccional que cualifica el perfil individual.',
+     tantum:['OPER · Verificación de competencias']}},
+  {n:3,team:'rd',emoji:'📑',
+   it:{name:'Gestione Documentale',
+     desc:'La fase cruciale, gestita su DHLNurses. Titoli di studio tradotti e asseverati legalmente, apostille per la validità internazionale e raccolta della documentazione per l\'espatrio. Nessun collo di bottiglia ministeriale.',
+     tantum:['OPER · Asseverazione titoli','OPER · Documenti espatrio']},
+   es:{name:'Gestión Documental',
+     desc:'La fase crucial, gestionada en DHLNurses. Títulos de estudio traducidos y legalizados, apostilla para la validez internacional y recogida de la documentación para la expatriación. Ningún cuello de botella ministerial.',
+     tantum:['OPER · Legalización de títulos','OPER · Documentos de expatriación']}},
+  {n:4,team:'rd',emoji:'🎓',
+   it:{name:'Formazione',
+     desc:'Preparazione del candidato con contenuti digitali e incontri online o in presenza, sul modello "Italia in tasca": formazione culturale, linguistica e tecnica, con assistenza diretta lungo il percorso.',
+     tantum:['OPER · Dossier "Italia in tasca"']},
+   es:{name:'Formación',
+     desc:'Preparación del candidato con contenidos digitales y encuentros online o presenciales, según el modelo "Italia in tasca": formación cultural, lingüística y técnica, con asistencia directa durante todo el recorrido.',
+     tantum:['OPER · Dossier "Italia in tasca"']}},
+  {n:5,team:'rd',emoji:'✈️',
+   it:{name:'Organizzazione Viaggio',
+     desc:'Chiusura della fase dominicana con l\'acquisto del biglietto aereo e il trasferimento del professionista all\'aeroporto in territorio dominicano. Il profilo è ora "ready-to-work".',
+     tantum:['OPER · Biglietto e transfer']},
+   es:{name:'Organización del Viaje',
+     desc:'Cierre de la fase dominicana con la compra del billete de avión y el traslado del profesional al aeropuerto en territorio dominicano. El perfil ya está "ready-to-work".',
+     tantum:['OPER · Billete y traslado']}},
+  {n:6,team:'it',emoji:'🏥',
+   it:{name:'Accordi quadro aziende',
+     desc:'Contrattualizzazione preventiva delle aziende ospedaliere richiedenti: assicura che esistano già sbocchi lavorativi certi e regolamentati una volta completato l\'iter documentale e formativo.',
+     tantum:['UNA TANTUM · Contratti aziende']},
+   es:{name:'Acuerdos marco con empresas',
+     desc:'Contractualización previa de las empresas hospitalarias solicitantes: asegura que ya existan salidas laborales ciertas y reguladas una vez completado el trámite documental y formativo.',
+     tantum:['UNA TANTUM · Contratos con empresas']}},
+  {n:7,team:'it',emoji:'🏠',
+   it:{name:'Accordi alloggi e servizi',
+     desc:'Accordi quadro per la fornitura di alloggi e utenze ai candidati in arrivo, almeno per un primo periodo, e accordi preventivi con professionisti legali, fiscali, assicurativi e finanziari a condizioni agevolate.',
+     tantum:['UNA TANTUM · Alloggi e utenze','UNA TANTUM · Servizi professionali']},
+   es:{name:'Acuerdos alojamiento y servicios',
+     desc:'Acuerdos marco para el suministro de alojamiento y servicios a los candidatos que llegan, al menos durante un primer periodo, y acuerdos previos con profesionales legales, fiscales, de seguros y financieros en condiciones ventajosas.',
+     tantum:['UNA TANTUM · Alojamiento y suministros','UNA TANTUM · Servicios profesionales']}},
+  {n:8,team:'it',emoji:'🎯',star:true,
+   it:{name:'Matching',
+     desc:'Il cuore del protocollo. Il Team IT inserisce in DHLNurses le richieste delle strutture sanitarie (competenze e specializzazioni per reparto) e gestisce l\'incrocio: interroga il database dei profili caricati dal Team RD per individuare quello che meglio risponde alle competenze richieste. L\'inserimento non è generico, ma mirato all\'efficienza operativa.',
+     tantum:['OPER · Inserimento richieste','OPER · Incrocio domanda/offerta']},
+   es:{name:'Matching',
+     desc:'El corazón del protocolo. El Equipo IT introduce en DHLNurses las solicitudes de los centros sanitarios (competencias y especializaciones por unidad) y gestiona el cruce: consulta la base de datos de perfiles cargados por el Equipo RD para identificar el que mejor responde a las competencias requeridas. La incorporación no es genérica, sino orientada a la eficiencia operativa.',
+     tantum:['OPER · Introducción de solicitudes','OPER · Cruce oferta/demanda']}},
+  {n:9,team:'it',emoji:'📝',
+   it:{name:'Rapporto di Lavoro',
+     desc:'In base ai singoli contratti si identifica il datore di lavoro (agenzia interinale, cooperativa o azienda ospedaliera) e si gestisce con continuità la relazione lavorativa, incluse eventuali controversie e il welfare aziendale.',
+     tantum:['OPER · Gestione rapporto']},
+   es:{name:'Relación Laboral',
+     desc:'En función de cada contrato se identifica al empleador (empresa de trabajo temporal, cooperativa o la propia empresa hospitalaria) y se gestiona de forma continua la relación laboral, incluidas posibles controversias y el bienestar corporativo.',
+     tantum:['OPER · Gestión de la relación']}},
+  {n:10,team:'it',emoji:'🛬',
+   it:{name:'Arrivo in Italia',
+     desc:'Gestione operativa dell\'accoglienza in aeroporto e del trasferimento verso l\'alloggio prestabilito. La logistica è già pronta quando il professionista atterra.',
+     tantum:['OPER · Accoglienza & transfer']},
+   es:{name:'Llegada a Italia',
+     desc:'Gestión operativa de la acogida en el aeropuerto y del traslado al alojamiento previsto. La logística ya está lista cuando el profesional aterriza.',
+     tantum:['OPER · Acogida y traslado']}},
+  {n:11,team:'it',emoji:'🔑',
+   it:{name:'Domicilio e Servizi',
+     desc:'Gestione operativa dei contratti di alloggio e servizi in corso, attivati sugli accordi quadro stipulati preventivamente. Stabilità abitativa dal primo giorno.',
+     tantum:['OPER · Contratti in corso']},
+   es:{name:'Domicilio y Servicios',
+     desc:'Gestión operativa de los contratos de alojamiento y servicios en curso, activados sobre los acuerdos marco firmados previamente. Estabilidad habitacional desde el primer día.',
+     tantum:['OPER · Contratos en curso']}},
+  {n:12,team:'it',emoji:'🧭',
+   it:{name:'Tutor e Assistenza',
+     desc:'Organizzazione di servizi socio-culturali, corsi di formazione e attività ricreative per coltivare un sentiment di community, oltre all\'assistenza del lavoratore per le problematiche extra-lavorative: meno turnover, più fidelizzazione.',
+     tantum:['OPER · Community & welfare']},
+   es:{name:'Tutoría y Asistencia',
+     desc:'Organización de servicios socioculturales, cursos de formación y actividades recreativas para cultivar un sentimiento de comunidad, además de la asistencia al trabajador en cuestiones extralaborales: menos rotación, más fidelización.',
+     tantum:['OPER · Comunidad y bienestar']}},
 ];
 
-/* ---------- render pipeline ---------- */
+const TIMELINE=[
+  {t:'T.0',items:[
+    {team:'rd',type:'ut',it:'Accordi quadro con associazioni',es:'Acuerdos marco con asociaciones'},
+    {team:'it',type:'ut',it:'Accordi quadro con aziende ospedaliere',es:'Acuerdos marco con empresas hospitalarias'},
+    {team:'it',type:'ut',it:'Accordi alloggi, servizi e professionisti legali/fiscali',es:'Acuerdos de alojamiento, servicios y profesionales legales/fiscales'},
+  ]},
+  {t:'T.1',items:[
+    {team:'rd',type:'op',it:'Selezione e reclutamento',es:'Selección y reclutamiento'},
+    {team:'it',type:'op',it:'Inserimento richieste',es:'Introducción de solicitudes'},
+  ]},
+  {t:'T.2',items:[
+    {team:'rd',type:'op',it:'Gestione documentale',es:'Gestión documental'},
+    {team:'rd',type:'op',it:'Formazione',es:'Formación'},
+  ]},
+  {t:'T.3',items:[
+    {team:'it',type:'op',star:true,it:'Matching',es:'Matching'},
+  ]},
+  {t:'T.4',items:[
+    {team:'rd',type:'op',it:'Organizzazione viaggio',es:'Organización del viaje'},
+  ]},
+  {t:'T.5',items:[
+    {team:'it',type:'op',it:'Stipula contratto di lavoro',es:'Firma del contrato de trabajo'},
+  ]},
+  {t:'T.6',items:[
+    {team:'it',type:'op',it:'Arrivo in Italia',es:'Llegada a Italia'},
+  ]},
+  {t:'T.7',items:[
+    {team:'it',type:'op',it:'Gestione alloggio e servizi',es:'Gestión de alojamiento y servicios'},
+    {team:'it',type:'op',it:'Tutor e assistenza',es:'Tutoría y asistencia'},
+  ]},
+];
+
+const REPARTI=[
+  {id:'nefro',ic:'🩸',init:'MF',name:'María Fernández',fit:97,
+   it:{t:'Nefrologia',s:'Dialisi · gestione cronica',role:'Infermiera · 8 anni',exp:'Ospedale Santo Domingo',spec:'Dialisi certificata',
+     skills:[['Dialisi',1],['Emodialisi',1],['Gestione CVC',1],['Area cronica',0]]},
+   es:{t:'Nefrología',s:'Diálisis · gestión de crónicos',role:'Enfermera · 8 años',exp:'Hospital Santo Domingo',spec:'Diálisis certificada',
+     skills:[['Diálisis',1],['Hemodiálisis',1],['Gestión CVC',1],['Área de crónicos',0]]}},
+  {id:'critica',ic:'🚨',init:'JR',name:'José Ramírez',fit:95,
+   it:{t:'Area Critica / Rianimazione',s:'Terapia intensiva',role:'Infermiere · 10 anni',exp:'UCI · Santiago',spec:'Area Critica certificata',
+     skills:[['Terapia intensiva',1],['Ventilazione',1],['ACLS',1],['Emergenza',0]]},
+   es:{t:'Área Crítica / Reanimación',s:'Cuidados intensivos',role:'Enfermero · 10 años',exp:'UCI · Santiago',spec:'Área Crítica certificada',
+     skills:[['Cuidados intensivos',1],['Ventilación',1],['ACLS',1],['Emergencias',0]]}},
+  {id:'pediatria',ic:'🧸',init:'AG',name:'Ana Gómez',fit:94,
+   it:{t:'Pediatria',s:'Neonatologia · TIN',role:'Infermiera · 6 anni',exp:'Hospital Infantil',spec:'Pediatria certificata',
+     skills:[['Pediatria',1],['Neonatologia',1],['TIN',1],['Vaccinazioni',0]]},
+   es:{t:'Pediatría',s:'Neonatología · UCIN',role:'Enfermera · 6 años',exp:'Hospital Infantil',spec:'Pediatría certificada',
+     skills:[['Pediatría',1],['Neonatología',1],['UCIN',1],['Vacunación',0]]}},
+  {id:'chirurgia',ic:'🔪',init:'LP',name:'Luis Peña',fit:96,
+   it:{t:'Chirurgia / Sala Operatoria',s:'Strumentista',role:'Infermiere · 9 anni',exp:'Blocco operatorio · SD',spec:'Ferrista certificato',
+     skills:[['Sala operatoria',1],['Strumentista',1],['Sterilità',1],['Post-op',0]]},
+   es:{t:'Cirugía / Quirófano',s:'Instrumentista',role:'Enfermero · 9 años',exp:'Bloque quirúrgico · SD',spec:'Instrumentista certificado',
+     skills:[['Quirófano',1],['Instrumentista',1],['Esterilidad',1],['Post-op',0]]}},
+  {id:'emergenza',ic:'🚑',init:'CN',name:'Carla Núñez',fit:93,
+   it:{t:'Pronto Soccorso',s:'Triage · emergenza',role:'Infermiera · 7 anni',exp:'Emergencias · SD',spec:'Emergenza certificata',
+     skills:[['Triage',1],['Emergenza',1],['BLSD',1],['Traumi',0]]},
+   es:{t:'Urgencias',s:'Triaje · emergencias',role:'Enfermera · 7 años',exp:'Emergencias · SD',spec:'Emergencias certificada',
+     skills:[['Triaje',1],['Emergencias',1],['BLSD',1],['Traumatismos',0]]}},
+];
+
+/* ---------- language state ---------- */
+const SUPPORTED = ['it','es'];
+let lang = (function(){
+  try { const s = localStorage.getItem('dhl.lang'); if (SUPPORTED.indexOf(s) >= 0) return s; } catch(e){}
+  return (navigator.language || 'it').toLowerCase().indexOf('es') === 0 ? 'es' : 'it';
+})();
+const t = k => (I18N[lang] && I18N[lang][k]) || I18N.it[k] || '';
+
+/* ---------- renderers (re-run on language change) ---------- */
 const pipe = document.getElementById('pipe');
 const detail = document.getElementById('detail');
+const tl = document.getElementById('timeline');
+const reparti = document.getElementById('reparti');
+const matchOut = document.getElementById('matchOut');
+const mrSteps = document.getElementById('mrSteps').children;
 let activeTeams = {rd:true, it:true};
 let currentPhase = 8;
+let currentReparto = null;
+let matchTimer = null;
 
 function renderPipe(){
   pipe.innerHTML='';
   PHASES.forEach(p=>{
-    const hidden = !activeTeams[p.team];
     const node=document.createElement('div');
     node.className='node'+(p.n===currentPhase?' active':'')+(p.star?' matching-star':'');
     node.dataset.team=p.team;
-    node.style.opacity = hidden ? .32 : 1;
+    node.style.opacity = activeTeams[p.team] ? 1 : .32;
     node.innerHTML=`<span class="flag">${p.team==='rd'?'RD':'IT'}</span>
-      <span class="num">${p.n}</span><span class="nm">${p.name}</span>`;
+      <span class="num">${p.n}</span><span class="nm">${p[lang].name}</span>`;
     node.addEventListener('click',()=>{currentPhase=p.n; renderPipe(); renderDetail();});
     pipe.appendChild(node);
   });
 }
 function renderDetail(){
   const p=PHASES.find(x=>x.n===currentPhase);
-  const teamName = p.team==='rd'?'Team RD · Fasi 1–5':'Team IT · Fasi 6–12';
+  const d=p[lang];
   detail.innerHTML=`
     <div class="badge ${p.team}">${p.n}</div>
     <div>
-      <div class="dt-team ${p.team}">${teamName}</div>
-      <h3>${p.emoji} ${p.name} ${p.star?'<span style="color:var(--amber);font-size:16px">★ fase chiave</span>':''}</h3>
-      <p>${p.desc}</p>
-      <div class="tantum">${p.tantum.map(t=>{
-        const isU=t.startsWith('UNA');
-        return `<span class="pill ${isU?'u':'o'}">${t}</span>`;
-      }).join('')}</div>
+      <div class="dt-team ${p.team}">${p.team==='rd'?t('teamRD'):t('teamIT')}</div>
+      <h3>${p.emoji} ${d.name} ${p.star?`<span style="color:var(--amber);font-size:16px">${t('keyPhase')}</span>`:''}</h3>
+      <p>${d.desc}</p>
+      <div class="tantum">${d.tantum.map(x=>`<span class="pill ${x.indexOf('UNA')===0?'u':'o'}">${x}</span>`).join('')}</div>
     </div>`;
 }
-document.getElementById('tgRd').addEventListener('click',function(){
-  activeTeams.rd=!activeTeams.rd; this.classList.toggle('active',activeTeams.rd); renderPipe();
-});
-document.getElementById('tgIt').addEventListener('click',function(){
-  activeTeams.it=!activeTeams.it; this.classList.toggle('active',activeTeams.it); renderPipe();
-});
-renderPipe(); renderDetail();
-
-/* ---------- render timeline T.0–T.7 ---------- */
-const TIMELINE=[
-  {t:'T.0',items:[
-    {a:'Accordi quadro con associazioni',team:'rd',type:'ut'},
-    {a:'Accordi quadro con aziende ospedaliere',team:'it',type:'ut'},
-    {a:'Accordi alloggi, servizi e professionisti legali/fiscali',team:'it',type:'ut'},
-  ]},
-  {t:'T.1',items:[
-    {a:'Selezione e reclutamento',team:'rd',type:'op'},
-    {a:'Inserimento richieste',team:'it',type:'op'},
-  ]},
-  {t:'T.2',items:[
-    {a:'Gestione documentale',team:'rd',type:'op'},
-    {a:'Formazione',team:'rd',type:'op'},
-  ]},
-  {t:'T.3',items:[
-    {a:'Matching',team:'it',type:'op',star:true},
-  ]},
-  {t:'T.4',items:[
-    {a:'Organizzazione viaggio',team:'rd',type:'op'},
-  ]},
-  {t:'T.5',items:[
-    {a:'Stipula contratto di lavoro',team:'it',type:'op'},
-  ]},
-  {t:'T.6',items:[
-    {a:'Arrivo in Italia',team:'it',type:'op'},
-  ]},
-  {t:'T.7',items:[
-    {a:'Gestione alloggio e servizi',team:'it',type:'op'},
-    {a:'Tutor e assistenza',team:'it',type:'op'},
-  ]},
-];
-const tl=document.getElementById('timeline');
-tl.innerHTML=TIMELINE.map(step=>`
-  <div class="tl-step">
-    <div class="tnode"><span class="tdot">${step.t}</span><span class="tline"></span></div>
-    ${step.items.map(it=>`
-      <div class="tl-card">
-        <div class="ta">${it.star?'🎯 ':''}${it.a}</div>
-        <div class="tm">
-          <span class="tbadge ${it.team}">${it.team==='rd'?'Team RD':'Team IT'}</span>
-          <span class="tbadge ${it.type}">${it.type==='ut'?'Una Tantum':'Oper'}</span>
-        </div>
-      </div>`).join('')}
-  </div>`).join('');
-
-/* ---------- MATCHING DEMO ---------- */
-const REPARTI=[
-  {id:'nefro',ic:'🩸',t:'Nefrologia',s:'Dialisi · gestione cronica',
-   cand:{name:'María Fernández',init:'MF',role:'Infermiera · 8 anni',fit:97,
-     skills:[['Dialisi',1],['Emodialisi',1],['Gestione CVC',1],['Area cronica',0]],
-     exp:'Ospedale Santo Domingo',spec:'Dialisi certificata'}},
-  {id:'critica',ic:'🚨',t:'Area Critica / Rianimazione',s:'Terapia intensiva',
-   cand:{name:'José Ramírez',init:'JR',role:'Infermiere · 10 anni',fit:95,
-     skills:[['Terapia intensiva',1],['Ventilazione',1],['ACLS',1],['Emergenza',0]],
-     exp:'UCI · Santiago',spec:'Area Critica certificata'}},
-  {id:'pediatria',ic:'🧸',t:'Pediatria',s:'Neonatologia · TIN',
-   cand:{name:'Ana Gómez',init:'AG',role:'Infermiera · 6 anni',fit:94,
-     skills:[['Pediatria',1],['Neonatologia',1],['TIN',1],['Vaccinazioni',0]],
-     exp:'Hospital Infantil',spec:'Pediatria certificata'}},
-  {id:'chirurgia',ic:'🔪',t:'Chirurgia / Sala Operatoria',s:'Strumentista',
-   cand:{name:'Luis Peña',init:'LP',role:'Infermiere · 9 anni',fit:96,
-     skills:[['Sala operatoria',1],['Strumentista',1],['Sterilità',1],['Post-op',0]],
-     exp:'Blocco operatorio · SD',spec:'Ferrista certificato'}},
-  {id:'emergenza',ic:'🚑',t:'Pronto Soccorso',s:'Triage · emergenza',
-   cand:{name:'Carla Núñez',init:'CN',role:'Infermiera · 7 anni',fit:93,
-     skills:[['Triage',1],['Emergenza',1],['BLSD',1],['Traumi',0]],
-     exp:'Emergencias · SD',spec:'Emergenza certificata'}},
-];
-const reparti=document.getElementById('reparti');
-const matchOut=document.getElementById('matchOut');
-const mrSteps=document.getElementById('mrSteps').children;
-let matchTimer=null;
-
-REPARTI.forEach((r,i)=>{
-  const b=document.createElement('button');
-  b.className='reparto'; b.dataset.id=r.id;
-  b.innerHTML=`<span class="ri">${r.ic}</span><span><span class="rt">${r.t}</span><br><span class="rs">${r.s}</span></span>
-    <span class="arw"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>`;
-  b.addEventListener('click',()=>runMatch(r,b));
-  reparti.appendChild(b);
-});
-
+function renderTimeline(){
+  tl.innerHTML=TIMELINE.map(step=>`
+    <div class="tl-step">
+      <div class="tnode"><span class="tdot">${step.t}</span><span class="tline"></span></div>
+      ${step.items.map(it=>`
+        <div class="tl-card">
+          <div class="ta">${it.star?'🎯 ':''}${it[lang]}</div>
+          <div class="tm">
+            <span class="tbadge ${it.team}">${it.team==='rd'?t('badgeRD'):t('badgeIT')}</span>
+            <span class="tbadge ${it.type}">${it.type==='ut'?t('badgeUT'):t('badgeOP')}</span>
+          </div>
+        </div>`).join('')}
+    </div>`).join('');
+}
+function renderReparti(){
+  reparti.innerHTML='';
+  REPARTI.forEach(r=>{
+    const d=r[lang];
+    const b=document.createElement('button');
+    b.className='reparto'+(currentReparto===r.id?' active':'');
+    b.innerHTML=`<span class="ri">${r.ic}</span><span><span class="rt">${d.t}</span><br><span class="rs">${d.s}</span></span>
+      <span class="arw"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></span>`;
+    b.addEventListener('click',()=>runMatch(r,b));
+    reparti.appendChild(b);
+  });
+}
+function renderMatchEmpty(){
+  matchOut.innerHTML=`<div class="match-empty">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#475569" stroke-width="1.6" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m21 21-4.3-4.3"/></svg>
+      ${t('matchEmpty')}
+    </div>`;
+  [...mrSteps].forEach(s=>s.classList.remove('on','done'));
+}
 function runMatch(r,btn){
+  currentReparto=r.id;
   document.querySelectorAll('.reparto').forEach(x=>x.classList.remove('active'));
   btn.classList.add('active');
   clearTimeout(matchTimer); clearInterval(matchTimer);
-  [...mrSteps].forEach(s=>{s.classList.remove('on','done')});
-  const c=r.cand;
+  [...mrSteps].forEach(s=>s.classList.remove('on','done'));
+  const d=r[lang];
   matchOut.innerHTML=`
     <div class="cand" id="candCard">
       <div class="top">
-        <div class="av">${c.init}</div>
-        <div><div class="nmx">${c.name}</div><div class="role">${c.role} · ${c.exp}</div></div>
+        <div class="av">${r.init}</div>
+        <div><div class="nmx">${r.name}</div><div class="role">${d.role} · ${d.exp}</div></div>
         <div class="fitwrap"><div class="fit" id="fitv">0%</div><div class="fitl">MATCH</div></div>
       </div>
-      <div class="skills">${c.skills.map(s=>`<span class="skill ${s[1]?'hit':''}">${s[1]?'✓ ':''}${s[0]}</span>`).join('')}</div>
-      <div class="meta"><span>🎓 <b>${c.spec}</b></span><span>📑 <b>Titoli asseverati</b></span><span>✅ <b>Dossier "Italia in tasca"</b></span></div>
+      <div class="skills">${d.skills.map(s=>`<span class="skill ${s[1]?'hit':''}">${s[1]?'✓ ':''}${s[0]}</span>`).join('')}</div>
+      <div class="meta"><span>🎓 <b>${d.spec}</b></span><span>📑 <b>${t('metaTitoli')}</b></span><span>✅ <b>${t('metaDossier')}</b></span></div>
     </div>`;
-  const card=document.getElementById('candCard');
-  const fitv=document.getElementById('fitv');
+  const card=document.getElementById('candCard'), fitv=document.getElementById('fitv');
   let step=0;
   const seq=()=>{
     if(step<4){
@@ -900,7 +1128,7 @@ function runMatch(r,btn){
     } else {
       mrSteps[3].classList.replace('on','done');
       card.classList.add('show');
-      let v=0; const target=c.fit;
+      let v=0; const target=r.fit;
       matchTimer=setInterval(()=>{
         v+=Math.ceil((target-v)/6)||1;
         if(v>=target){v=target; clearInterval(matchTimer);}
@@ -911,12 +1139,45 @@ function runMatch(r,btn){
   seq();
 }
 
+/* ---------- apply language ---------- */
+function applyLang(next){
+  lang = next;
+  try { localStorage.setItem('dhl.lang', lang); } catch(e){}
+  document.documentElement.lang = lang;
+  document.title = t('docTitle');
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent = t(el.dataset.i18n); });
+  document.querySelectorAll('[data-i18n-html]').forEach(el=>{ el.innerHTML = t(el.dataset.i18nHtml); });
+  document.querySelectorAll('#langSw button').forEach(b=>b.classList.toggle('active', b.dataset.lang===lang));
+  renderPipe(); renderDetail(); renderTimeline(); renderReparti();
+  // Keep a selected candidate visible across a language switch, re-rendered in the new language.
+  if(currentReparto){
+    const r=REPARTI.find(x=>x.id===currentReparto);
+    const btn=[...document.querySelectorAll('.reparto')][REPARTI.indexOf(r)];
+    if(r&&btn) runMatch(r,btn);
+  } else {
+    renderMatchEmpty();
+  }
+}
+document.querySelectorAll('#langSw button').forEach(b=>{
+  b.addEventListener('click',()=>{ if(b.dataset.lang!==lang) applyLang(b.dataset.lang); });
+});
+
+/* ---------- pipeline team toggles ---------- */
+document.getElementById('tgRd').addEventListener('click',function(){
+  activeTeams.rd=!activeTeams.rd; this.classList.toggle('active',activeTeams.rd); renderPipe();
+});
+document.getElementById('tgIt').addEventListener('click',function(){
+  activeTeams.it=!activeTeams.it; this.classList.toggle('active',activeTeams.it); renderPipe();
+});
+
+applyLang(lang);
+
 /* ---------- COUNTERS ---------- */
 function animateCount(el){
   const target=+el.dataset.count, suffix=el.dataset.suffix||'';
-  let v=0; const dur=1100, t0=performance.now();
-  function tick(t){
-    const p=Math.min((t-t0)/dur,1); const e=1-Math.pow(1-p,3);
+  const dur=1100, t0=performance.now();
+  function tick(now){
+    const p=Math.min((now-t0)/dur,1); const e=1-Math.pow(1-p,3);
     el.textContent=Math.round(e*target)+suffix;
     if(p<1) requestAnimationFrame(tick);
   }
