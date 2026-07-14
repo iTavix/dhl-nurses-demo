@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-<title>DHL Nurses · Mobilità sanitaria di precisione — Repubblica Dominicana → Italia</title>
-<meta name="description" content="DHLNurses: la piattaforma che trasforma il reclutamento infermieristico internazionale in matching tecnico di precisione. 12 fasi, 2 team, un'unica fonte di verità." />
+<title>DominicaHealthLink · Mobilità sanitaria di precisione — Repubblica Dominicana → Italia</title>
+<meta name="description" content="DominicaHealthLink presenta il progetto di mobilità sanitaria Rep. Dominicana → Italia, operato tramite la piattaforma DHL Nurses: 12 fasi, 2 team, un'unica fonte di verità." />
 <meta name="theme-color" content="#4f46e5" />
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%234f46e5'/%3E%3Cpath d='M5 17h5l2-5 3 9 2-4h6' fill='none' stroke='white' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E" />
 <link rel="preconnect" href="https://fonts.googleapis.com" />
@@ -70,10 +70,14 @@ header.nav.scrolled{
   border-bottom:1px solid var(--line);
 }
 .brand{display:flex; align-items:center; gap:11px; font-weight:800; color:var(--ink); font-size:17px; letter-spacing:-.02em; white-space:nowrap; flex:none}
+/* Company mark: the DominicaHealthLink logo is a square PNG on white, so it sits in a
+   white tile (same treatment the gestionale uses in its own header). */
 .brand .logo{
-  width:38px;height:38px;border-radius:11px; display:grid; place-items:center;
-  background:var(--grad-brand); box-shadow:0 10px 22px rgba(79,70,229,.4); flex:none;
+  width:40px;height:40px;border-radius:11px; display:grid; place-items:center;
+  background:#fff; box-shadow:0 8px 20px rgba(15,23,42,.20); flex:none;
+  overflow:hidden; padding:3px;
 }
+.brand .logo img{width:100%;height:100%;object-fit:contain;display:block}
 .brand small{display:block; font-size:10.5px; font-weight:600; color:var(--muted); letter-spacing:.02em; margin-top:1px; white-space:nowrap}
 .nav-links{display:flex; align-items:center; gap:2px; flex:none}
 .nav-links a{padding:8px 10px; border-radius:9px; font-size:13.5px; font-weight:600; color:var(--ink-2); transition:.18s; white-space:nowrap}
@@ -354,12 +358,9 @@ footer.ft .links a:hover{color:var(--indigo-500)}
   <div class="bar">
     <a class="brand" href="#top">
       <span class="logo">
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>
-          <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/>
-        </svg>
+        <img src="/src/logo_dhl_nurses.png" alt="DominicaHealthLink" />
       </span>
-      <span>DHL Nurses<small>Mobilità sanitaria di precisione</small></span>
+      <span>DominicaHealthLink<small>Mobilità sanitaria di precisione</small></span>
     </a>
     <nav class="nav-links">
       <a href="#problema">Problema</a>
@@ -402,7 +403,7 @@ footer.ft .links a:hover{color:var(--indigo-500)}
       <div>
         <span class="eyebrow"><span class="pulse-dot"></span> Repubblica Dominicana &rarr; Italia</span>
         <h1>Non reclutiamo infermieri.<br><span class="hl">Facciamo matching clinico</span> di precisione.</h1>
-        <p class="lead">DHLNurses trasforma la mobilità sanitaria internazionale da operazione logistica a <b>investimento in efficienza clinica</b>. Due team, dodici fasi, un'unica fonte di verità digitale che collega ogni competenza certificata al reparto giusto.</p>
+        <p class="lead"><b>DominicaHealthLink</b> trasforma la mobilità sanitaria internazionale da operazione logistica a <b>investimento in efficienza clinica</b>. Due team, dodici fasi e un'unica fonte di verità digitale — la piattaforma <b>DHL Nurses</b> — che collega ogni competenza certificata al reparto giusto.</p>
         <div class="cta">
           <a href="./app.html" class="btn btn-primary">Entra nella demo
             <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
@@ -508,7 +509,7 @@ footer.ft .links a:hover{color:var(--indigo-500)}
         <div class="li x"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f43f5e" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m15 9-6 6M9 9l6 6"/></svg> Nessun supporto post-arrivo &rarr; turnover</div>
       </div>
       <div class="panel good reveal" data-d="2">
-        <span class="tag">Modello DHLNurses</span>
+        <span class="tag">Modello DominicaHealthLink</span>
         <h3>Precisione chirurgica</h3>
         <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Profilo scelto per specializzazione clinica certificata</div>
         <div class="li"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#10b981" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="9"/><path d="m8 12 3 3 5-6"/></svg> Titoli asseverati e tradotti <b>prima</b> della partenza</div>
@@ -689,10 +690,10 @@ footer.ft .links a:hover{color:var(--indigo-500)}
 <footer class="ft">
   <div class="wrap row">
     <div class="brand" style="font-size:15px">
-      <span class="logo" style="width:32px;height:32px;border-radius:9px">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>
+      <span class="logo" style="width:34px;height:34px;border-radius:9px">
+        <img src="/src/logo_dhl_nurses.png" alt="DominicaHealthLink" />
       </span>
-      DHL Nurses
+      DominicaHealthLink
     </div>
     <div class="links">
       <a href="#pipeline">Percorso</a>
@@ -700,7 +701,7 @@ footer.ft .links a:hover{color:var(--indigo-500)}
       <a href="#matching">Matching</a>
       <a href="./app.html">Demo</a>
     </div>
-    <div class="muted">© 2026 DHL Nurses · Mobilità sanitaria Rep. Dominicana → Italia</div>
+    <div class="muted">© 2026 DominicaHealthLink · DHL Nurses è la piattaforma operativa del progetto</div>
   </div>
 </footer>
 
