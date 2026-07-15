@@ -4697,7 +4697,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         '<rect x="46" y="118" width="82" height="4" rx="2" fill="#fecdd3"/>' +
         '<text x="292" y="118" text-anchor="end" ' + F + ' font-size="12" font-weight="800" fill="#e11d48">74 gg</text>');
     }
-    if (key === 'wl_s2') { // Workflow: two team bands + 9 phase nodes
+    if (key === 'wl_s2') { // Workflow: 3 one-off framework phases + two team bands + 9 phase nodes (3+9=12)
       const node = (x, n, kind) => {
         const fill = kind === 'done' ? '#10b981' : (kind === 'cur' ? '#4f46e5' : '#e2e8f0');
         const tx = kind === 'future' ? '#94a3b8' : '#ffffff';
@@ -4709,10 +4709,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
       let nodes = '<line x1="28" y1="98" x2="284" y2="98" stroke="#e2e8f0" stroke-width="2"/>';
       xs.forEach((x, i) => { const n = i + 1; nodes += node(x, n, n < 7 ? 'done' : (n === 7 ? 'cur' : 'future')); });
       return frame(
-        '<rect x="14" y="40" width="126" height="20" rx="6" fill="#e0f2fe" stroke="#bae6fd"/>' +
-        '<text x="77" y="54" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#0369a1">TEAM RD · 1–4</text>' +
-        '<rect x="146" y="40" width="160" height="20" rx="6" fill="#dcfce7" stroke="#bbf7d0"/>' +
-        '<text x="226" y="54" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#047857">TEAM ITALIA · 5–9</text>' +
+        '<rect x="14" y="34" width="292" height="16" rx="6" fill="#f5f3ff" stroke="#ddd6fe"/>' +
+        '<circle cx="26" cy="42" r="4" fill="#8b5cf6"/><circle cx="37" cy="42" r="4" fill="#8b5cf6"/><circle cx="48" cy="42" r="4" fill="#8b5cf6"/>' +
+        '<text x="180" y="46" text-anchor="middle" ' + F + ' font-size="8.5" font-weight="800" fill="#6d28d9">3× ACCORDI QUADRO · UNA TANTUM</text>' +
+        '<rect x="14" y="56" width="126" height="18" rx="6" fill="#e0f2fe" stroke="#bae6fd"/>' +
+        '<text x="77" y="69" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#0369a1">TEAM RD · 1–4</text>' +
+        '<rect x="146" y="56" width="160" height="18" rx="6" fill="#dcfce7" stroke="#bbf7d0"/>' +
+        '<text x="226" y="69" text-anchor="middle" ' + F + ' font-size="9" font-weight="800" fill="#047857">TEAM ITALIA · 5–9</text>' +
         nodes);
     }
     if (key === 'wl_s3') { // Privacy: signed consent sheet with green check
