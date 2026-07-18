@@ -63,7 +63,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   // Canonical JSON of every record as last CONFIRMED by the cloud (id → stableJson). Records whose
   // local JSON differs are "dirty" (edited here, not yet pushed): a remote snapshot must not
   // overwrite them. This turns the whole-array write into a per-record last-writer-wins merge.
-  let lastSynced = { nurses: {}, requests: {}, settingsJson: '' };
+  // Settings are 5 id-keyed collections: they get the same per-record merge as cases,
+  // so two admins editing base records at once no longer overwrite each other.
+  const SETTINGS_COLLECTIONS = ['agencies', 'employers', 'operators', 'docTypes', 'specialties'];
+  function emptySettingsBaseline() { const m = {}; SETTINGS_COLLECTIONS.forEach((k) => { m[k] = {}; }); return m; }
+  let lastSynced = { nurses: {}, requests: {}, settings: emptySettingsBaseline() };
   let remoteRenderTimer = null, lastRemoteToastAt = 0, sizeWarnShown = false;
   // Cap on per-nurse activity-log entries: keeps the single shared Firestore document
   // (hard limit ~1 MiB) from growing unbounded as cases accumulate history.
@@ -650,6 +654,21 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (s.statusFilter === 'opi') s.statusFilter = 'all';
     // Backfill the team field on operators saved before the two-team structure.
     (s.settings.operators || []).forEach((o) => { if (o.team === undefined) o.team = ''; });
+    // Migrate employer references saved as the bare facility NAME to the composed
+    // "name · city" label the catalogue uses everywhere (selects, usage counts, rename
+    // propagation). Only when the match is unambiguous: same-name facilities in two
+    // cities are left untouched.
+    {
+      const empLabel = {};
+      (s.settings.employers || []).forEach((e2) => {
+        if (!e2.city) return; // label == name, nothing to migrate
+        const label = e2.name + ' · ' + e2.city;
+        empLabel[e2.name] = (e2.name in empLabel) ? null : label; // null = ambiguous
+      });
+      const fixEmp = (obj) => { const l = empLabel[obj.employer]; if (l) obj.employer = l; };
+      (s.nurses || []).forEach(fixEmp);
+      (s.requests || []).forEach(fixEmp);
+    }
     // Backfill the personal anagrafica fields and document slots on every saved nurse.
     (s.nurses || []).forEach((n) => {
       // Migrate nurses saved with the legacy 11-state workflow: their checklist still
@@ -660,6 +679,9 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         n.checklist = makeChecklist({ __current: n.currentStep });
       }
       PERSONAL_FIELDS.forEach((k) => { if (n[k] === undefined) n[k] = ''; });
+      // languageLevel is rendered with .split() in the master list and the matching
+      // shortlist: a restored backup without it must not crash the render.
+      if (typeof n.languageLevel !== 'string') n.languageLevel = '';
       // Trim histories saved before the log cap existed (see MAX_LOG_ENTRIES).
       if (Array.isArray(n.logs) && n.logs.length > MAX_LOG_ENTRIES) n.logs.length = MAX_LOG_ENTRIES;
       // Structured clinical specialisations + matching assignment (matching protocol).
@@ -677,6 +699,29 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         if (docNames.indexOf(d.name.toLowerCase()) < 0) n.documents.push({ id: uid(), name: d.name, language: d.language, uploadDate: null, validity: null, status: 'missing', optional: !!d.optional });
       });
     });
+    // Referential reconciliation (restored backups, legacy data, partial merges): drop
+    // matched entries whose candidate no longer exists, clear matchedRequestId pointing to
+    // a missing request or not mirrored in the request's matched list, and realign the
+    // open/matched status of non-closed requests. Keeps candidates from being stuck
+    // "in matching" with no visible assignment to remove.
+    {
+      const nurseIds = {};
+      (s.nurses || []).forEach((n) => { if (n && n.id) nurseIds[n.id] = true; });
+      const matchedByReq = {};
+      (s.requests || []).forEach((r) => {
+        if (!r || !r.id) return;
+        r.matched = (r.matched || []).filter((m) => m && nurseIds[m.id]);
+        if (r.status !== 'closed') r.status = r.matched.length >= (r.quantity || 1) ? 'matched' : 'open';
+        const set = {};
+        r.matched.forEach((m) => { set[m.id] = true; });
+        matchedByReq[r.id] = set;
+      });
+      (s.nurses || []).forEach((n) => {
+        if (n.matchedRequestId && !(matchedByReq[n.matchedRequestId] && matchedByReq[n.matchedRequestId][n.id])) {
+          n.matchedRequestId = null; n.matchedDepartment = '';
+        }
+      });
+    }
     return s;
   }
   function serverTs() { return firebase.firestore.FieldValue.serverTimestamp(); }
@@ -705,9 +750,10 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
           .then(() => { lastSynced.nurses = writtenNurses; lastSynced.requests = writtenRequests; setSyncStatus('saved'); })
           .catch((err) => setSyncError(t('sync_ctx_cases'), err));
         if (isAdmin()) {
-          const settingsJson = stableJson(state.settings);
+          const writtenSettings = {};
+          SETTINGS_COLLECTIONS.forEach((k) => { writtenSettings[k] = snapshotMap(state.settings[k]); });
           data.doc('settings').set({ settings: state.settings, updatedAt: serverTs() }, { merge: true })
-            .then(() => { lastSynced.settingsJson = settingsJson; })
+            .then(() => { lastSynced.settings = writtenSettings; })
             .catch((err) => setSyncError(t('sync_ctx_settings'), err));
           // Access map: keeps Firestore authorization aligned with the HR operators
           // list, so accounts work without server-side custom claims.
@@ -830,14 +876,17 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (lastFilled) showToast(filled > 1 ? t('toast_req_filled_many', { n: filled }) : t('toast_req_filled', { s: requestLabel(lastFilled), n: lastFilled.quantity || 1 }), 'ok', 6000);
   }
   function applyRemoteSettings(remoteSettings) {
+    // Same per-record merge as cases, collection by collection: locally-edited records win
+    // (the pending push realigns the cloud), everything else follows the cloud. Two admins
+    // adding different records at the same time both survive.
     normalizeState(Object.assign({}, state, { settings: remoteSettings }));
-    const remoteJson = stableJson(remoteSettings);
-    const localJson = stableJson(state.settings);
-    if (remoteJson === localJson) { lastSynced.settingsJson = remoteJson; return; }
-    // An admin with unsaved local settings edits keeps them (their push will follow).
-    if (lastSynced.settingsJson && localJson !== lastSynced.settingsJson) return;
-    state.settings = remoteSettings;
-    lastSynced.settingsJson = remoteJson;
+    let changed = false;
+    SETTINGS_COLLECTIONS.forEach((k) => {
+      const before = stableJson(state.settings[k] || []);
+      state.settings[k] = mergeRecords(state.settings[k] || [], remoteSettings[k] || [], lastSynced.settings[k]);
+      if (stableJson(state.settings[k]) !== before) changed = true;
+    });
+    if (!changed) return;
     try { localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); } catch (e) { /* quota — ignore */ }
     safeRemoteRender();
   }
@@ -997,6 +1046,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const n = getNurse(nurseId);
     if (n) {
       n.matchedRequestId = null; n.matchedDepartment = '';
+      // The employer was set by the match: undoing it puts the candidate back "to assign".
+      if (n.employer === r.employer) n.employer = t('nn_default_employer');
       pushLog(n, 'alert', actorName(), t('log_unmatched', { s: r.employer, r: r.department || '—' }));
       n.lastUpdate = new Date().toISOString().slice(0, 10);
     }
@@ -1022,7 +1073,11 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (!confirm(t('mt_confirm_delete', { s: r.employer, r: r.department || '—' }))) return;
     (r.matched || []).forEach((m) => {
       const n = getNurse(m.id);
-      if (n) { n.matchedRequestId = null; n.matchedDepartment = ''; }
+      if (n) {
+        n.matchedRequestId = null; n.matchedDepartment = '';
+        // Same rule as unassignMatch: deleting the request frees the employer too.
+        if (n.employer === r.employer) n.employer = t('nn_default_employer');
+      }
     });
     state.requests = (state.requests || []).filter((x) => x.id !== reqId);
     commit();
@@ -1134,7 +1189,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function setFilter(v) { state.statusFilter = v; commit(); }
 
   function approveDoc(nurseId, docId) {
-    const n = getNurse(nurseId); const d = n.documents.find((x) => x.id === docId); if (!d) return;
+    const n = getNurse(nurseId); if (!n) return; // stale DOM: candidate removed by another operator
+    const d = n.documents.find((x) => x.id === docId); if (!d) return;
     if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     d.status = 'approved';
     if (!d.uploadDate) d.uploadDate = new Date().toISOString().slice(0, 10);
@@ -1143,7 +1199,8 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     commit();
   }
   function rejectDoc(nurseId, docId) {
-    const n = getNurse(nurseId); const d = n.documents.find((x) => x.id === docId); if (!d) return;
+    const n = getNurse(nurseId); if (!n) return; // stale DOM: candidate removed by another operator
+    const d = n.documents.find((x) => x.id === docId); if (!d) return;
     if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     d.status = 'missing'; d.uploadDate = null;
     d.fileName = null; d.fileUrl = null; d.fileSize = null; d.fileStoragePath = null;
@@ -1223,7 +1280,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   function toggleChecklist(nurseId, stepId, itemId) {
-    const n = getNurse(nurseId);
+    const n = getNurse(nurseId); if (!n) return; // stale DOM: candidate removed by another operator
     if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     const item = (n.checklist[stepId] || []).find((i) => i.id === itemId);
     if (!item) return;
@@ -1233,7 +1290,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
 
   function advanceStatus(nurseId) {
-    const n = getNurse(nurseId);
+    const n = getNurse(nurseId); if (!n) return; // stale DOM: candidate removed by another operator
     if (!canOperatePhase(n.currentStep)) return; // the other team's phase
     if (!canAdvance(n)) return;
     if (n.currentStep >= DONE_STEP) return;
@@ -1251,7 +1308,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     if (nurse.logs.length > MAX_LOG_ENTRIES) nurse.logs.length = MAX_LOG_ENTRIES;
   }
   function addLog(nurseId, type, text) {
-    const n = getNurse(nurseId);
+    const n = getNurse(nurseId); if (!n) return; // stale DOM: candidate removed by another operator
     const clean = (text || '').trim();
     if (!clean) return;
     pushLog(n, type, actorName(), clean);
@@ -1571,13 +1628,26 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     const q = (state.docSearch || '').trim().toLowerCase();
     const f = state.docFilter || 'all';
     const rows = [];
-    state.nurses.forEach((n) => (n.documents || []).forEach((d) => {
-      if (f === 'withfile') { if (!d.fileName) return; }
-      else if (f === 'expiring') { const ex = docExpiry(d); if (ex !== 'expired' && ex !== 'soon') return; }
-      else if (f !== 'all' && d.status !== f) return;
-      if (q && !((n.name || '').toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q) || (d.fileName || '').toLowerCase().includes(q))) return;
-      rows.push({ n: n, d: d });
-    }));
+    state.nurses.forEach((n) => {
+      (n.documents || []).forEach((d) => {
+        if (f === 'withfile') { if (!d.fileName) return; }
+        else if (f === 'expiring') { const ex = docExpiry(d); if (ex !== 'expired' && ex !== 'soon') return; }
+        else if (f !== 'all' && d.status !== f) return;
+        if (q && !((n.name || '').toLowerCase().includes(q) || (d.name || '').toLowerCase().includes(q) || (d.fileName || '').toLowerCase().includes(q))) return;
+        rows.push({ n: n, d: d });
+      });
+      // Identity expiry dates (passport/cédula) from the personal-data sheet: virtual rows,
+      // so the "expiring" archive list matches the dashboard KPI and expiry panel. They only
+      // appear when expired/expiring — they are dates to watch, not files to manage.
+      [{ k: 'passportExpiry', label: t('f_passport_exp') }, { k: 'cedulaExpiry', label: t('f_cedula_exp') }].forEach((fld) => {
+        if (!n[fld.k] || f === 'withfile' || (f !== 'all' && f !== 'expiring')) return;
+        const vd = { id: 'virt_' + fld.k + '_' + n.id, name: fld.label, language: '—', uploadDate: null, validity: n[fld.k], virtual: true };
+        const ex = docExpiry(vd);
+        if (ex !== 'expired' && ex !== 'soon') return;
+        if (q && !((n.name || '').toLowerCase().includes(q) || fld.label.toLowerCase().includes(q))) return;
+        rows.push({ n: n, d: vd });
+      });
+    });
     return rows;
   }
   function fileKind(name, url) {
@@ -1621,14 +1691,20 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
             '<th class="px-4 py-2.5">' + t('col_candidate') + '</th><th class="px-2 py-2.5">' + t('th_document') + '</th><th class="px-2 py-2.5">' + t('th_lang') + '</th><th class="px-2 py-2.5">' + t('th_uploaded') + '</th><th class="px-2 py-2.5">' + t('th_status') + '</th><th class="px-4 py-2.5 text-right">' + t('th_actions') + '</th>' +
           '</tr></thead><tbody>' +
           list.map((it) => {
-            const d = it.d, n = it.n, m = DOC_STATUS_CLS[d.status], icon = DOC_STATUS_ICON[d.status];
+            const d = it.d, n = it.n;
+            // Virtual identity-expiry rows have no file/status lifecycle: neutral badge.
+            const m = d.virtual ? 'bg-slate-100 text-slate-600 ring-slate-200' : DOC_STATUS_CLS[d.status];
+            const icon = d.virtual ? 'id-card' : DOC_STATUS_ICON[d.status];
+            const statusLbl = d.virtual ? t('tab_dati') : docStatusLabel(d.status);
             const ex = docExpiry(d);
             const exBadge = ex === 'expired'
               ? ' <span class="inline-flex items-center gap-1 rounded-full bg-rose-100 px-1.5 py-0.5 text-[10px] font-semibold text-rose-700 ring-1 ring-inset ring-rose-200"><i data-lucide="calendar-x" class="h-2.5 w-2.5"></i>' + t('exp_expired') + '</span>'
               : ex === 'soon'
                 ? ' <span class="inline-flex items-center gap-1 rounded-full bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold text-amber-700 ring-1 ring-inset ring-amber-200"><i data-lucide="calendar-clock" class="h-2.5 w-2.5"></i>' + t('exp_soon') + '</span>'
                 : '';
-            const act = d.fileName
+            const act = d.virtual
+              ? '<span class="text-xs text-slate-300">—</span>'
+              : d.fileName
               ? '<button data-action="view-doc" data-nurse="' + n.id + '" data-doc="' + d.id + '" class="inline-flex items-center gap-1 rounded-lg bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600 ring-1 ring-inset ring-indigo-200 transition hover:bg-indigo-100"><i data-lucide="eye" class="h-3 w-3"></i>' + t('doc_view') + '</button>'
               : '<span class="text-xs text-slate-300">' + t('doc_no_file') + '</span>';
             return '<tr class="border-b border-slate-100 last:border-0 hover:bg-slate-50/60">' +
@@ -1636,7 +1712,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
               '<td class="px-2 py-3 text-slate-700">' + escapeHtml(d.name) + (d.fileName ? '<span class="ml-1 text-slate-300">·</span> <span class="text-[11px] text-slate-400">' + escapeHtml(d.fileName) + '</span>' : '') + '</td>' +
               '<td class="px-2 py-3"><span class="inline-flex rounded-md bg-slate-100 px-1.5 py-0.5 text-[11px] font-semibold text-slate-500">' + escapeHtml(d.language) + '</span></td>' +
               '<td class="px-2 py-3 text-xs text-slate-500">' + formatDate(d.uploadDate) + '</td>' +
-              '<td class="px-2 py-3"><span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + m + '"><i data-lucide="' + icon + '" class="h-3 w-3"></i>' + docStatusLabel(d.status) + '</span>' + exBadge + '</td>' +
+              '<td class="px-2 py-3"><span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ring-1 ring-inset ' + m + '"><i data-lucide="' + icon + '" class="h-3 w-3"></i>' + statusLbl + '</span>' + exBadge + '</td>' +
               '<td class="px-4 py-3 text-right">' + act + '</td>' +
             '</tr>';
           }).join('') +
@@ -1703,8 +1779,13 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   function optValue(o) { return (o && typeof o === 'object') ? o.value : o; }
   function optLabel(o) { return (o && typeof o === 'object') ? (o.label != null ? o.label : t(o.labelKey)) : o; }
   function selectField(id, label, options, current) {
+    // A record can hold a value that no longer matches any catalogue label (legacy seed,
+    // renamed entity, restored backup). Without this, the select silently falls back to
+    // the empty option and a later save would wipe or default the stored value.
+    let all = options;
+    if (current && !options.some((o) => optValue(o) === current)) all = [current].concat(options);
     const opts = ['<option value="">' + escapeHtml(t('select_none')) + '</option>']
-      .concat(options.map((o) => '<option value="' + escapeHtml(optValue(o)) + '"' + (optValue(o) === current ? ' selected' : '') + '>' + escapeHtml(optLabel(o)) + '</option>')).join('');
+      .concat(all.map((o) => '<option value="' + escapeHtml(optValue(o)) + '"' + (optValue(o) === current ? ' selected' : '') + '>' + escapeHtml(optLabel(o)) + '</option>')).join('');
     return '<div>' +
       '<label class="mb-1 block text-xs font-semibold text-slate-500">' + label + '</label>' +
       '<select id="' + id + '" class="w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-indigo-300 focus:ring-2 focus:ring-indigo-100">' + opts + '</select>' +
@@ -2276,7 +2357,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
   }
   // Only one document overlay at a time (the print CSS relies on this).
   function openDocOverlay(id, html) {
-    closeManual(); closeGuide(); closePrivacyForm();
+    closeManual(); closeGuide(); closePrivacyForm(); closeNurseSheet();
     const o = document.createElement('div');
     o.id = id;
     o.className = 'fixed inset-0 z-[80] overflow-y-auto bg-slate-100';
@@ -4327,7 +4408,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
         } else {
           // Signed out: stop listening and forget the cloud baseline of the previous session.
           detachRealtimeSync();
-          lastSynced = { nurses: {}, requests: {}, settingsJson: '' };
+          lastSynced = { nurses: {}, requests: {}, settings: emptySettingsBaseline() };
           syncStatus = 'idle'; syncErrorMsg = '';
           render();
         }
@@ -4378,7 +4459,7 @@ const lucide = { createIcons: (opts) => createIcons({ icons: lucideIcons, ...(op
     // Cloud baseline for the per-record merge: everything just read is, by definition, in sync.
     lastSynced.nurses = snapshotMap(state.nurses);
     lastSynced.requests = snapshotMap(state.requests || []);
-    lastSynced.settingsJson = stableJson(state.settings);
+    SETTINGS_COLLECTIONS.forEach((k) => { lastSynced.settings[k] = snapshotMap(state.settings[k]); });
     state.selectedNurseId = state.nurses[0] ? state.nurses[0].id : null;
     // First-run initialization: seed the shared docs (writes succeed only for an admin).
     if (!casesSnap.exists) data.doc('cases').set({ nurses: state.nurses, requests: state.requests || [], updatedAt: serverTs() }, { merge: true }).catch(() => {});
